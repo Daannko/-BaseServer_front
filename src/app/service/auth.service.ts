@@ -12,12 +12,27 @@ export class AuthService {
   constructor(private http: HttpClient) { }
 
   // Function to send a POST request to the server
-  login(username: string, password: string): Observable<any> {
+  login(email: string, password: string): Observable<any> {
     // Prepare the body of the request
     const body = {
-      username: username,
+      email: email,
       password: password
     };
+
+    // Prepare headers if needed
+    const headers = new HttpHeaders({
+      'Content-Type': 'application/json'
+    });
+
+    // Options including headers and credentials
+    // Send POST request to backend
+    return this.http.post<any>(this.apiUrl + 'token', body, {
+      headers,
+    },);
+  }
+
+  test(username: string, password: string): Observable<any> {
+
 
     // Prepare headers if needed
     const headers = new HttpHeaders({
@@ -26,22 +41,9 @@ export class AuthService {
 
     });
 
-    // Options including headers and credentials
-    const options = {
-      headers: headers,
-      withCredentials: true // Important for cookies/authentication
-    };
-
     // Send POST request to backend
-    return this.http.post<any>(this.apiUrl + 'token', body, {
+    return this.http.post(this.apiUrl + "test2",null, {
       headers,
-      withCredentials: true  // Include credentials like cookies
-    },);
-  }
-
-  test(): Observable<any> {
-    // Send POST request to backend
-    return this.http.post(this.apiUrl + "test",null, {
       'responseType': 'text'
     },);
   }

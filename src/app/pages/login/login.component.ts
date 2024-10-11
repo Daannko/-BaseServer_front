@@ -21,7 +21,7 @@ export class LoginComponent {
 
   // Call the login function when the user submits the form
   login() {
-    this.authService.test().subscribe(
+    this.authService.login(this.email,this.password).subscribe(
       response => {
         console.log( response);
       },
