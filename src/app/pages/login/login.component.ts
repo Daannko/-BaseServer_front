@@ -4,11 +4,12 @@ import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { AuthService } from '../../service/auth.service';
+import { RouterModule } from '@angular/router';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [FormsModule],
+  imports: [FormsModule,RouterModule],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
 })
