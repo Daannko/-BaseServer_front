@@ -13,11 +13,9 @@
           <input type="password" [(ngModel)]="password" name="password" class="login-password" required="true" placeholder="Password" />
           <input type="text" [(ngModel)]="name" name="name" class="login-password" required="true" placeholder="Name" />
 
-          <input type="submit" name="Login"(click)="register()" value="Login" class="login-submit" />
+          <input type="submit" name="Register"(click)="register()" value="Register" class="login-submit" />
         </form>
-        <div class="auth-info"> Have an account?
-          <a routerLink="/login" routerLinkActive="active" class="auth-info-link">Login</a>
-        </div>
+        <label class="auth-info" routerLink="/login">Have an account? </label>
 
         <div class="underlay-black"></div>
 

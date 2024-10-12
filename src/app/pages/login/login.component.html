@@ -9,14 +9,15 @@
               <i class="fa fa-lock fa-stack-1x"></i>
             </span>
           </p>
-          <input type="email" [(ngModel)]="email" name="email" class="login-username" autofocus="true" required="true" placeholder="Email" />
-          <input type="password" [(ngModel)]="password" name="password" class="login-password" required="true" placeholder="Password" />
+          <div class = "form-center">
+            <input type="email" [(ngModel)]="email" name="email" class="login-username" autofocus="true" required="true" placeholder="Email" />
+            <input type="password" [(ngModel)]="password" name="password" class="login-password" required="true" placeholder="Password" />
+          </div>
+
 
           <input type="submit" name="Login"(click)="login()" value="Login" class="login-submit" />
         </form>
-        <div class="auth-info"> Need an account?
-          <a routerLink="/register" routerLinkActive="active" class="auth-info-link">Register</a>
-        </div>
+        <label class="auth-info" routerLink="/register">Need an account? </label>
 
 
         <div class="underlay-black"></div>

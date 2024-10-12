@@ -25,12 +25,38 @@
 
 
 
+input {
+
+  ::-webkit-input-placeholder {
+     color: rgba(255,255,255,0.7);
+  }
+  ::-moz-placeholder {
+     color: rgba(255,255,255,0.7);
+  }
+  :-ms-input-placeholder {
+     color: rgba(255,255,255,0.7);
+  }
+  &:focus {
+    outline: 0 transparent solid;
+    ::-webkit-input-placeholder {
+     color: rgba(0,0,0,0.7);
+    }
+    ::-moz-placeholder {
+       color: rgba(0,0,0,0.7);
+    }
+    :-ms-input-placeholder {
+       color: rgba(0,0,0,0.7);
+    }
+  }
+}
+
+
 .login-form {
   /* //background: #222;
   //box-shadow: 0 0 1rem rgba(0,0,0,0.3); */
   min-height: 10rem;
   margin: auto;
-  max-width: 70%;
+  max-width: 80%;
   padding: .5rem;
 }
 .login-text {
@@ -50,6 +76,7 @@
 
 .login-username, .login-password {
   background: transparent;
+  border-radius: 20px;
   border: 0 solid;
   border-bottom: 5px solid rgba(white, .5);
   color: white;
@@ -87,6 +114,7 @@
 
 .login-submit {
   border: 0;
+  border-radius: 20px;
   background: transparent;
   width: 50%;
   color: white;
