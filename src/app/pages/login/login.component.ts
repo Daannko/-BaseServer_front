@@ -5,6 +5,9 @@ import { inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { AuthService } from '../../service/auth.service';
 import { RouterModule } from '@angular/router';
+import {MatSnackBar} from '@angular/material/snack-bar';
+import { CustomSnackbar } from '../../helpers/snackbar';
+import { error } from 'console';
 
 @Component({
   selector: 'app-login',
@@ -18,14 +21,18 @@ export class LoginComponent {
   email: string = '';
   password: string = '';
 
-  constructor(private authService: AuthService) { }
+  constructor(private authService: AuthService,private snackBar: CustomSnackbar) { }
 
   // Call the login function when the user submits the form
   login() {
-    this.authService.login(this.email,this.password).subscribe(
-      response => {
-        console.log( response);
+    this.authService.login(this.email,this.password).subscribe({
+      next: (res:any) => {
+        this.snackBar.success("Success");
       },
+      error: (error:any) => {
+        this.snackBar.error("Failed to login");
+      }
+    }
     );
   }
 

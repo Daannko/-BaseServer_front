@@ -5,3 +5,58 @@ body {
   display: flex;
   overflow: hidden;
 }
+html {
+  display: block;
+  height: 100dvh;
+  padding: 20px;
+  margin: 0;
+  background-image: radial-gradient(
+      circle at 50% 0%,
+      rgb(67, 54, 74) 16.4%,
+      rgb(47, 48, 67) 68.2%,
+      rgb(27, 23, 36) 99.1%
+  );
+}
+
+html, body { height: 100%; }
+body { margin: 0; font-family: Roboto, "Helvetica Neue", sans-serif; }
+
+
+.snackbar-error {
+  .mdc-snackbar__surface {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 12px !important;
+    margin: 0 0 1rem 1rem;
+    border: 1px solid rgba(255, 3, 3, 0.4)
+  }
+
+  .mdc-snackbar__label {
+    color: white !important;
+  }
+}
+
+.snackbar-success {
+  .mdc-snackbar__surface {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 12px !important;
+    margin: 0 0 1rem 1rem;
+    border: 1px solid rgba(0, 255, 0, 0.4)
+  }
+
+  .mdc-snackbar__label {
+    color: white !important;
+  }
+}
+
+.snackbar-custom {
+  .mdc-snackbar__surface {
+    background-color: rgba(0, 0, 0, 0.1) !important;
+    border-radius: 12px !important;
+    margin: 0 0 1rem 1rem;
+    border: 1px solid rgba(255, 255, 255, 0.1)
+  }
+
+  .mdc-snackbar__label {
+    color: white !important;
+  }
+}

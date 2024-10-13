@@ -11,41 +11,36 @@ export class AuthService {
 
   constructor(private http: HttpClient) { }
 
-  // Function to send a POST request to the server
   login(email: string, password: string): Observable<any> {
-    // Prepare the body of the request
     const body = {
       email: email,
       password: password
     };
 
-    // Prepare headers if needed
     const headers = new HttpHeaders({
       'Content-Type': 'application/json'
     });
 
-    // Options including headers and credentials
-    // Send POST request to backend
     return this.http.post<any>(this.apiUrl + 'token', body, {
-      headers,
+      headers
     },);
   }
 
-  test(username: string, password: string): Observable<any> {
+  register(email: string, password: string,name:string): Observable<any> {
+    const body = {
+      email: email,
+      password: password,
+      name: name
+    };
 
-
-    // Prepare headers if needed
     const headers = new HttpHeaders({
       'Content-Type': 'application/json'
-
-
     });
 
-    // Send POST request to backend
-    return this.http.post(this.apiUrl + "test2",null, {
-      headers,
-      'responseType': 'text'
+    return this.http.post<any>(this.apiUrl + 'register', body, {
+      headers
     },);
   }
+
 
 }
