@@ -25,16 +25,18 @@ export class LoginComponent {
 
   // Call the login function when the user submits the form
   login() {
+
     this.authService.login(this.email,this.password).subscribe({
       next: (res:any) => {
+        console.log(res.headers)
         this.snackBar.success("Success");
+        localStorage.setItem("jwt",res.jwt)
+        localStorage.setItem("refresh",res.refreshToken)
       },
       error: (error:any) => {
-        this.snackBar.error("Failed to login");
+        this.snackBar.error(error.error.message);
       }
     }
-    );
+    )
   }
-
-
 }

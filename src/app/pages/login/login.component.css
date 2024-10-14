@@ -110,6 +110,7 @@ input {
 
 .login-submit {
   border: 0;
+  border-radius: 20px;
   background: transparent;
   width: 50%;
   color: white;

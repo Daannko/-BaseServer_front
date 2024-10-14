@@ -1,7 +1,11 @@
-import { HttpInterceptorFn } from '@angular/common/http';
+import { HttpContextToken, HttpInterceptorFn } from '@angular/common/http';
+export const BYPASS_LOG = new HttpContextToken(() => false);
 
 export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
-  debugger;
+  if(BYPASS_LOG){
+    return next(req);
+  }
+
   let jwt = localStorage.getItem('jwt');
   if(jwt){
     req = req.clone({
@@ -10,6 +14,5 @@ export const jwtInterceptor: HttpInterceptorFn = (req, next) => {
       }
     })
   }
-  debugger;
   return next(req);
 };
