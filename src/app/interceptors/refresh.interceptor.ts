@@ -22,6 +22,8 @@ export class HttpRequestInterceptor implements HttpInterceptor {
     private eventService: EventService
   ) {}
 
+
+
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
     req = req.clone({
       withCredentials: true,
@@ -31,7 +33,7 @@ export class HttpRequestInterceptor implements HttpInterceptor {
         if (
           error instanceof HttpErrorResponse &&
           !req.url.includes('auth/signin') &&
-          (error.status === 401 || error.status === 422)
+          (error.status === 401 || error.status === 462)
         ) {
           return this.handle401Error(req, next);
         }
@@ -43,7 +45,6 @@ export class HttpRequestInterceptor implements HttpInterceptor {
 
   private handle401Error(request: HttpRequest<any>, next: HttpHandler) {
     if (!this.isRefreshing) {
-      debugger;
       this.isRefreshing = true;
       if (this.storageService.isLoggedIn()) {
         return this.authService.refresh().pipe(
@@ -55,7 +56,7 @@ export class HttpRequestInterceptor implements HttpInterceptor {
           catchError((error) => {
             this.isRefreshing = false;
 
-            if (error.status == '403') {
+            if (error.status == '462') {
               this.eventService.emit(new EventData('logout', null));
             }
 

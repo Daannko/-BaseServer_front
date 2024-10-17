@@ -1,4 +1,4 @@
-@import url(https://fonts.googleapis.com/css?family=Open+Sans:100,300,400,700);
+
 @import url(//netdna.bootstrapcdn.com/font-awesome/4.0.3/css/font-awesome.css);
 
 
@@ -125,11 +125,17 @@ input {
   font-size: 1rem;
   padding: .25rem;
   transition: 250ms background ease-in;
-  &:hover, &:focus {
-    background: rgba(116, 116, 116, 0.363);
-    color: rgb(255, 255, 255);
-    transition: 250ms background ease-in;
-  }
+}
+
+.login-submit:hover{
+  background: rgba(116, 116, 116, 0.363);
+  color: rgb(255, 255, 255);
+  transition: 250ms background ease-in;
+}
+
+/* Remove focus outline */
+.login-submit:focus {
+  outline: none;
 }
 
 
