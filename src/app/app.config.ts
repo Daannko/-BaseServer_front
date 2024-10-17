@@ -3,14 +3,16 @@ import { provideRouter } from '@angular/router';
 
 import { routes } from './app.routes';
 import { provideClientHydration } from '@angular/platform-browser';
-import { provideHttpClient, withFetch, withInterceptors} from '@angular/common/http';
+import { HTTP_INTERCEPTORS, provideHttpClient, withFetch, withInterceptors, withInterceptorsFromDi} from '@angular/common/http';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { jwtInterceptor } from './interceptors/jwt.interceptor';
+import { httpInterceptorProviders, HttpRequestInterceptor } from './interceptors/refresh.interceptor';
 
 export const appConfig: ApplicationConfig = {
   providers: [provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(routes),
      provideClientHydration(),
-     provideHttpClient(withFetch(),withInterceptors([jwtInterceptor])),
+     provideHttpClient(withFetch(),withInterceptorsFromDi()),
+     httpInterceptorProviders,
     provideAnimationsAsync(), provideAnimationsAsync()]
+
 };

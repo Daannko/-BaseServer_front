@@ -3,6 +3,8 @@ import { FormsModule } from '@angular/forms';
 import { AuthService } from '../../service/auth.service';
 import { Router, RouterModule } from '@angular/router';
 import { MatSnackBar } from '@angular/material/snack-bar';
+import { CustomSnackbar } from '../../helpers/snackbar';
+import { timeout } from 'rxjs';
 
 @Component({
   selector: 'app-register',
@@ -16,23 +18,16 @@ export class RegisterComponent {
   password: string = '';
   name:string = '';
 
-  constructor(private authService: AuthService,private router: Router,private snackBar: MatSnackBar) { }
+  constructor(private authService: AuthService,private router: Router,private snackBar: CustomSnackbar) { }
 
   register() {
-    this.authService.register(this.email,this.password,this.name).subscribe(
-      (response) => {
-        this.snackBar.open('Success', 'Close', {
-          duration: 2000, // Set the duration in milliseconds
-          horizontalPosition: 'start',
-          verticalPosition: 'bottom',
-          panelClass: ['snackbar-success']
-        });
-        setTimeout(() => this.router.navigate(["/login"]), 2000)
+    this.authService.register(this.email,this.password,this.name).subscribe({
+      next:() => {
+        this.snackBar.success("Success")
+        setTimeout(()=> this.router.navigate(['/login']),2000)
       },
-      (error) => {
-        console.log(error)
-      }
-    );
+      error:(error) => this.snackBar.error(error)
+    })
   }
 
 }

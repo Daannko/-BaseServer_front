@@ -2,12 +2,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { inject } from '@angular/core';
-import { Observable } from 'rxjs';
+import { catchError, Observable, of, switchMap } from 'rxjs';
 import { AuthService } from '../../service/auth.service';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
 import {MatSnackBar} from '@angular/material/snack-bar';
 import { CustomSnackbar } from '../../helpers/snackbar';
 import { error } from 'console';
+import { UserService } from '../../service/user.service';
 
 @Component({
   selector: 'app-login',
@@ -21,22 +22,17 @@ export class LoginComponent {
   email: string = '';
   password: string = '';
 
-  constructor(private authService: AuthService,private snackBar: CustomSnackbar) { }
+  constructor(private authService: AuthService,private snackBar: CustomSnackbar,private router:Router) { }
 
   // Call the login function when the user submits the form
   login() {
-
     this.authService.login(this.email,this.password).subscribe({
-      next: (res:any) => {
-        console.log(res.headers)
-        this.snackBar.success("Success");
-        localStorage.setItem("jwt",res.jwt)
-        localStorage.setItem("refresh",res.refreshToken)
-      },
-      error: (error:any) => {
-        this.snackBar.error(error.error.message);
+        next: (data) => {
+          this.snackBar.success("Successfuly logged in")
+          this.router.navigate(['/'])
+        },
+        error: (error) => console.log(error),
       }
-    }
     )
   }
 }
