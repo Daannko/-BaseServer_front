@@ -25,10 +25,9 @@ export class HttpRequestInterceptor implements HttpInterceptor {
 
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    if(req.url.includes('geolocation-db.com/json/') ){
+    if(req.url.includes('geolocation-db.com/json/') || req.url.includes('api.tomorrow.io/v4/') ){
       return next.handle(req)
     }
-    debugger
     req = req.clone({
       withCredentials: true,
     });

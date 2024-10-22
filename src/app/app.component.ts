@@ -5,7 +5,7 @@ import { StorageService } from './service/storage.service';
 import { error } from 'console';
 import { switchMap,of, catchError, tap, Subscription } from 'rxjs';
 import { UserService } from './service/user.service';
-import e from 'express';
+import e, { Router } from 'express';
 import { EventService } from './service/event.service';
 
 @Component({
@@ -33,12 +33,6 @@ export class AppComponent {
   eventSub?: Subscription;
 
   ngOnInit(): void {
-    this.getData = this.storageService.isLoggedIn();
-    this.authService.checkSession()
-    .subscribe(data =>{
-      console.log("Check Session go brrrrr: "+ data)
-    })
-
   this.eventSub = this.eventService.on('logout', () => {
     this.logout();
   });
@@ -47,7 +41,7 @@ export class AppComponent {
 
 
   logout():void{
-    localStorage.clear()
+    this.authService.logout();
   }
 
 

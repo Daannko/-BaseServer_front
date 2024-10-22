@@ -5,12 +5,14 @@ import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { RegisterComponent } from './pages/register/register.component';
 import { authGuard } from './guards/auth.guard';
 import { HomeComponent } from './pages/home/home.component';
+import { LogoutComponent } from './helpers/logout';
 
 
 export const routes: Routes = [
 
   {path: 'login',component: LoginComponent},
   {path: 'register',component: RegisterComponent},
+  {path: 'logout', component: LogoutComponent},
   {path:'', component: HomeComponent,
     children:[
       {path:'dashboard',

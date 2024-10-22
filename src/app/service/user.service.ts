@@ -25,7 +25,7 @@ export class UserService {
  }
 
  getWeather(lat:string,lon:string) {
-  return this.http.get<any>(`https://api.tomorrow.io/v4/weather/forecast?location=${lat},${lon}&apikey=${environment.tomorrowApiKey}`)
+  return this.http.get<any>(`https://api.tomorrow.io/v4/weather/realtime?location=${lat},${lon}&apikey=${environment.tomorrowApiKey}`)
 }
 
 }

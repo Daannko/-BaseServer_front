@@ -15,7 +15,11 @@ export class AuthService {
   private apiUrl = 'http://localhost:8080/auth/';
   private validSession = false;
 
-  constructor(private http: HttpClient) {}
+  constructor(
+    private http: HttpClient,
+    private router:Router,
+    private snackBar:CustomSnackbar
+  ) {}
 
   refresh(options?:any): Observable<any>{
     return this.http.get<any>(this.apiUrl + "refresh", options)
@@ -68,4 +72,12 @@ export class AuthService {
     },);
   }
 
+  logout(){
+    window.sessionStorage.clear()
+    localStorage.clear()
+    this.http.get<any>(this.apiUrl + 'logout' ).subscribe({
+      complete:()=> this.router.navigate(['/login'])
+    });
+    this.snackBar.success("Successfuly loged out")
+  }
 }

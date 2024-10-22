@@ -25,6 +25,15 @@ export class LoginComponent {
     private router:Router) { }
 
   ngOnInit(): void {
+    if(!this.authService.isSessionValid()){
+      this.authService.checkSession()
+      .subscribe({
+        next:(data)=>{
+            console.log("Check Session go brrrrr: "+ data)
+        },
+      })
+    }
+
     this.loginForm = new FormGroup({
       email: new FormControl('',[Validators.required,Validators.email]),
       password: new FormControl('',[Validators.required])
