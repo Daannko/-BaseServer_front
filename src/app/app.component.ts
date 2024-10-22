@@ -33,22 +33,15 @@ export class AppComponent {
   eventSub?: Subscription;
 
   ngOnInit(): void {
-    console.log(this.value++)
     this.getData = this.storageService.isLoggedIn();
-    this.authService.refresh().pipe(
-      switchMap((res:any) => this.userService.getUserData()),
-      catchError(errorForFirstOrSecondCall => {
-        this.logout()
-        console.error('An error occurred: ', errorForFirstOrSecondCall);
-        throw new Error('Error: ' + errorForFirstOrSecondCall.message);
-      }))
-      .subscribe(data =>
-         this.storageService.saveUser(data)
-      )
+    this.authService.checkSession()
+    .subscribe(data =>{
+      console.log("Check Session go brrrrr: "+ data)
+    })
 
-      this.eventSub = this.eventService.on('logout', () => {
-        this.logout();
-      });
+  this.eventSub = this.eventService.on('logout', () => {
+    this.logout();
+  });
 
   }
 

@@ -33,29 +33,8 @@ ngOnInit(): void {
 
 }
 
-validate():boolean{
-  Object.keys(this.registrationForm.controls).reverse().forEach(key => {
-    const controlErrors = this.registrationForm.get(key)?.errors
-    if (controlErrors != null)
-      Object.keys(controlErrors).forEach(keyError => {
-        if(keyError === 'required'){
-          var name = key.charAt(0).toLocaleUpperCase() + key.slice(1)
-          this.snackBar.error(`${name} is required`)
-        } else if(keyError === 'email'){
-          this.snackBar.error(`Email have to ba an actuall email :)`)
-        } else if(keyError === 'minlength'){
-          this.snackBar.error(`Password have to be min 8 characters long`)
-        }
-        return false;
-      })});
-  return this.registrationForm.valid;
-}
-
   register() {
-    if(!this.validate){
-      return
-    }
-
+    if(!this.validate) return
     this.authService.register(this.email,this.password,this.name).subscribe({
       next:() => {
         this.snackBar.success("Success")
@@ -65,9 +44,30 @@ validate():boolean{
     })
   }
 
-  checkInputFileds(){
 
+validate():boolean{
+    Object.keys(this.registrationForm.controls).reverse().forEach(key => {
+      const controlErrors = this.registrationForm.get(key)?.errors
+      if (controlErrors != null){
+        Object.keys(controlErrors).forEach(keyError => {
+          if(keyError === 'required'){
+            var name = key.charAt(0).toLocaleUpperCase() + key.slice(1)
+            this.snackBar.error(`${name} is required`)
+            return false;
+          } else if(keyError === 'email'){
+            this.snackBar.error(`Email have to ba an actuall email :)`)
+            return false;
+          } else if(keyError === 'minlength'){
+            this.snackBar.error(`Password have to be min 8 characters long`)
+            return false;
+          }
+          return false;
+        })
+      }
+    });
+    return this.registrationForm.valid;
   }
+
 
 }
 

@@ -1,30 +1,29 @@
-<div class="outer">
-  <div class="middle">
-    <div class="inner">
-      <div class="parent">
-        <form class="login-form" [formGroup]="loginForm">
-          <p class="login-text">
-            <span class="fa-stack fa-lg">
-              <i class="fa fa-circle fa-stack-2x"></i>
-              <i class="fa fa-lock fa-stack-1x"></i>
-            </span>
-          </p>
-          <div class = "form-center" >
-            <input type="email" [(ngModel)]="email" formControlName="email" name="email" class="login-username" autofocus="true" required="true" value="user@user.com" placeholder="Email" />
-            <input type="password" [(ngModel)]="password" formControlName="password" name="password" class="login-password" required="true" value="pass" placeholder="Password" />
-          </div>
+<body>
+  <script>0</script>
+  <div class="outer">
+    <div class="middle">
+      <div class="inner">
+        <div class="parent">
+          <form class="login-form" [formGroup]="loginForm">
+            <p class="login-text">
+              <span class="fa-stack fa-lg">
+                <i class="fa fa-circle fa-stack-2x"></i>
+                <i class="fa fa-lock fa-stack-1x"></i>
+              </span>
+            </p>
+            <div class = "form-center" >
+              <input type="email" [(ngModel)]="email" formControlName="email" name="email" class="login-username" autofocus="true" required="true" value="user@user.com" placeholder="Email" />
+              <input type="password" [(ngModel)]="password" formControlName="password" name="password" class="login-password" required="true" value="pass" placeholder="Password" />
+            </div>
 
-
-          <input type="submit" name="Login"(click)="login()" value="Login" class="login-submit" />
-        </form>
-        <label class="auth-info" routerLink="/register">Need an account? </label>
-
-
-        <div class="underlay-black"></div>
-
+            <input type="submit" name="Login"(click)="login()" value="Login" class="login-submit" />
+          </form>
+          <label class="auth-info" routerLink="/register">Need an account? </label>
+        </div>
       </div>
     </div>
   </div>
-</div>
+
+</body>
 
 

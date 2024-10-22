@@ -1,9 +1,10 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpContext, HttpContextToken, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Observable, of, from, throwError, map, catchError, tap, lastValueFrom } from 'rxjs';
+import { Observable, of, from, throwError, map, catchError, tap, lastValueFrom, finalize } from 'rxjs';
 import { error } from 'node:console';
 import { Router } from '@angular/router';
 import { CustomSnackbar } from '../helpers/snackbar';
+import { response } from 'express';
 
 @Injectable({
   providedIn: 'root'
@@ -12,15 +13,23 @@ export class AuthService {
 
 
   private apiUrl = 'http://localhost:8080/auth/';
+  private validSession = false;
 
   constructor(private http: HttpClient) {}
 
-  refresh(): Observable<any>{
-    return this.http.get<any>(this.apiUrl + "refresh")
+  refresh(options?:any): Observable<any>{
+    return this.http.get<any>(this.apiUrl + "refresh", options)
+  }
+
+  isSessionValid():boolean{
+    return this.validSession;
   }
 
   checkSession() : Observable<any>{
-    return this.http.get(this.apiUrl + "session")
+    return this.refresh({ observe: 'response' }).pipe(
+      tap((response:any) => {
+        this.validSession = response.status > 199 && response.status < 300
+      }))
   }
 
   login(email: string, password: string): Observable<boolean> {
@@ -33,10 +42,14 @@ export class AuthService {
       'Content-Type': 'application/json',
     });
 
-    return this.http.post<any>(this.apiUrl + 'token', body, {
-      headers,
-      withCredentials: true
+    return this.http.post<any>(this.apiUrl + 'login', body, {
+      headers
     })
+    .pipe(
+      tap((response:any) => {
+        if(response != null)
+          this.validSession = response.status > 199 && response.status < 300
+    }))
   }
 
   register(email: string, password: string,name:string): Observable<any> {
@@ -51,25 +64,8 @@ export class AuthService {
     });
 
     return this.http.post<any>(this.apiUrl + 'register', body, {
-      headers,
-      withCredentials: true,
+      headers
     },);
   }
-
-  getClientIP() : void {
-     this.http.get<any>('https://geolocation-db.com/json/',{
-     })
-    .subscribe(
-    {
-      next: (response:any) => {
-
-        localStorage.setItem("ClientIP", response.IPv4)
-      }
-
-    })
-
-  }
-
-
 
 }

@@ -25,6 +25,10 @@ export class HttpRequestInterceptor implements HttpInterceptor {
 
 
   intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
+    if(req.url.includes('geolocation-db.com/json/') ){
+      return next.handle(req)
+    }
+    debugger
     req = req.clone({
       withCredentials: true,
     });

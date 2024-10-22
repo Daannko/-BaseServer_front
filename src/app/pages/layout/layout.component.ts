@@ -1,4 +1,6 @@
 import { Component } from '@angular/core';
+import { StorageService } from '../../service/storage.service';
+import { ActivatedRoute } from '@angular/router';
 
 @Component({
   selector: 'app-layout',
@@ -8,5 +10,17 @@ import { Component } from '@angular/core';
   styleUrl: './layout.component.css'
 })
 export class LayoutComponent {
+
+
+  constructor(private storageService: StorageService,private route: ActivatedRoute){}
+
+
+  private loading = true;
+  user : any;
+
+  ngOnInit(): void {
+    this.user = this.storageService.getUser()['name'];
+  }
+
 
 }

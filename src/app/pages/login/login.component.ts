@@ -27,14 +27,14 @@ export class LoginComponent {
   ngOnInit(): void {
     this.loginForm = new FormGroup({
       email: new FormControl('',[Validators.required,Validators.email]),
-      password: new FormControl('',[Validators.required,Validators.minLength(8)])
+      password: new FormControl('',[Validators.required])
     })
   }
 
-  validate(): boolean{
+  validate():boolean{
     Object.keys(this.loginForm.controls).reverse().forEach(key => {
       const controlErrors = this.loginForm.get(key)?.errors
-      if (controlErrors != null)
+      if (controlErrors != null){
         Object.keys(controlErrors).forEach(keyError => {
           if(keyError === 'required'){
             var name = key.charAt(0).toLocaleUpperCase() + key.slice(1)
@@ -43,14 +43,14 @@ export class LoginComponent {
           } else if(keyError === 'email'){
             this.snackBar.error(`Email have to ba an actuall email :)`)
             return false;
-          } else if(keyError === 'minlength'){
-            this.snackBar.error(`Password have to be min 8 characters long`)
-            return false;
           }
           return false;
-        })});
+        })
+      }
+    });
     return this.loginForm.valid;
   }
+
 
   login() {
     if(!this.validate()){
@@ -62,6 +62,7 @@ export class LoginComponent {
           this.router.navigate(['/'])
         },
         error: (error) => {
+          console.log(error)
           this.snackBar.error(error.error.message)
         },
       }

@@ -139,19 +139,3 @@ input {
 }
 
 
-
-
-[class*=underlay] {
-  left: 0;
-  min-height: 100%;
-  min-width: 100%;
-  position: fixed;
-  top: 0;
-}
-
-.underlay-black {
-  background: rgba(0,0,0,0.7);
-  z-index: -1;
-}
-
-

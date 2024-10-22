@@ -1,0 +1,41 @@
+
+.clock{
+  font-family:  "Rubik", sans-serif;
+  text-shadow: 2px 2px 2px rgba(black, 0.1);
+  color: white;
+  font-size: 6em;
+}
+
+.date{
+  font-family:  "Rubik", sans-serif;
+  text-shadow: 2px 2px 2px rgba(black, 0.1);
+  color: white;
+  font-size: 1em;
+
+
+}
+
+.dateInfo{
+  padding-left: 5rem;
+  text-align: right;
+  width: 15rem;
+}
+
+
+#scrollable{
+  width: 100vw;
+  height: 1000px;
+  overflow-y:auto
+
+}
+
+#content{
+  height: 3000px;
+  width: 100%;
+  background: rgb(0,0,0);
+  background: -moz-linear-gradient(0deg, rgba(0,0,0,0.8743698162858894) 0%, rgba(0,0,0,0.6418768190870099) 5%, rgba(117,82,32,0) 50%, rgba(252,176,69,0) 100%);
+  background: -webkit-linear-gradient(0deg, rgba(0,0,0,0.8743698162858894) 0%, rgba(0,0,0,0.6418768190870099) 5%, rgba(117,82,32,0) 50%, rgba(252,176,69,0) 100%);
+  background: linear-gradient(0deg, rgba(0,0,0,0.8743698162858894) 0%, rgba(0,0,0,0.6418768190870099) 5%, rgba(117,82,32,0) 50%, rgba(252,176,69,0) 100%);
+  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#000000",endColorstr="#fcb045",GradientType=1);
+}
+
