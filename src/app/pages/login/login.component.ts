@@ -25,11 +25,12 @@ export class LoginComponent {
     private router:Router) { }
 
   ngOnInit(): void {
-    if(!this.authService.isSessionValid()){
+    if(this.authService.getFirstLogin()){
       this.authService.checkSession()
       .subscribe({
         next:(data)=>{
             console.log("Check Session go brrrrr: "+ data)
+            this.router.navigate(["/"])
         },
       })
     }

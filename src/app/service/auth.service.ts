@@ -13,7 +13,7 @@ export class AuthService {
 
 
   private apiUrl = 'http://localhost:8080/auth/';
-  private validSession = false;
+  private firstLogin= true;
 
   constructor(
     private http: HttpClient,
@@ -25,15 +25,14 @@ export class AuthService {
     return this.http.get<any>(this.apiUrl + "refresh", options)
   }
 
-  isSessionValid():boolean{
-    return this.validSession;
+  public getFirstLogin():boolean{
+    return this.firstLogin;
   }
 
+
+
   checkSession() : Observable<any>{
-    return this.refresh({ observe: 'response' }).pipe(
-      tap((response:any) => {
-        this.validSession = response.status > 199 && response.status < 300
-      }))
+    return this.refresh({ observe: 'response' })
   }
 
   login(email: string, password: string): Observable<boolean> {
@@ -49,11 +48,6 @@ export class AuthService {
     return this.http.post<any>(this.apiUrl + 'login', body, {
       headers
     })
-    .pipe(
-      tap((response:any) => {
-        if(response != null)
-          this.validSession = response.status > 199 && response.status < 300
-    }))
   }
 
   register(email: string, password: string,name:string): Observable<any> {
@@ -75,6 +69,7 @@ export class AuthService {
   logout(){
     window.sessionStorage.clear()
     localStorage.clear()
+    this.firstLogin = false;
     this.http.get<any>(this.apiUrl + 'logout' ).subscribe({
       complete:()=> this.router.navigate(['/login'])
     });

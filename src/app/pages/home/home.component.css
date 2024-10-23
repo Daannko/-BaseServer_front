@@ -1,6 +1,10 @@
 
+.spacer{
+
+  height: 10rem;
+}
+
 .clock{
-  font-family:  "Rubik", sans-serif;
   text-shadow: 2px 2px 2px rgba(black, 0.1);
   color: white;
   font-size: 6em;
