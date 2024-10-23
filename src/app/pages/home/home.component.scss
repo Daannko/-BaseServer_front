@@ -1,7 +1,18 @@
 
 .spacer{
-
   height: 10rem;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(2, 1fr);
+  grid-column-gap: 0px;
+  grid-row-gap: 0px;
+}
+.up-right{
+  grid-area:  1 / 2 / 2 / 3;
+  width: auto;
+  margin-left: auto;
+  margin-right: 1rem;
+  margin-top: 1rem;
 }
 
 .clock{
@@ -11,7 +22,6 @@
 }
 
 .date{
-
   font-family:  "Rubik", sans-serif;
   text-shadow: 2px 2px 2px rgba(black, 0.1);
   color: white;
@@ -42,4 +52,23 @@
   background: linear-gradient(0deg, rgba(0,0,0,0.8743698162858894) 0%, rgba(0,0,0,0.6418768190870099) 5%, rgba(117,82,32,0) 50%, rgba(252,176,69,0) 100%);
   filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#000000",endColorstr="#fcb045",GradientType=1);
 }
+
+.loggout-button{
+  border: none;
+  background-color: none;
+  box-shadow: none;
+  backdrop-filter: none;
+  border-radius: 100px;
+
+  /* "to left" / "to right" - affects initial color */
+  background: linear-gradient(to left, transparent 50%,  rgba(white, 0.2) 50%) right;
+  background-size: 300%;
+  transition: .5s ease-out;
+
+  &:hover{
+    background-position: left;
+    }
+
+}
+
 

@@ -10,7 +10,7 @@ import { CustomSnackbar } from '../../helpers/snackbar';
   imports: [RouterModule,        FormsModule,
     ReactiveFormsModule],
   templateUrl: './register.component.html',
-  styleUrl: './register.component.css'
+  styleUrl: './register.component.scss'
 })
 export class RegisterComponent {
   email: string = '';

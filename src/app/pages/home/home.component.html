@@ -1,7 +1,9 @@
 <div id="scrollable">
   <div id="content">
     <div class="spacer">
-      <button class="loggout-button" (click)="logout()">Log out</button>
+      <div class="up-right">
+        <button class="glass-button loggout-button" (click)="logout()">Log out</button>
+      </div>
     </div>
     <div class="dateInfo">
       <div class="clock">{{dateTime | date:'H:mm'}}</div>
@@ -12,7 +14,5 @@
       </div>
     </div>
   </div>
-
-
 
 </div>

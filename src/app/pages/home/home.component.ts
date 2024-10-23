@@ -1,4 +1,4 @@
-import { Component, inject } from '@angular/core';
+import { Component, HostListener, inject, OnInit } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { StorageService } from '../../service/storage.service';
 import { CommonModule, DatePipe } from '@angular/common';
@@ -12,10 +12,10 @@ import { AuthService } from '../../service/auth.service';
   standalone: true,
   imports: [CommonModule ],
   templateUrl: './home.component.html',
-  styleUrl: './home.component.css',
+  styleUrl: './home.component.scss',
   providers: [DatePipe]
 })
-export class HomeComponent {
+export class HomeComponent implements OnInit {
 
 
   constructor(
@@ -26,7 +26,8 @@ export class HomeComponent {
   ){
     setInterval(() => this.dateTime = new Date())
   }
-  private loading = true;
+
+  scrollPosition: number = 0;
   user : any;
   location:any;
   dateTime!: Date;
@@ -34,7 +35,6 @@ export class HomeComponent {
 
   ngOnInit(): void {
     this.user = this.storageService.getUser();
-
     if(!this.user){
       this.logout()
     }
@@ -43,11 +43,13 @@ export class HomeComponent {
     if(this.location == null){
       this.userService.getClientIP().subscribe({
         next: (data) => {
+          debugger;
           this.location = data;
           this.storageService.saveLocation(data);
-
+          this.weather$ = this.userService.getWeather(this.location.latitude,this.location.longitude)
         },
         error:(error) =>{
+          debugger;
           this.snackBar.info("Could not get user location")
         }
       })
@@ -59,6 +61,13 @@ export class HomeComponent {
 
   logout(){
    this.router.navigate(['../logout'])
+  }
+
+
+  @HostListener('window:scroll', [])
+  onWindowScroll() {
+    this.scrollPosition = window.pageYOffset || document.documentElement.scrollTop || document.body.scrollTop || 0;
+    console.log('Scroll Position: ', this.scrollPosition);
   }
 
 }
