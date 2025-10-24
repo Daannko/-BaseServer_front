@@ -1,0 +1,77 @@
+<div class="outer">
+  <div class="middle">
+    <div *ngIf="isLoginPage; else registrationBlock">
+      <form class="auth-form" [class.leaving]="leavingLogin" [formGroup]="loginForm">
+        <div class="auth-header">
+          <h1>Welcome</h1>
+          <p>Please sign in to continue</p>
+        </div>
+        
+        <div class="form-center">
+          <div class="input-group">
+            <input type="email" [(ngModel)]="email" formControlName="email" 
+                   class="auth-input" autofocus required 
+                   placeholder="Email" />
+          </div>
+          
+          <div class="input-group">
+            <input type="password" [(ngModel)]="password" formControlName="password" 
+                   class="auth-input" required 
+                   placeholder="Password" />
+          </div>
+          <button type="submit" (click)="login()" class="auth-submit">
+            Sign In
+          </button>
+  
+          <div class="auth-info-container">
+            <span class="auth-info" (click)="changeAuthForm()">
+              Don't have an account? <span class="auth-link">Sign up</span>
+            </span>
+          </div>
+        </div>
+        
+      </form> 
+    </div>
+    
+    <ng-template #registrationBlock>
+      <form class="auth-form registration-form" [class.leaving]="leavingRegistration" [formGroup]="registrationForm">
+        <div class="auth-header">
+          <h1>Create Account</h1>
+          <p>Please fill in your details</p>
+        </div>
+        
+        <div class="form-center">
+          <div class="input-group">
+            <input type="text" [(ngModel)]="name" formControlName="name" 
+                   class="auth-input" required 
+                   placeholder="Name" />
+          </div>
+  
+          <div class="input-group">
+            <input type="email" [(ngModel)]="email" formControlName="email" 
+                   class="auth-input" required 
+                   placeholder="Email" />
+          </div>
+          
+          <div class="input-group">
+            <input type="password" [(ngModel)]="password" formControlName="password" 
+                   class="auth-input" required 
+                   placeholder="Password" />
+          </div>
+        </div>
+  
+        <button type="submit" (click)="register()" class="auth-submit">
+          Create Account
+        </button>
+        
+        <div class="auth-info-container">
+          <span class="auth-info" (click)="changeAuthForm()">
+            Already have an account? <span class="auth-link">Sign in</span>
+          </span>
+        </div>
+      </form>
+    </ng-template>
+  </div>
+</div>
+
+

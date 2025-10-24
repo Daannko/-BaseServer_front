@@ -1,18 +1,27 @@
+<app-navbar [isClockVisible]="isClockVisible" [isLogoutVisible]="true"></app-navbar>
 <div id="scrollable">
   <div id="content">
-    <div class="spacer">
-      <div class="up-right">
-        <button class="glass-button loggout-button" (click)="logout()">Log out</button>
-      </div>
-    </div>
-    <div class="dateInfo">
+    <div  #clockElement class="dateInfo">
+      <div class="date-time-container">
       <div class="clock">{{dateTime | date:'H:mm'}}</div>
       <br>
-      <div class="date" *ngIf="(weather$ | async) as weather" >{{dateTime | date:'fullDate'}}</div>
+      <div class="date">{{dateTime | date:'fullDate'}}</div>
       <div class="date" *ngIf="(weather$ | async) as weather">
         {{location.city}} {{ weather.data.values.temperature | number:'1.0-0' }} °C
       </div>
+
+      </div>
+
     </div>
+
+    <!-- GRID Here -->
+    <div class="grid-container">
+      <div class="grid-item" *ngFor="let item of gridItems">
+        {{ item }}
+      </div>
+    </div>
+
   </div>
+  
 
 </div>

@@ -1,24 +1,22 @@
-
-.spacer{
-  height: 10rem;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  grid-template-rows: repeat(2, 1fr);
-  grid-column-gap: 0px;
-  grid-row-gap: 0px;
-}
-.up-right{
-  grid-area:  1 / 2 / 2 / 3;
-  width: auto;
-  margin-left: auto;
-  margin-right: 1rem;
-  margin-top: 1rem;
-}
-
 .clock{
+  display: inline-block;
   text-shadow: 2px 2px 2px rgba(black, 0.1);
   color: white;
-  font-size: 6em;
+  font-size: 5rem;
+  margin-left: 0;
+}
+
+.weather{
+  margin-left: 1rem;
+  display: inline-block;
+  text-align: right;
+  color: white;
+  font-size: 1em;
+}
+
+.date-time-container{
+  text-align: right;
+  padding-right: 3.5rem;
 }
 
 .date{
@@ -26,12 +24,13 @@
   text-shadow: 2px 2px 2px rgba(black, 0.1);
   color: white;
   font-size: 1em;
+  margin-left: 5rem;
 }
 
 .dateInfo{
-  text-align: right;
-  padding-left: 5rem;
-  width: 15rem;
+  padding-top: 5rem;
+  text-align: center;
+  width: 100%;
   white-space: nowrap;
 }
 
@@ -39,36 +38,50 @@
 #scrollable{
   width: 100vw;
   height: 1000px;
-  overflow-y:auto
+  overflow-y: scroll; 
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 
+  &::-webkit-scrollbar {
+    display: none; 
+  }
 }
 
 #content{
-  height: 3000px;
   width: 100%;
-  background: rgb(0,0,0);
-  background: -moz-linear-gradient(0deg, rgba(0,0,0,0.8743698162858894) 0%, rgba(0,0,0,0.6418768190870099) 5%, rgba(117,82,32,0) 50%, rgba(252,176,69,0) 100%);
-  background: -webkit-linear-gradient(0deg, rgba(0,0,0,0.8743698162858894) 0%, rgba(0,0,0,0.6418768190870099) 5%, rgba(117,82,32,0) 50%, rgba(252,176,69,0) 100%);
-  background: linear-gradient(0deg, rgba(0,0,0,0.8743698162858894) 0%, rgba(0,0,0,0.6418768190870099) 5%, rgba(117,82,32,0) 50%, rgba(252,176,69,0) 100%);
-  filter: progid:DXImageTransform.Microsoft.gradient(startColorstr="#000000",endColorstr="#fcb045",GradientType=1);
+
 }
 
-.loggout-button{
-  border: none;
-  background-color: none;
-  box-shadow: none;
-  backdrop-filter: none;
-  border-radius: 100px;
+.grid-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 1.5rem;
+  margin: 2rem 0;
+  padding-left: 3rem;
+  padding-right: 3rem;
+}
 
-  /* "to left" / "to right" - affects initial color */
-  background: linear-gradient(to left, transparent 50%,  rgba(white, 0.2) 50%) right;
-  background-size: 300%;
-  transition: .5s ease-out;
+.grid-item {
+  background: rgba(255, 255, 255, 0.18);
+  border-radius: 1.2rem;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+  border: 1px solid rgba(255,255,255,0.25);
+  padding: 2.5rem 2rem;
+  color: #fff;
+  font-size: 1.25rem;
+  transition: background 0.3s, box-shadow 0.3s;
+  word-break: break-word;
+  min-height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(8px);
 
-  &:hover{
-    background-position: left;
-    }
-
+  &:hover {
+    background: rgba(255,255,255,0.28);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.18);
+    border-color: rgba(255,255,255,0.35);
+  }
 }
 
 

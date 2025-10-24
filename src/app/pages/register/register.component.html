@@ -1,17 +1,6 @@
 <div class="outer">
   <div class="middle">
-    <div class="inner">
-      <div class="parent">
-        <form class="login-form" [formGroup]="registrationForm">
-
-            <input type="text" [(ngModel)]="name" name="name" formControlName="name" class="login-password" required="true" placeholder="Name" />
-            <input type="email" [(ngModel)]="email" name="email" formControlName="email" class="login-username" autofocus="true" required="true" placeholder="Email" />
-            <input type="password" [(ngModel)]="password" name="password" formControlName="password" class="login-password" required="true" placeholder="Password" />
-            <input type="submit" name="Register"(click)="register()" value="Register" class="glass-button login-submit" />
-        </form>
-        <label class="auth-info" routerLink="/login">Have an account? </label>
-      </div>
-    </div>
+   
   </div>
 </div>
 

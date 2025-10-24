@@ -48,6 +48,8 @@ export class AuthService {
     return this.http.post<any>(this.apiUrl + 'login', body, {
       headers
     })
+    console.log("login called");
+    console.log(this.apiUrl + 'login');
   }
 
   register(email: string, password: string,name:string): Observable<any> {
@@ -71,7 +73,7 @@ export class AuthService {
     localStorage.clear()
     this.firstLogin = false;
     this.http.get<any>(this.apiUrl + 'logout' ).subscribe({
-      complete:()=> this.router.navigate(['/login'])
+      complete:()=> this.router.navigate(['/auth'])
     });
     this.snackBar.success("Successfuly loged out")
   }

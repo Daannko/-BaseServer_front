@@ -25,13 +25,13 @@ export class authGuard implements CanActivate {
           return true;
         } else {
           console.log("Failed to load user")
-          this.router.navigate(['/login']);
+          this.router.navigate(['/auth']);
           return false;
         }
       }),
       catchError((error) => {
         console.error('Error fetching user data', error);
-        this.router.navigate(['/login']);
+        this.router.navigate(['/auth']);
         return of(false);
       })
     );

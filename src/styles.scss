@@ -1,5 +1,3 @@
-
-
 /* You can add global styles to this file, and also import other style files */
 body {
   display: flex;
@@ -28,27 +26,46 @@ input, h1, h3, a, span {
 
 .snackbar-error {
   .mdc-snackbar__surface {
-    background-color: rgba(0, 0, 0, 0.1) !important;
-    border-radius: 12px !important;
-    margin: 0 0 1rem 1rem;
-    border: 1px solid rgba(255, 3, 3, 0.4)
+    background: rgba(255, 0, 0, 0.1) !important;
+    border: 1px solid rgba(255, 0, 0, 0.4);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(255, 0, 0, 0.2);
+    backdrop-filter: blur(8px);
   }
 
   .mdc-snackbar__label {
     color: white !important;
+    font-weight: 500;
   }
 }
 
 .snackbar-success {
   .mdc-snackbar__surface {
-    background-color: rgba(0, 0, 0, 0.1) !important;
-    border-radius: 12px !important;
-    margin: 0 0 1rem 1rem;
-    border: 1px solid rgba(0, 255, 0, 0.4)
+    background: rgba(0, 255, 0, 0.1) !important;
+    border: 1px solid rgba(0, 255, 0, 0.4);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 255, 0, 0.2);
+    backdrop-filter: blur(8px);
   }
 
   .mdc-snackbar__label {
     color: white !important;
+    font-weight: 500;
+  }
+}
+
+.snackbar-info {
+  .mdc-snackbar__surface {
+    background: rgba(0, 0, 255, 0.1) !important;
+    border: 1px solid rgba(0, 0, 255, 0.4);
+    border-radius: 12px;
+    box-shadow: 0 4px 16px rgba(0, 0, 255, 0.2);
+    backdrop-filter: blur(8px);
+  }
+
+  .mdc-snackbar__label {
+    color: white !important;
+    font-weight: 500;
   }
 }
 
@@ -94,6 +111,27 @@ input, h1, h3, a, span {
   cursor: pointer;
   transition: 250ms background ease-out;
   transition: 250ms border ease-out;
+
+  &:hover{
+    background-color: rgba(white, 0.2);
+    border: 1px solid rgba(white, 0.3);
+    transition: 250ms background ease-in;
+    transition: 250ms border ease-in;
+    }
+  }
+
+  .transparent-glass-button{
+  background-color: transparent;
+  border-radius: 100px;
+  border: 0.5px solid rgba(white, 0.0);
+
+  color: white;
+  font-size: 1rem;
+
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  transition: 1000ms background ease-out;
+  transition: 1000ms border ease-out;
 
   &:hover{
     background-color: rgba(white, 0.2);
