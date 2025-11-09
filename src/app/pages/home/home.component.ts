@@ -7,58 +7,65 @@ import { CustomSnackbar } from '../../helpers/snackbar';
 import { Observable, switchMap, timer } from 'rxjs';
 import { AuthService } from '../../service/auth.service';
 import { NavbarComponent } from "../../helpers/navbar/navbar.component";
+import { PageTileComponent } from '../../helpers/PageTile/page.tile.component';
 
 
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [CommonModule, NavbarComponent],
+  imports: [CommonModule, NavbarComponent, PageTileComponent],
   templateUrl: './home.component.html',
-  styleUrl: './home.component.scss',
+  styleUrls: ['./home.component.scss'],
   providers: [DatePipe]
 })
-export class HomeComponent implements AfterViewInit,OnInit,OnDestroy {
+export class HomeComponent implements AfterViewInit, OnInit, OnDestroy {
 
   constructor(
     private storageService: StorageService,
     private userService: UserService,
     private snackBar: CustomSnackbar,
     private router: Router
-  ){setInterval(() => this.dateTime = new Date())}
+  ) {}
 
   scrollPosition: number = 0;
-  user : any;
-  location:any;
+  user: any;
+  location: any;
   dateTime!: Date;
   weather$!: Observable<any>;
   @ViewChild('clockElement') clockElement!: ElementRef; // Reference to the clock element
   observer!: IntersectionObserver;
   isClockVisible: boolean = false;
-  gridItems: string[] = Array.from({ length: 60 }, (_, i) => `Item ${i + 1}`); // Example grid items
+  gridItems: { name: string; description: string; icon: string, url: string }[] = Array.from({ length: 60 }, (_, i) => ({
+    name: `Name${i}`,
+    description: `Description${i}`,
+    icon: `https://upload.wikimedia.org/wikipedia/en/4/49/Home_Assistant_logo_%282023%29.svg`,
+    url: `../board`
+  }));
 
 
   ngOnInit(): void {
+    this.dateTime = new Date(); // Initialize dateTime
+    setInterval(() => (this.dateTime = new Date()), 1000); // Update dateTime every second
+
     this.user = this.storageService.getUser();
-    if(!this.user){
-      this.logout()
+    if (!this.user) {
+      this.logout();
     }
-    this.location = this.storageService.getLocation()
-    if(this.location == null){
+
+    this.location = this.storageService.getLocation();
+    if (this.location == null) {
       this.userService.getClientIP().subscribe({
         next: (data) => {
-          debugger;
           this.location = data;
           this.storageService.saveLocation(data);
-          this.weather$ = this.userService.getWeather(this.location.latitude,this.location.longitude)
+          this.weather$ = this.userService.getWeather(this.location.latitude, this.location.longitude);
         },
-        error:(error) =>{
-          debugger;
-          this.snackBar.info("Could not get user location")
+        error: () => {
+          this.snackBar.info('Could not get user location');
         }
-      })
-    }
-    else{
-      this.weather$ = this.userService.getWeather(this.location.latitude,this.location.longitude)
+      });
+    } else {
+      this.weather$ = this.userService.getWeather(this.location.latitude, this.location.longitude);
     }
   }
   ngAfterViewInit(): void {
@@ -67,12 +74,9 @@ export class HomeComponent implements AfterViewInit,OnInit,OnDestroy {
   ngOnDestroy() {
     if (this.observer) {
       this.observer.disconnect(); // Cleanup observer on destroy
+      this.observer = null!; // Clear reference
     }
   }
-
-
-
-
 
   setupIntersectionObserver() {
     const options = {
@@ -88,8 +92,7 @@ export class HomeComponent implements AfterViewInit,OnInit,OnDestroy {
     this.observer.observe(this.clockElement.nativeElement);
   }
 
-
-  logout(){
-    this.router.navigate(['../logout'])
-   }
+  logout() {
+    this.router.navigate(['../logout']);
+  }
 }

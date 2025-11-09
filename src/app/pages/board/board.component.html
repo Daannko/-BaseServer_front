@@ -1,0 +1,24 @@
+<div id="background">
+    <app-navbar [isClockVisible]="true" [isLogoutVisible]="true"></app-navbar>
+    <div class="board-container" 
+    #board
+      [ngStyle]="{
+    'background-size': zoom + '%'}"
+    (wheel)="onWheel($event)"
+    > 
+    <p>{{boardX}}</p>
+    <p>{{zoom}}</p>
+    <ng-container *ngFor="let item of items">
+    <div
+        *ngIf="isItemvisible(item)"
+        class="board-item"
+        [style.left.px]="item.x"
+        [style.top.px]="item.y"
+        [style.transform]="'scale(' + item.scale + ')'"
+    >
+        {{item.label}}
+    </div>
+    </ng-container>
+</div>
+</div>
+

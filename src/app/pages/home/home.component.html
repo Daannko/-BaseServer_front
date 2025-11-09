@@ -14,14 +14,11 @@
 
     </div>
 
-    <!-- GRID Here -->
     <div class="grid-container">
       <div class="grid-item" *ngFor="let item of gridItems">
-        {{ item }}
+        <app-page-tile [name]="item.name" [description]="item.description" [icon]="item.icon" [url]="item.url"></app-page-tile>
       </div>
     </div>
-
   </div>
   
-
 </div>

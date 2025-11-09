@@ -1,0 +1,42 @@
+#workspace{
+
+    display: flex;
+    width: 100vw;
+    height: 100vh;
+}
+
+#background{
+    background-color: black;
+}
+
+
+.board-container {
+  width: 100vw; /* Full viewport width */
+  height: 100vh; /* Full viewport height */
+  overflow: hidden; /* Hide overflowing content */
+  position: relative;
+  background-image: url('/pattern2.png');
+  background-repeat: repeat;
+  background-position: 0 0;
+  background-size: auto;
+  background-color: rgba(0,0,0,0.90);
+  background-blend-mode: darken;
+}
+
+p{
+  color: white;
+}
+
+.board-item {
+  position: absolute;
+  width: 100px;
+  height: 50px;
+  background-color: rgba(255, 255, 255, 0.8);
+  border: 1px solid #ccc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}

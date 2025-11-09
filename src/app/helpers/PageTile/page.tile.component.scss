@@ -1,0 +1,66 @@
+.tile {
+  min-height: 11.5rem;
+  padding-left: 1rem;
+  padding-right: 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  border-radius: 16px;
+  cursor: pointer;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  transition:
+    transform 0.3s ease-in-out,
+    box-shadow 0.3s ease-in-out, 
+    background 0.3s ease-in-out;
+
+  background-repeat:no-repeat;
+  background-position: calc(10px) calc(10px);
+  background-size: 10%;
+  
+
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    background: rgba(255, 255, 255, 0.2);
+    background-repeat:no-repeat;
+    background-position: calc(10px) calc(10px);
+    background-size: 10%;
+  }
+
+  .icon {
+    font-size: 3rem;
+    color: rgba(255, 255, 255, 0.8);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: transform 0.3s ease, color 0.3s ease, text-shadow 0.3s ease; /* Smooth transition for scaling, rotation, and color */
+  }
+
+  &:hover .icon {
+    transform: scale(1.2) rotate(10deg); /* Slightly enlarge and rotate the icon */
+    color: rgba(255, 255, 255, 1); /* Brighten the icon color */
+    text-shadow: 0 4px 8px rgba(0, 0, 0, 0.4); /* Enhance the text shadow for a glowing effect */
+  }
+
+  .content h3 {
+    padding-top: 1rem;
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: white;
+    width: 13rem;
+        text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  }
+
+  .content p {
+    height: 100%;
+    font-size: 1rem;
+    color: rgba(255, 255, 255, 0.7);
+  }
+  
+}
