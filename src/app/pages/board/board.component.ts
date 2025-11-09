@@ -1,41 +1,40 @@
-import { booleanAttribute, Component, ElementRef, ViewChild } from '@angular/core';
-import { NavbarComponent } from '../../helpers/navbar/navbar.component';
+import { Component, ElementRef, ViewChild, OnInit, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from "@angular/forms"; // Import CommonModule
+import { FormsModule } from "@angular/forms";
+import { NavbarComponent } from '../../helpers/navbar/navbar.component';
 
 @Component({
   selector: 'app-board',
   standalone: true,
   imports: [CommonModule, NavbarComponent, FormsModule],
   templateUrl: './board.component.html',
-  styleUrl: './board.component.scss'
+  styleUrls: ['./board.component.scss']
 })
-export class BoardComponent {
-@ViewChild('board', { static: true }) boardRef!: ElementRef<HTMLDivElement>;
+export class BoardComponent implements OnInit {
+  @ViewChild('board', { static: true }) boardRef!: ElementRef<HTMLDivElement>;
 
   private isDragging = false;
   private startX = 0;
   private startY = 0;
-  boardX = 0;
-  boardY = 0;
-  scale = 1
+
+  cameraX = 0; // top-left of viewport in world coords
+  cameraY = 0;
   zoom = 1;
 
   items = [
-    { x: 100, y: 100, label: 'Item 1' , scale:1, width: 100, height: 50},
-    { x: 300, y: 200, label: 'Item 2' , scale:1, width: 100, height: 50},
-    { x: 500, y: 400, label: 'Item 3' , scale:1, width: 100, height: 50}
+    { realX: 100, realY: 50, realWidth: 300, realHeight: 150, label: 'Item A', screenX: 0, screenY: 0, width: 0, height: 0 },
+    { realX: 500, realY: 200, realWidth: 400, realHeight: 200, label: 'Item B', screenX: 0, screenY: 0, width: 0, height: 0 },
+    { realX: 1000, realY: 100, realWidth: 250, realHeight: 250, label: 'Item C', screenX: 0, screenY: 0, width: 0, height: 0 },
+    { realX: 150, realY: 500, realWidth: 350, realHeight: 300, label: 'Item D', screenX: 0, screenY: 0, width: 0, height: 0 },
+    { realX: 800, realY: 400, realWidth: 500, realHeight: 100, label: 'Item E', screenX: 0, screenY: 0, width: 0, height: 0 }
   ];
 
   ngOnInit() {
     const board = this.boardRef.nativeElement;
 
-    this.boardX = 0
-    this.boardY = 0
-
     board.addEventListener('mousedown', (event: MouseEvent) => {
       this.isDragging = true;
-      this.startX = event.clientX; // Use the exact mouse position
+      this.startX = event.clientX;
       this.startY = event.clientY;
       board.style.cursor = 'grabbing';
     });
@@ -43,21 +42,18 @@ export class BoardComponent {
     window.addEventListener('mousemove', (event: MouseEvent) => {
       if (!this.isDragging) return;
 
+      // Calculate delta in screen pixels
       const deltaX = event.clientX - this.startX;
       const deltaY = event.clientY - this.startY;
 
-      this.boardX += deltaX;
-      this.boardY += deltaY;
-
-      this.boardRef.nativeElement.style.backgroundPosition = `${this.boardX}px ${this.boardY}px`;
-
-      this.items.forEach(item => {
-        item.x += deltaX;
-        item.y += deltaY;
-      });
+      // Convert delta to world coordinates by dividing by zoom
+      this.cameraX -= deltaX / this.zoom;
+      this.cameraY -= deltaY / this.zoom;
 
       this.startX = event.clientX;
       this.startY = event.clientY;
+
+      this.updateBoard();
     });
 
     window.addEventListener('mouseup', () => {
@@ -65,51 +61,58 @@ export class BoardComponent {
       board.style.cursor = 'grab';
     });
 
+    this.updateBoard();
   }
 
-onWheel(event: WheelEvent) {
-  event.preventDefault(); // Prevent default browser zoom
+  @HostListener('wheel', ['$event'])
+  onWheel(event: WheelEvent) {
+    event.preventDefault();
+    const board = this.boardRef.nativeElement;
+    const rect = board.getBoundingClientRect();
 
-  const zoomChange = event.deltaY < 0 ? 0.1 : -0.1;
-  if (this.zoom + zoomChange < 0.5 || this.zoom + zoomChange > 2) return; // Clamp zoom level
+    const mouseX = event.clientX - rect.left;
+    const mouseY = event.clientY - rect.top;
 
-  const newZoom = this.zoom + zoomChange;
-  const zoomFactor = newZoom / this.zoom;
+    const newZoom = this.zoom + (event.deltaY < 0 ? 0.1 : -0.1);
+    if (newZoom < 0.1 || newZoom > 5) return;
 
-  const board = this.boardRef.nativeElement;
-  const rect = board.getBoundingClientRect();
-  const mouseX = event.clientX - rect.left;
-  const mouseY = event.clientY - rect.top;
+    // Keep mouse position fixed during zoom
+    const worldMouseX = (mouseX / this.zoom) + this.cameraX;
+    const worldMouseY = (mouseY / this.zoom) + this.cameraY;
 
-  // Adjust item positions and scale to keep them relative to the zoom center
-  this.items.forEach(item => {
-    item.x = mouseX + (item.x - mouseX) * zoomFactor;
-    item.y = mouseY + (item.y - mouseY) * zoomFactor;
-    item.scale *= zoomFactor; // Adjust item scale
-  });
+    this.zoom = Math.round(newZoom * 10) / 10;
 
-  // Update the zoom level
-  this.zoom = newZoom;
+    this.cameraX = worldMouseX - (mouseX / this.zoom);
+    this.cameraY = worldMouseY - (mouseY / this.zoom);
 
-  // Apply the zoom to the board background
-  this.boardRef.nativeElement.style.backgroundSize = `${this.zoom * 100}%`;
-  this.boardRef.nativeElement.style.backgroundPosition = 'center';
-}
+    this.updateBoard();
+  }
 
-  isItemvisible(item: { x: number; y: number; scale: number; width: number; height: number }): boolean {
-    const boardWidth = this.boardRef.nativeElement.offsetWidth / this.zoom; // Adjust for zoom level
-    const boardHeight = this.boardRef.nativeElement.offsetHeight / this.zoom; // Adjust for zoom level
+  private updateBoard() {
+    const board = this.boardRef.nativeElement;
 
-    // Adjust visibility check to account for item scale and dimensions
-    const itemWidth = item.width * item.scale;
-    const itemHeight = item.height * item.scale;
+    // Update background scaling
+    board.style.backgroundSize = `scale(${this.zoom})`;
+    board.style.backgroundPosition = `${-this.cameraX}px ${-this.cameraY}px`;
+
+    // Update items positions in screen pixels
+    this.items.forEach(item => {
+      item.screenX = (item.realX - this.cameraX) * this.zoom;
+      item.screenY = (item.realY - this.cameraY) * this.zoom;
+      item.width = item.realWidth * this.zoom;
+      item.height = item.realHeight * this.zoom;
+    });
+  }
+
+  isItemVisible(item: any): boolean {
+    const boardWidth = this.boardRef.nativeElement.offsetWidth;
+    const boardHeight = this.boardRef.nativeElement.offsetHeight;
 
     return (
-      item.x + itemWidth / 2 > this.boardX &&
-      item.x - itemWidth / 2 < this.boardX + boardWidth &&
-      item.y + itemHeight / 2 > this.boardY &&
-      item.y - itemHeight / 2 < this.boardY + boardHeight
+      item.screenX + item.width > 0 &&
+      item.screenX < boardWidth &&
+      item.screenY + item.height > 0 &&
+      item.screenY < boardHeight
     );
   }
-
 }
