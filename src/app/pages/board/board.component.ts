@@ -22,11 +22,11 @@ export class BoardComponent implements OnInit {
   zoom = 1;
 
   items = [
-    { realX: 100, realY: 50, realWidth: 300, realHeight: 150, label: 'Item A', screenX: 0, screenY: 0, width: 0, height: 0 },
-    { realX: 500, realY: 200, realWidth: 400, realHeight: 200, label: 'Item B', screenX: 0, screenY: 0, width: 0, height: 0 },
-    { realX: 1000, realY: 100, realWidth: 250, realHeight: 250, label: 'Item C', screenX: 0, screenY: 0, width: 0, height: 0 },
-    { realX: 150, realY: 500, realWidth: 350, realHeight: 300, label: 'Item D', screenX: 0, screenY: 0, width: 0, height: 0 },
-    { realX: 800, realY: 400, realWidth: 500, realHeight: 100, label: 'Item E', screenX: 0, screenY: 0, width: 0, height: 0 }
+    { realX: 100, realY: 0, realWidth: 300, realHeight: 150, label: 'Item A', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true},
+    { realX: 500, realY: 200, realWidth: 400, realHeight: 200, label: 'Item B', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true},
+    { realX: 1000, realY: 100, realWidth: 250, realHeight: 250, label: 'Item C', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true},
+    { realX: 150, realY: 500, realWidth: 350, realHeight: 300, label: 'Item D', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true},
+    { realX: 800, realY: 400, realWidth: 500, realHeight: 100, label: 'Item E', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true}
   ];
 
   ngOnInit() {
@@ -105,14 +105,42 @@ export class BoardComponent implements OnInit {
   }
 
   isItemVisible(item: any): boolean {
-    const boardWidth = this.boardRef.nativeElement.offsetWidth;
-    const boardHeight = this.boardRef.nativeElement.offsetHeight;
+    const boardWidth = this.boardRef.nativeElement.offsetWidth / this.zoom;
+    const boardHeight = this.boardRef.nativeElement.offsetHeight / this.zoom;
 
-    return (
-      item.screenX + item.width > 0 &&
-      item.screenX < boardWidth &&
-      item.screenY + item.height > 0 &&
-      item.screenY < boardHeight
-    );
+    const willBeVisible = (
+      item.screenX > -item.width &&
+      (item.screenX / this.zoom) < boardWidth &&
+      item.screenY > -item.height &&
+      (item.screenY / this.zoom) < boardHeight 
+    )
+
+    // if(item.label === 'Item B'){
+    //   console.log((item.screenY) + " " + -item.height)
+    //   // console.log(" " + ((item.screenX + item.width) > 0) + " " + ( item.screenX < boardWidth)) 
+    // }
+
+
+    if(item.isVisible != willBeVisible){
+      console.log("dog: " + item.label + " " + willBeVisible)
+      item.isVisible = willBeVisible
+    }
+
+    return willBeVisible
+  }
+
+  centerOnItem(item: { realX: number; realY: number; realWidth: number; realHeight: number }) {
+    const board = this.boardRef.nativeElement;
+    const viewportWidth = window.outerWidth
+    const viewportHeight = window.outerHeight
+    this.zoom = 1
+
+    // Center of the item in world coordinates
+    const itemCenterX = item.realX + item.realWidth / 2;
+    const itemCenterY = item.realY + item.realHeight / 2;
+    // Set camera so that item center is at viewport center
+    this.cameraX = itemCenterX - (viewportWidth / 2) / this.zoom;
+    this.cameraY = itemCenterY - (viewportHeight / 2) / this.zoom + 100;
+    this.updateBoard();
   }
 }
