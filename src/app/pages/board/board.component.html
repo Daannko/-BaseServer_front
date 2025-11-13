@@ -7,17 +7,12 @@
         <div class="board-container" #board (wheel)="onWheel($event)">
                 <div #itemsContainer class="items-container">
             <ng-container *ngFor="let item of items">
-                <div
-                    (click)="centerOnItem(item)"
+                <app-board-tile
+                    [tile]="item"
+                    (click)="centerOnItem(getFirstLink(item))"
                     *ngIf="isItemVisible(item)"
-                    class="board-item"
-                    [style.width.px]="item.width"
-                    [style.height.px]="item.height"
-                    [style.left.px]="item.screenX"
-                    [style.top.px]="item.screenY"
                 >
-                    {{item.label}}
-                </div>
+                </app-board-tile>
             </ng-container>
         </div>
     </div>

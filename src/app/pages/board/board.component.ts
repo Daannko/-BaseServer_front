@@ -2,11 +2,13 @@ import { Component, ElementRef, ViewChild, OnInit, HostListener } from '@angular
 import { CommonModule } from '@angular/common';
 import { FormsModule } from "@angular/forms";
 import { NavbarComponent } from '../../helpers/navbar/navbar.component';
+import { BoardTile } from './board-tile/board-tile.data';
+import { BoardTileComponent } from './board-tile/board-tile.component';
 
 @Component({
   selector: 'app-board',
   standalone: true,
-  imports: [CommonModule, NavbarComponent, FormsModule],
+  imports: [CommonModule, NavbarComponent, FormsModule, BoardTileComponent],
   templateUrl: './board.component.html',
   styleUrls: ['./board.component.scss']
 })
@@ -23,15 +25,22 @@ export class BoardComponent implements OnInit {
   zoom = 1;
 
   items = [
-    { realX: 100, realY: 0, realWidth: 300, realHeight: 150, label: 'Item A', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true},
-    { realX: 500, realY: 200, realWidth: 400, realHeight: 200, label: 'Item B', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true},
-    { realX: 1000, realY: 100, realWidth: 250, realHeight: 250, label: 'Item C', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true},
-    { realX: 150, realY: 500, realWidth: 350, realHeight: 300, label: 'Item D', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true},
-    { realX: 800, realY: 400, realWidth: 500, realHeight: 100, label: 'Item E', screenX: 0, screenY: 0, width: 0, height: 0 , isVisible: true}
+    new BoardTile(100, 0, 300, 150, new Set(), 0, 'Item A'),
+    new BoardTile(500, 200, 400, 200, new Set(), 0, 'Item B'),
+    new BoardTile(1000, 100, 250, 250, new Set(), 0, 'Item C'),
+    new BoardTile(150, 500, 350, 300, new Set(), 0, 'Item D'),
+    new BoardTile(800, 400, 500, 100, new Set(), 0, 'Item E')
   ];
+Array: any;
+
+
+
 
   ngOnInit() {
     const board = this.boardRef.nativeElement;
+    this.items[0].addLink(this.items[1])
+    this.items[3].addLink(this.items[2])
+
 
     board.addEventListener('mousedown', (event: MouseEvent) => {
       this.isDragging = true;
@@ -108,7 +117,7 @@ export class BoardComponent implements OnInit {
   isItemVisible(item: any): boolean {
     const boardWidth = this.boardRef.nativeElement.offsetWidth / this.zoom;
     const boardHeight = this.boardRef.nativeElement.offsetHeight / this.zoom;
-    
+
     return (
       item.screenX > -item.width &&
       (item.screenX / this.zoom) < boardWidth &&
@@ -131,5 +140,12 @@ export class BoardComponent implements OnInit {
     this.cameraY = itemCenterY - (viewportHeight / 2) / this.zoom + navbar.offsetHeight;
 
     this.updateBoard();
+  }
+
+  getFirstLink(item: any): any {
+    if (item.links && item.links.size > 0) {
+      return item.links.values().next().value;
+    }
+    return item;
   }
 }

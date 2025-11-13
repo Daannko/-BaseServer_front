@@ -1,1 +1,9 @@
-<p>board-tile works!</p>
+<div 
+  class="board-item"
+  [style.width.px]="tile.width"
+  [style.height.px]="tile.height"
+  [style.left.px]="tile.screenX"
+  [style.top.px]="tile.screenY"
+>
+  {{tile.label}}
+</div>
