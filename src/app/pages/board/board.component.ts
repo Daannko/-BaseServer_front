@@ -12,6 +12,7 @@ import { NavbarComponent } from '../../helpers/navbar/navbar.component';
 })
 export class BoardComponent implements OnInit {
   @ViewChild('board', { static: true }) boardRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('navbar', { static: true, read: ElementRef }) navbarRef!: ElementRef;
 
   private isDragging = false;
   private startX = 0;
@@ -107,40 +108,28 @@ export class BoardComponent implements OnInit {
   isItemVisible(item: any): boolean {
     const boardWidth = this.boardRef.nativeElement.offsetWidth / this.zoom;
     const boardHeight = this.boardRef.nativeElement.offsetHeight / this.zoom;
-
-    const willBeVisible = (
+    
+    return (
       item.screenX > -item.width &&
       (item.screenX / this.zoom) < boardWidth &&
       item.screenY > -item.height &&
       (item.screenY / this.zoom) < boardHeight 
     )
-
-    // if(item.label === 'Item B'){
-    //   console.log((item.screenY) + " " + -item.height)
-    //   // console.log(" " + ((item.screenX + item.width) > 0) + " " + ( item.screenX < boardWidth)) 
-    // }
-
-
-    if(item.isVisible != willBeVisible){
-      console.log("dog: " + item.label + " " + willBeVisible)
-      item.isVisible = willBeVisible
-    }
-
-    return willBeVisible
   }
 
-  centerOnItem(item: { realX: number; realY: number; realWidth: number; realHeight: number }) {
+  centerOnItem(item:any) {
     const board = this.boardRef.nativeElement;
-    const viewportWidth = window.outerWidth
-    const viewportHeight = window.outerHeight
-    this.zoom = 1
+    const navbar = this.navbarRef.nativeElement;
+    const viewportWidth = board.offsetWidth 
+    const viewportHeight = board.offsetHeight 
 
     // Center of the item in world coordinates
     const itemCenterX = item.realX + item.realWidth / 2;
     const itemCenterY = item.realY + item.realHeight / 2;
     // Set camera so that item center is at viewport center
     this.cameraX = itemCenterX - (viewportWidth / 2) / this.zoom;
-    this.cameraY = itemCenterY - (viewportHeight / 2) / this.zoom + 100;
+    this.cameraY = itemCenterY - (viewportHeight / 2) / this.zoom + navbar.offsetHeight;
+
     this.updateBoard();
   }
 }
