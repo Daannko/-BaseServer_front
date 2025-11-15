@@ -5,15 +5,26 @@
             <div>zoom: {{zoom}}</div>
         </div>
         <div class="board-container" #board (wheel)="onWheel($event)">
-                <div #itemsContainer class="items-container">
-            <ng-container *ngFor="let item of items">
-                <app-board-tile
-                    [tile]="item"
-                    (click)="centerOnItem(getFirstLink(item))"
-                    *ngIf="isItemVisible(item)"
-                >
-                </app-board-tile>
-            </ng-container>
-        </div>
+
+            <!-- Draw squares using divs -->
+            <div #itemsContainer class="items-container">
+                <ng-container *ngFor="let item of tiles">
+                    <app-board-tile
+                        [tile]="item"
+                        (dblclick)="centerOnItem(item)"
+                        *ngIf="isItemVisible(item)"
+                    >
+                    </app-board-tile>
+                </ng-container>
+            </div>
+
+            <!-- Drawn squares (outside items-container so they can receive clicks) -->
+            <div class="drawn-square" 
+              *ngFor="let connector of connectors"
+              [style.left.px]="connector.screenX"
+              [style.top.px]="connector.screenY"
+              (click)="centerOnItem(connector.itemB)"
+              >
+            </div>
     </div>
 </div>

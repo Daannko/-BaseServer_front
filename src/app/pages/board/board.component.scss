@@ -11,11 +11,6 @@
   border-bottom-right-radius: 8px;
   pointer-events: none;
 }
-#workspace{
-    display: flex;
-    width: 100vw;
-    height: 100vh;
-}
 
 #background{
     background-color: black;
@@ -39,6 +34,16 @@ p{
   color: white;
 }
 
+.drawn-square {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  background-color: red;
+  z-index: 2;
+  pointer-events: auto; /* Enable clicks on squares */
+  cursor: pointer;
+}
+
 .items-container {
   position: absolute;
   width: 100%;
@@ -47,15 +52,3 @@ p{
   transform-origin: 0 0; /* Set transform origin to top-left */
 }
 
-.board-item {
-  position: absolute;
-  background-color: rgba(255, 255, 255, 0.8);
-  border: 1px solid #ccc;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  pointer-events: auto; /* Re-enable clicks on items */
-}

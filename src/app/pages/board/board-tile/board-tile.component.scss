@@ -2,6 +2,12 @@ p{
     width: 100px;
     height: 100px;
     background-color: red;
+    position: absolute;
+    margin: 0;
+}
+
+app-board-tile {
+  position: absolute;
 }
 
 .board-item {

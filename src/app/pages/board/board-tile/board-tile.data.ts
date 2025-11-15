@@ -1,38 +1,51 @@
+import { BoardConnector } from "../board-connector/board-connector";
+
 export class BoardTile {
-  realX!: number;
-  realY!: number;
-  realWidth!: number;
-  realHeight!: number;
-  links!: Set<BoardTile>;
+  x!: number;
+  y!: number;
+  width!: number;
+  height!: number;
   tier!: number;
   label!: string;
   screenX!: number;
   screenY!: number;
-  width!: number;
-  height!: number;
+  screenWidth!: number;
+  screenHeight!: number;
+  connectors: Set<BoardConnector> = new Set();
   constructor(
     realX: number,
     realY: number,
     realWidth: number,
     realHeight: number,
-    links: Set<BoardTile>,
+    connectors: Set<BoardConnector>,
     tier: number,
     label: string,
   ) {
-    this.realX = realX;
-    this.realY = realY;
-    this.realWidth = realWidth;
-    this.realHeight = realHeight;
-    this.links = links == null ? new Set() : links;
+    this.x = realX;
+    this.y = realY;
+    this.width = realWidth;
+    this.height = realHeight;
     this.tier = tier;
     this.label = label;
     this.screenX = realX;
     this.screenY = realY;
-    this.width = realWidth;
-    this.height = realHeight;
+    this.screenWidth = realWidth;
+    this.screenHeight = realHeight;
+    this.connectors = connectors;
   }
 
-  addLink(item: BoardTile){
-    this.links.add(item)
+  getCenterX(){
+    return this.x + this.width / 2
+  }
+
+  getCenterY(){
+    return this.y + this.height / 2
+  }
+
+  addConnector(item:BoardTile){
+    const connectorA = new BoardConnector(this,item)
+    this.connectors.add(connectorA)
+    const connectorB = new BoardConnector(item,this)
+    item.connectors.add(connectorB)
   }
 }
