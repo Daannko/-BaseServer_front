@@ -4,7 +4,7 @@
             <div>cameraX: {{cameraX}} cameraY: {{cameraY}}</div>
             <div>zoom: {{zoom}}</div>
         </div>
-        <div class="board-container" #board (wheel)="onWheel($event)">
+        <div class="board-container" #board>
 
             <!-- Draw squares using divs -->
             <div #itemsContainer>
@@ -29,5 +29,17 @@
                     </app-board-connector>
                 </ng-container>
              </div>
+
+             <!-- SVG lines for connectors -->
+             <svg class="connector-lines" width="100%" height="100%">
+                <line *ngFor="let connector of connectors"
+                    [attr.x1]="(connector.itemA.screenX + connector.itemA.screenWidth / 2)"
+                    [attr.y1]="(connector.itemA.screenY + connector.itemA.screenHeight / 2)"
+                    [attr.x2]="(connector.itemB.screenX + connector.itemB.screenWidth / 2)"
+                    [attr.y2]="(connector.itemB.screenY + connector.itemB.screenHeight / 2)"
+                    stroke="rgba(102, 126, 234, 0.5)"
+                    stroke-width="2"
+                />
+             </svg>
     </div>
 </div>

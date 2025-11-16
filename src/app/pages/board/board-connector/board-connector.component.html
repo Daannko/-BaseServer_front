@@ -1,8 +1,9 @@
 <div class="drawn-square" #connector
-    [style.left.px]="data.screenX"
-    [style.top.px]="data.screenY"
+    [style.left.px]="data.x"
+    [style.top.px]="data.y"
     [style.width.px]="data.screenWidth"
     [style.height.px]="data.screenHeight"
+    [style.opacity]="data.opacity"
 >
     {{data.itemB.label}}  
 </div>

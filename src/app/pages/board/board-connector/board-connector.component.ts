@@ -13,11 +13,17 @@ export class BoardConnectorComponent {
   @ViewChild('connector') connectorRef!: ElementRef;
 
 
-  updateShift(){
-    this.data.width = (this.connectorRef.nativeElement.offsetWidth / 2)
-    this.data.height = (this.connectorRef.nativeElement.offsetHeight / 2)
-    this.data.setLocation(this.data.itemA,this.data.itemB)
+  updateSize(){
+    this.data.width = (this.connectorRef.nativeElement.offsetWidth)
+    this.data.height = (this.connectorRef.nativeElement.offsetHeight)
+  }
 
+  ngOnInit(){
+      const connector = this.connectorRef.nativeElement;
+
+      connector.addEventListener('contextmenu', (event: MouseEvent) => {
+        console.log(this.data.itemB.label)
+      })
   }
 
 }

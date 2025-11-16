@@ -42,10 +42,28 @@ export class BoardTile {
     return this.y + this.height / 2
   }
 
+  getCenterScreenX(){
+    return this.screenX + this.screenWidth / 2
+  }
+
+  getCenterScreenY(){
+    return this.screenY + this.screenHeight / 2
+  }
+
   addConnector(item:BoardTile){
     const connectorA = new BoardConnector(this,item)
     this.connectors.add(connectorA)
     const connectorB = new BoardConnector(item,this)
     item.connectors.add(connectorB)
+  }
+
+  updateSize(zoom: number){
+    this.screenWidth = this.width * zoom;
+    this.screenHeight = this.height * zoom;
+  }
+  
+  updatePosition(cameraX: number, cameraY:number, zoom: number){
+    this.screenX = (this.x - cameraX) * zoom;
+    this.screenY = (this.y - cameraY) * zoom;
   }
 }

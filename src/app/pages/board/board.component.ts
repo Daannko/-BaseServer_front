@@ -29,11 +29,11 @@ export class BoardComponent implements OnInit {
   zoom = 1;
 
   tiles = [
-    new BoardTile(100, 100, 100, 100, new Set(), 0, 'Item A'),
-    new BoardTile(500, 300, 100, 100, new Set(), 0, 'Item BAAAAAAAAAAAAAAAAAAA'),
-    new BoardTile(1200, 800, 100, 100, new Set(), 0, 'Item CSSSSS'),
-    new BoardTile(1600, 200, 100, 100, new Set(), 0, 'Item D'),
-    new BoardTile(800, 900, 100, 100, new Set(), 0, 'Item E')
+    new BoardTile(100, 100, 400, 300, new Set(), 0, 'Item A'),
+    new BoardTile(1200, 150, 500, 360, new Set(), 0, 'Item B'),
+    new BoardTile(2100, 1100, 360, 400, new Set(), 0, 'Item CSSSSS'),
+    new BoardTile(2800, 350, 440, 320, new Set(), 0, 'Item D'),
+    new BoardTile(1400, 1800, 380, 340, new Set(), 0, 'Item E')
   ];
 
   connectors: Array<BoardConnector> = [];
@@ -57,38 +57,13 @@ export class BoardComponent implements OnInit {
   }
 
   ngAfterViewInit(){
+    this.centerOnItem(this.tiles[0])
     this.connectorComponents.forEach(item => {
-      item.updateShift()
-      item.data.calculateScreenPositon(this.cameraX,this.cameraY,this.zoom)
+      item.updateSize()
     })
     this.updateBoard()
   }
   
-
-  @HostListener('wheel', ['$event'])
-  onWheel(event: WheelEvent) {
-    event.preventDefault();
-    const board = this.boardRef.nativeElement;
-    const rect = board.getBoundingClientRect();
-
-    const mouseX = event.clientX - rect.left;
-    const mouseY = event.clientY - rect.top;
-
-    const newZoom = this.zoom + (event.deltaY < 0 ? 0.1 : -0.1);
-    if (newZoom < 0.1 || newZoom > 5) return;
-
-    // Keep mouse position fixed during zoom
-    const worldMouseX = (mouseX / this.zoom) + this.cameraX;
-    const worldMouseY = (mouseY / this.zoom) + this.cameraY;
-
-    this.zoom = Math.round(newZoom * 10) / 10;
-
-    this.cameraX = worldMouseX - (mouseX / this.zoom);
-    this.cameraY = worldMouseY - (mouseY / this.zoom);
-
-    this.updateBoard();
-  }
-
   private updateBoard() {
     const board = this.boardRef.nativeElement;
 
@@ -97,29 +72,14 @@ export class BoardComponent implements OnInit {
     board.style.backgroundPosition = `${-this.cameraX}px ${-this.cameraY}px`;
 
     // Update items positions in screen pixels
-    this.tiles
-    .forEach(item => {
-      const oldX = item.screenX
-      const oldY = item.screenY
-      item.screenX = (item.x - this.cameraX) * this.zoom;
-      item.screenY = (item.y - this.cameraY) * this.zoom;
-      item.screenWidth = item.width * this.zoom;
-      item.screenHeight = item.height * this.zoom;
-
+    this.tiles.forEach(item => {    
+      item.updateSize(this.zoom)
+      item.updatePosition(this.cameraX,this.cameraY,this.zoom)
       item.connectors.forEach(connector => {
-        connector.screenX += (item.screenX - oldX) 
-        connector.screenY += (item.screenY - oldY) 
+        connector.updateSize(this.zoom)
+        connector.updatePosition(this.zoom)
       })
-    });
-
-    // First, measure connector sizes from DOM
-    this.connectorComponents.forEach(component => {
-      component.updateShift();
-    });
-
-    // Trigger change detection
-    this.tiles = [...this.tiles];
-    this.connectors = [...this.connectors];
+    })
   }
 
   isItemVisible(item: any): boolean {
@@ -141,15 +101,40 @@ export class BoardComponent implements OnInit {
     const viewportHeight = board.offsetHeight
 
     // Set camera so that item center is at viewport center
-    this.zoom = 1
-    this.cameraX = item.getCenterX() - (viewportWidth / 2) / this.zoom;
-    this.cameraY = item.getCenterY() - (viewportHeight / 2) / this.zoom + navbar.offsetHeight;
+    // Viewport in world coords is: viewportWidth / zoom and viewportHeight / zoom
+    this.cameraX = item.getCenterX() - (viewportWidth / (2 * this.zoom));
+    this.cameraY = (item.getCenterY()) - ((viewportHeight -  navbar.offsetHeight) / (2 * this.zoom));
 
-    this.updateBoard();
+    this.updateBoard()
   }
 
   setupListeners(){
     const board = this.boardRef.nativeElement;
+
+    board.addEventListener('wheel', (event: WheelEvent) => {
+      event.preventDefault();
+      const board = this.boardRef.nativeElement;
+      const rect = board.getBoundingClientRect();
+
+      const mouseX = event.clientX - rect.left;
+      const mouseY = event.clientY - rect.top;
+
+      const newZoom = this.zoom + (event.deltaY < 0 ? 0.05 : -0.05);
+      if (newZoom < 0.1 || newZoom > 5) return;
+
+      // Keep mouse position fixed during zoom
+      const worldMouseX = (mouseX / this.zoom) + this.cameraX;
+      const worldMouseY = (mouseY / this.zoom) + this.cameraY;
+
+      this.zoom = newZoom
+
+      this.cameraX = worldMouseX - (mouseX / this.zoom);
+      this.cameraY = worldMouseY - (mouseY / this.zoom);
+
+      this.updateBoard();
+    })
+
+
     board.addEventListener('mousedown', (event: MouseEvent) => {
       this.isDragging = true;
       this.startX = event.clientX;
@@ -171,7 +156,15 @@ export class BoardComponent implements OnInit {
       this.startX = event.clientX;
       this.startY = event.clientY;
 
-      this.updateBoard();
+      board.style.backgroundPosition = `${-this.cameraX}px ${-this.cameraY}px`;
+
+      this.tiles.forEach(item => {
+        item.updatePosition(this.cameraX,this.cameraY,this.zoom)
+        item.connectors.forEach(connector => {
+          connector.updatePosition(this.zoom)
+        })
+
+      })
     });
 
     window.addEventListener('mouseup', () => {

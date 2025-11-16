@@ -5,14 +5,12 @@ export class BoardConnector{
 
     x!: number;
     y!: number;
-    width: number = 50;
-    height: number = 50;
+    width: number = 0;
+    height: number = 0;
     label!: string;
     tier!: number;
     shiftX: number = 0;
     shiftY: number = 0;
-    screenX!: number;
-    screenY!: number;
     screenWidth!: number;
     screenHeight!: number;
     itemA!: BoardTile;
@@ -21,14 +19,15 @@ export class BoardConnector{
     sin!: number;
     cos!: number
     zoom!: number;
+    opacity: number = 1;
 
 
     constructor(itemA:BoardTile,itemB:BoardTile){
         this.itemA = itemA;
         this.itemB = itemB;
-        this.setLocation(itemA,itemB)
+        this.updateAngles()
+        this.updatePosition(1)
         this.label
-
     }
 
     getCenterX(){
@@ -39,37 +38,33 @@ export class BoardConnector{
      return this.y 
     }
 
-    setLocation(itemA: BoardTile,itemB: BoardTile){
-        var dx = itemA.getCenterX() - itemB.getCenterX()
-        var dy = itemA.getCenterY() - itemB.getCenterY()
-        var angle = Math.atan2(-dy,-dx)
-        var cos = Math.cos(angle)
-        var sin = Math.sin(angle)
+    updatePosition(zoom : number){
+        var connectorShift = 20
 
-        // if(itemA.label === 'Item A'){
-        //     console.log(itemB.label + ": " + angle * 180 / Math.PI)
-        //     console.log(cos, + " " + sin)
-        // }
+        const tx = ((this.itemA.screenWidth / 2) + connectorShift + this.width / 2) / Math.abs(this.cos) * zoom
+        const ty = ((this.itemA.screenHeight / 2) + connectorShift + this.height / 2)  / Math.abs(this.sin) * zoom
+        const r = Math.min(tx,ty) / zoom
 
-        var connectorShift = 10
-
-        const tx = ((itemA.width / 2) + connectorShift + this.width) / Math.abs(cos) 
-        const ty = ((itemA.height / 2) + connectorShift + this.height)  / Math.abs(sin) 
-        const r = Math.min(tx,ty)
-
-        const x = (itemA.x ) + r * cos
-        const y = (itemA.y) + r * sin
+        var x = (this.itemA.screenX + this.itemA.screenWidth / 2) + r * this.cos
+        var y = (this.itemA.screenY + this.itemA.screenHeight / 2) + r * this.sin
 
         this.x = x 
         this.y = y
-        this.angle = angle
-        this.cos = cos
-        this.sin = sin
   }
 
-  calculateScreenPositon(cameraX: number,cameraY: number,zoom: number){
-    this.screenX = (this.x - cameraX) * zoom;
-    this.screenY = (this.y - cameraY) * zoom;
+  updateSize(zoom: number){
+    if(zoom < 1){
+      this.opacity = 2 * zoom - 1
+    }
   }
+
+  updateAngles(){
+    var dx = this.itemA.getCenterX() - this.itemB.getCenterX()
+    var dy = this.itemA.getCenterY() - this.itemB.getCenterY()
+    this.angle = Math.atan2(-dy,-dx)
+    this.cos = Math.cos(this.angle)
+    this.sin = Math.sin(this.angle)
+  }
+
 
 }
