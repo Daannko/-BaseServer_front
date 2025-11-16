@@ -7,7 +7,7 @@
         <div class="board-container" #board (wheel)="onWheel($event)">
 
             <!-- Draw squares using divs -->
-            <div #itemsContainer class="items-container">
+            <div #itemsContainer>
                 <ng-container *ngFor="let item of tiles">
                     <app-board-tile
                         [tile]="item"
@@ -19,12 +19,15 @@
             </div>
 
             <!-- Drawn squares (outside items-container so they can receive clicks) -->
-            <div class="drawn-square" 
-              *ngFor="let connector of connectors"
-              [style.left.px]="connector.screenX"
-              [style.top.px]="connector.screenY"
-              (click)="centerOnItem(connector.itemB)"
-              >
-            </div>
+             <div style="display: block;">
+                <ng-container  *ngFor="let connector of connectors" >
+                    <app-board-connector 
+                        #connector
+                        [data]="connector"
+                        (click)="centerOnItem(connector.itemB)"
+                    >
+                    </app-board-connector>
+                </ng-container>
+             </div>
     </div>
 </div>

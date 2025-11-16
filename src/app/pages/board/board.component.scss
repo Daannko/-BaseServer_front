@@ -16,7 +16,6 @@
     background-color: black;
 }
 
-
 .board-container {
   width: 100vw; /* Full viewport width */
   height: 100vh; /* Full viewport height */
@@ -34,21 +33,4 @@ p{
   color: white;
 }
 
-.drawn-square {
-  position: absolute;
-  width: 20px;
-  height: 20px;
-  background-color: red;
-  z-index: 2;
-  pointer-events: auto; /* Enable clicks on squares */
-  cursor: pointer;
-}
-
-.items-container {
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  pointer-events: none; /* Allow clicks to pass through to board */
-  transform-origin: 0 0; /* Set transform origin to top-left */
-}
 

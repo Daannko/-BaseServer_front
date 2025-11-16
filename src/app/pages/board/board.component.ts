@@ -1,21 +1,24 @@
-import { Component, ElementRef, ViewChild, OnInit, HostListener } from '@angular/core';
+import { Component, ElementRef, ViewChild, OnInit, HostListener, ViewChildren, QueryList } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from "@angular/forms";
 import { NavbarComponent } from '../../helpers/navbar/navbar.component';
 import { BoardTile } from './board-tile/board-tile.data';
 import { BoardTileComponent } from './board-tile/board-tile.component';
 import { BoardConnector } from './board-connector/board-connector';
+import { BoardConnectorComponent } from './board-connector/board-connector.component';
+import { read } from 'fs';
 
 @Component({
   selector: 'app-board',
   standalone: true,
-  imports: [CommonModule, NavbarComponent, FormsModule, BoardTileComponent],
+  imports: [CommonModule, NavbarComponent, FormsModule, BoardTileComponent, BoardConnectorComponent],
   templateUrl: './board.component.html',
   styleUrls: ['./board.component.scss']
 })
 export class BoardComponent implements OnInit {
   @ViewChild('board', { static: true }) boardRef!: ElementRef<HTMLDivElement>;
   @ViewChild('navbar', { static: true, read: ElementRef }) navbarRef!: ElementRef;
+  @ViewChildren(BoardConnectorComponent) connectorComponents!: QueryList<BoardConnectorComponent>;
 
   private isDragging = false;
   private startX = 0;
@@ -26,11 +29,11 @@ export class BoardComponent implements OnInit {
   zoom = 1;
 
   tiles = [
-    new BoardTile(100, 100, 300, 150, new Set(), 0, 'Item A'),
-    new BoardTile(7000, 1000, 400, 200, new Set(), 0, 'Item B'),
-    new BoardTile(14000, 1000, 250, 250, new Set(), 0, 'Item C'),
-    new BoardTile(1000, 6000, 350, 300, new Set(), 0, 'Item D'),
-    new BoardTile(7000, 6000, 500, 100, new Set(), 0, 'Item E')
+    new BoardTile(100, 100, 100, 100, new Set(), 0, 'Item A'),
+    new BoardTile(500, 300, 100, 100, new Set(), 0, 'Item BAAAAAAAAAAAAAAAAAAA'),
+    new BoardTile(1200, 800, 100, 100, new Set(), 0, 'Item CSSSSS'),
+    new BoardTile(1600, 200, 100, 100, new Set(), 0, 'Item D'),
+    new BoardTile(800, 900, 100, 100, new Set(), 0, 'Item E')
   ];
 
   connectors: Array<BoardConnector> = [];
@@ -52,6 +55,15 @@ export class BoardComponent implements OnInit {
     this.setupListeners()
     this.updateBoard();
   }
+
+  ngAfterViewInit(){
+    this.connectorComponents.forEach(item => {
+      item.updateShift()
+      item.data.calculateScreenPositon(this.cameraX,this.cameraY,this.zoom)
+    })
+    this.updateBoard()
+  }
+  
 
   @HostListener('wheel', ['$event'])
   onWheel(event: WheelEvent) {
@@ -87,21 +99,27 @@ export class BoardComponent implements OnInit {
     // Update items positions in screen pixels
     this.tiles
     .forEach(item => {
+      const oldX = item.screenX
+      const oldY = item.screenY
       item.screenX = (item.x - this.cameraX) * this.zoom;
       item.screenY = (item.y - this.cameraY) * this.zoom;
       item.screenWidth = item.width * this.zoom;
       item.screenHeight = item.height * this.zoom;
+
+      item.connectors.forEach(connector => {
+        connector.screenX += (item.screenX - oldX) 
+        connector.screenY += (item.screenY - oldY) 
+      })
     });
 
-    // Update drawn squares positions
-    this.connectors
-    .forEach(square => {
-      square.screenX = (square.x - this.cameraX) * this.zoom;
-      square.screenY = (square.y - this.cameraY) * this.zoom;
-      square.screenWidth = square.width * this.zoom * 100;
-      square.screenHeight = square.height * this.zoom * 100;
+    // First, measure connector sizes from DOM
+    this.connectorComponents.forEach(component => {
+      component.updateShift();
     });
 
+    // Trigger change detection
+    this.tiles = [...this.tiles];
+    this.connectors = [...this.connectors];
   }
 
   isItemVisible(item: any): boolean {

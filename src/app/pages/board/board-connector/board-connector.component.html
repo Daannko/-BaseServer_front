@@ -1,1 +1,8 @@
-<p>board-connector works!</p>
+<div class="drawn-square" #connector
+    [style.left.px]="data.screenX"
+    [style.top.px]="data.screenY"
+    [style.width.px]="data.screenWidth"
+    [style.height.px]="data.screenHeight"
+>
+    {{data.itemB.label}}  
+</div>
