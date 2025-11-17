@@ -1,10 +1,4 @@
-p{
-    width: 100px;
-    height: 100px;
-    background-color: red;
-    position: absolute;
-    margin: 0;
-}
+/* Tile styles: polished note card with topic badge and editor */
 
 app-board-tile {
   position: absolute;
@@ -12,15 +6,99 @@ app-board-tile {
 
 .board-item {
   position: absolute;
-  background-color: rgba(255, 255, 255, 0.8);
-  border: 1px solid #ccc;
+  background-color: #ffffff;
+  border: 1px solid rgba(2,6,23,0.04);
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+  border-radius: 10px;
+  padding: 12px;
+  box-shadow: 0 10px 30px rgba(2,6,23,0.06);
+  pointer-events: auto;
+  user-select: text;
+
+}
+
+.tile-top{
   display: flex;
   align-items: center;
-  justify-content: center;
-  text-align: center;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  pointer-events: auto;
-  user-select: none;
-  // transform: translate(-50%, -50%);
+  justify-content: space-between;
+  gap: 8px;
 }
+
+.board-item .label {
+  font-weight: 700;
+  color: #0f172a;
+  font-size: 15px;
+  line-height: 1;
+  display: block;
+}
+
+.topic-badge{
+  background: #ffffff;
+  color: #0f172a;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 6px 18px rgba(2,6,23,0.06);
+  white-space: nowrap;
+}
+
+.editor-wrap{
+  flex: 1 1 auto;
+  min-height: 120px;
+  display: flex;
+  flex-direction: column;
+  height: 200px;
+  overflow: hidden;
+}
+
+/* CKEditor editable area */
+.ck-editor{
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.ck-editor__editable_inline{
+  flex: 1 1 auto;
+  min-height: 120px;
+  max-height: 100%;
+  padding: 8px 10px;
+  font-size: 14px;
+  color: #0f172a;
+  box-sizing: border-box;
+}
+
+/* Ensure toolbar doesn't push the editable out of view */
+.ck-toolbar {
+  flex: 0 0 auto;
+}
+
+/* Keep toolbar visible (sticky) while the editable area scrolls */
+.ck-editor .ck-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: #ffffff; /* match tile background so toolbar looks integrated */
+  border-bottom: 1px solid rgba(2,6,23,0.04);
+}
+
+/* Small offset so content isn't flush under sticky toolbar */
+.ck-editor__editable_inline {
+  padding-top: 6px;
+}
+
+/* Force toolbar to remain visible even when editor loses focus */
+.ck-editor .ck-toolbar {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}
+

@@ -7,10 +7,6 @@ export class BoardConnector{
     y!: number;
     width: number = 0;
     height: number = 0;
-    label!: string;
-    tier!: number;
-    shiftX: number = 0;
-    shiftY: number = 0;
     screenWidth!: number;
     screenHeight!: number;
     itemA!: BoardTile;
@@ -18,8 +14,10 @@ export class BoardConnector{
     angle!: number;
     sin!: number;
     cos!: number
-    zoom!: number;
-    opacity: number = 1;
+    opacity: number = 0;
+
+    shiftX: number = 0;
+    shiftY: number = 0;
 
 
     constructor(itemA:BoardTile,itemB:BoardTile){
@@ -27,7 +25,6 @@ export class BoardConnector{
         this.itemB = itemB;
         this.updateAngles()
         this.updatePosition(1)
-        this.label
     }
 
     getCenterX(){

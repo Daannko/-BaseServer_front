@@ -1,9 +1,9 @@
 .drawn-square {
-    color: white;
+    color: rgba(255, 255, 255, 0.6);
     position: absolute;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    border: 2px solid rgba(255, 255, 255, 0.3);
-    border-radius: 8px;
+    background: transparent;
+    border: none;
+    border-radius: 4px;
     z-index: 2;
     pointer-events: auto;
     cursor: pointer;
@@ -13,15 +13,15 @@
     font-size: 12px;
     font-weight: 600;
     padding: 5px 10px 5px 10px;
-    box-shadow: 0 8px 32px rgba(102, 126, 234, 0.4);
+    box-shadow: none;
     transform: translate(-50%, -50%);
     white-space: nowrap;
-    opacity: 1;
+    
+    
     
     &:hover {
-        box-shadow: 0 12px 48px rgba(102, 126, 234, 0.6);
-        border-color: rgba(255, 255, 255, 0.6);
+        color: white;
+        background: rgba(80, 80, 100, 0.3);
         z-index: 3;
-        opacity: 1;
     }
 }

@@ -7,10 +7,14 @@ export class BoardTile {
   height!: number;
   tier!: number;
   label!: string;
+  topic: string = '';
+  note: string = '';
   screenX!: number;
   screenY!: number;
   screenWidth!: number;
   screenHeight!: number;
+
+
   connectors: Set<BoardConnector> = new Set();
   constructor(
     realX: number,

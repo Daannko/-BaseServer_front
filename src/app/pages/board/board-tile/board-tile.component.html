@@ -4,6 +4,17 @@
   [style.height.px]="tile.screenHeight"
   [style.left.px]="tile.screenX"
   [style.top.px]="tile.screenY"
+  (contextmenu)="onContextMenu($event)"
 >
-  {{tile.label}}
+  <div class="tile-top">
+    <div class="label">{{tile.label}}</div>
+    <div class="topic-badge" *ngIf="tile.topic">{{ tile.topic }}</div>
+  </div>
+
+  
+  <div class="editor-wrap">
+    <ng-container>
+      <ckeditor [editor]="Editor" [(ngModel)]="tile.note" [config]="{ toolbar: ['bold','italic','link','bulletedList','numberedList'] }"></ckeditor>
+    </ng-container>
+  </div>
 </div>

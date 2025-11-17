@@ -16,7 +16,7 @@ import { read } from 'fs';
   styleUrls: ['./board.component.scss']
 })
 export class BoardComponent implements OnInit {
-  @ViewChild('board', { static: true }) boardRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('board', {static: true}) boardRef!: ElementRef<HTMLDivElement>;
   @ViewChild('navbar', { static: true, read: ElementRef }) navbarRef!: ElementRef;
   @ViewChildren(BoardConnectorComponent) connectorComponents!: QueryList<BoardConnectorComponent>;
 
@@ -51,17 +51,25 @@ export class BoardComponent implements OnInit {
     this.tiles.forEach(item => {
       this.connectors.push(...Array.from(item.connectors))
     })
-
+    this.centerOnItem(this.tiles[0])
     this.setupListeners()
     this.updateBoard();
   }
 
   ngAfterViewInit(){
-    this.centerOnItem(this.tiles[0])
-    this.connectorComponents.forEach(item => {
+    Promise.resolve().then(() => {
+      this.connectorComponents.forEach(item => {
       item.updateSize()
+     })
+    }).then(() => {
+      this.updateBoard()
     })
-    this.updateBoard()
+    
+      
+  }
+  
+  private scheduleBoardUpdate() {
+    Promise.resolve().then(() => this.updateBoard())
   }
   
   private updateBoard() {
