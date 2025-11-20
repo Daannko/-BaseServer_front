@@ -89,3 +89,18 @@
     border-color: rgba(255, 80, 80, 0.5);
   }
 }
+
+.up-center{
+  width: 100%;
+}
+
+.center-content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 1000;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
