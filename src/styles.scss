@@ -141,3 +141,33 @@ input, h1, h3, a, span {
     }
   }
 
+
+// Tiptap editor global styles
+.tiptap {
+  height: 100%;  
+}
+
+.board-item .title-editor{
+  text-align: center;
+  font-size:xx-large;
+  border-bottom:rgba(black, 0.1);
+}
+
+.board-item .title-editor .ProseMirror,
+.board-item .content-editor .ProseMirror {
+  background: transparent !important;
+  outline: none !important;
+  box-shadow: none !important;
+  border: none !important;
+  color: #fff !important;
+}
+
+
+.board-item .title-editor .ProseMirror:focus,
+.board-item .content-editor .ProseMirror:focus,
+.board-item .title-editor .ProseMirror:focus-visible,
+.board-item .content-editor .ProseMirror:focus-visible {
+  outline: none !important;
+  box-shadow: none !important;
+}
+

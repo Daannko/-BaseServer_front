@@ -1,9 +1,9 @@
 <div id="background">
     <app-navbar #navbar [isClockVisible]="true" [isLogoutVisible]="true"></app-navbar>
-        <div class="debug-overlay">
+        <!-- <div class="debug-overlay">
             <div>cameraX: {{cameraX}} cameraY: {{cameraY}}</div>
             <div>zoom: {{zoom}}</div>
-        </div>
+        </div> -->
         <div class="board-container" #board>
 
             <!-- Draw squares using divs -->
@@ -22,10 +22,9 @@
              <div style="display: block;">
                 <ng-container  *ngFor="let connector of connectors" >
                     <app-board-connector 
-                        #connector
                         [data]="connector"
                         [zoom]="zoom"
-                        (click)="centerOnItem(connector.itemB)"
+                        (click)="moveToItem(connector.itemB)"
                     >
                     </app-board-connector>
                 </ng-container>

@@ -63,5 +63,4 @@ export class BoardConnector{
     this.sin = Math.sin(this.angle)
   }
 
-
 }

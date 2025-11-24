@@ -4,17 +4,44 @@
   [style.height.px]="tile.screenHeight"
   [style.left.px]="tile.screenX"
   [style.top.px]="tile.screenY"
-  (contextmenu)="onContextMenu($event)"
 >
-  <div class="tile-top">
-    <div class="label">{{tile.label}}</div>
-    <div class="topic-badge" *ngIf="tile.topic">{{ tile.topic }}</div>
+  <div class="editor-wrap">
+    <div #titleElement class="title-editor"></div>
+    <div #contentElement class="content-editor"></div>
   </div>
 
-  
-  <div class="editor-wrap">
-    <ng-container>
-      <ckeditor [editor]="Editor" [(ngModel)]="tile.note" [config]="{ toolbar: ['bold','italic','link','bulletedList','numberedList'] }"></ckeditor>
-    </ng-container>
-  </div>
+
+  <ng-template #navbarContentTemplate let-tile="tile" let-toggleBold="toggleBold" let-toggleItalic="toggleItalic" let-toggleBulletList="toggleBulletList" let-toggleOrderedList="toggleOrderedList" let-insertTable="insertTable" let-setLink="setLink" let-setAlignment="setAlignment">
+      <div class="bar">
+        <div class="navbar-tile-controls">
+          <div  [innerHTML]="tile.label"></div>
+          <button (click)="toggleBold(contentEditor)" aria-label="Bold" title="Bold">
+            <app-svg-icon icon="editor-bold"></app-svg-icon>
+          </button>
+          <button (click)="toggleItalic(contentEditor)" aria-label="Italic" title="Italic">
+            <app-svg-icon icon="editor-italic-svgrepo-com"></app-svg-icon>
+          </button>
+          <button (click)="toggleBulletList(contentEditor)" aria-label="Bullet list" title="Bullet list">
+            <app-svg-icon icon="editor-ul-svgrepo-com"></app-svg-icon>
+          </button>
+          <button (click)="insertTable(contentEditor)" aria-label="Insert table" title="Insert table">
+            <app-svg-icon icon="editor-table-svgrepo-com"></app-svg-icon>
+          </button>
+        </div>
+      </div>
+    </ng-template>
+
+    <ng-template #navbarTitleTemplate let-tile="tile" let-toggleBold="toggleBold" let-toggleItalic="toggleItalic" let-toggleBulletList="toggleBulletList" let-toggleOrderedList="toggleOrderedList" let-insertTable="insertTable" let-setLink="setLink" let-setAlignment="setAlignment">
+      <div class="bar">
+        <div class="navbar-tile-controls">
+          <div [innerHTML]="tile.label"></div>
+          <button (click)="toggleBold(titleEditor)" aria-label="Bold" title="Bold">
+            <app-svg-icon icon="editor-bold"></app-svg-icon>
+          </button>
+          <button (click)="toggleItalic(titleEditor)" aria-label="Italic" title="Italic">
+            <app-svg-icon icon="editor-italic-svgrepo-com"></app-svg-icon>
+          </button>
+        </div>
+      </div>
+    </ng-template>
 </div>

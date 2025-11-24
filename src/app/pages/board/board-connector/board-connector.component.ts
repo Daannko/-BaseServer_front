@@ -25,4 +25,8 @@ export class BoardConnectorComponent implements AfterViewInit {
     this.updateSize()
     this.data.opacity = 1
   }
+
+  getDisplayText(html: string): string {
+  return html.replace(/<\/?p[^>]*>/g, '').trim();
+  }
 }

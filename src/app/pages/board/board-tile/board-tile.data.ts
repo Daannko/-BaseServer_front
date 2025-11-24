@@ -9,10 +9,12 @@ export class BoardTile {
   label!: string;
   topic: string = '';
   note: string = '';
+  content: string = '';
   screenX!: number;
   screenY!: number;
   screenWidth!: number;
   screenHeight!: number;
+  forceToRender: boolean = false
 
 
   connectors: Set<BoardConnector> = new Set();

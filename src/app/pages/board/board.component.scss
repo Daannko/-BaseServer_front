@@ -14,11 +14,14 @@
 
 #background{
     background-color: black;
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
 }
 
 .board-container {
   width: 100vw; /* Full viewport width */
-  height: 100vh; /* Full viewport height */
+  flex: 1; /* Take remaining height after navbar */
   overflow: hidden; /* Hide overflowing content */
   position: relative;
   background-image: url('/pattern2.png');

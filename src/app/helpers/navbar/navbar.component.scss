@@ -104,3 +104,31 @@
   justify-content: center;
   align-items: center;
 }
+
+// Board navbar scss
+::ng-deep .navbar-tile-controls p {
+  margin: 0 !important;
+  padding: 0 !important;
+  display: inline !important;
+  line-height: 1 !important;
+}
+
+::ng-deep .navbar-tile-controls strong {
+  font-weight: 700 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+::ng-deep .navbar-tile-controls em {
+  font-style: italic !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+
+::ng-deep .navbar-tile-controls strong,
+::ng-deep .navbar-tile-controls em,
+::ng-deep .navbar-tile-controls strong strong,
+::ng-deep .navbar-tile-controls strong em {
+  margin: 0 !important;
+  padding: 0 !important;
+}

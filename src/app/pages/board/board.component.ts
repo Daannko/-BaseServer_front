@@ -1,4 +1,4 @@
-import { Component, ElementRef, ViewChild, OnInit, HostListener, ViewChildren, QueryList } from '@angular/core';
+import { Component, ElementRef, ViewChild, OnInit, HostListener, ViewChildren, QueryList, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from "@angular/forms";
 import { NavbarComponent } from '../../helpers/navbar/navbar.component';
@@ -7,6 +7,7 @@ import { BoardTileComponent } from './board-tile/board-tile.component';
 import { BoardConnector } from './board-connector/board-connector';
 import { BoardConnectorComponent } from './board-connector/board-connector.component';
 import { read } from 'fs';
+import { NavbarService } from '../../service/navbar.service';
 
 @Component({
   selector: 'app-board',
@@ -14,11 +15,15 @@ import { read } from 'fs';
   imports: [CommonModule, NavbarComponent, FormsModule, BoardTileComponent, BoardConnectorComponent],
   templateUrl: './board.component.html',
   styleUrls: ['./board.component.scss']
+  
 })
 export class BoardComponent implements OnInit {
   @ViewChild('board', {static: true}) boardRef!: ElementRef<HTMLDivElement>;
   @ViewChild('navbar', { static: true, read: ElementRef }) navbarRef!: ElementRef;
   @ViewChildren(BoardConnectorComponent) connectorComponents!: QueryList<BoardConnectorComponent>;
+  @ViewChildren(BoardTileComponent) tileComponents!: QueryList<BoardTileComponent>
+
+  constructor(private navBarService: NavbarService, private cdr: ChangeDetectorRef ){}
 
   private isDragging = false;
   private startX = 0;
@@ -67,11 +72,7 @@ export class BoardComponent implements OnInit {
     
       
   }
-  
-  private scheduleBoardUpdate() {
-    Promise.resolve().then(() => this.updateBoard())
-  }
-  
+
   private updateBoard() {
     const board = this.boardRef.nativeElement;
 
@@ -95,26 +96,42 @@ export class BoardComponent implements OnInit {
     const boardHeight = this.boardRef.nativeElement.offsetHeight / this.zoom;
 
     return (
-      item.screenX > -item.screenWidth &&
+      item.forceToRender ||
+      (item.screenX > -item.screenWidth &&
       (item.screenX / this.zoom) < boardWidth &&
       item.screenY > -item.screenHeight &&
-      (item.screenY / this.zoom) < boardHeight 
+      (item.screenY / this.zoom) < boardHeight)
     )
   }
 
   centerOnItem(item:any) {
     const board = this.boardRef.nativeElement;
-    const navbar = this.navbarRef.nativeElement;
     const viewportWidth = board.offsetWidth 
     const viewportHeight = board.offsetHeight
 
-    // Set camera so that item center is at viewport center
-    // Viewport in world coords is: viewportWidth / zoom and viewportHeight / zoom
     this.cameraX = item.getCenterX() - (viewportWidth / (2 * this.zoom));
-    this.cameraY = (item.getCenterY()) - ((viewportHeight -  navbar.offsetHeight) / (2 * this.zoom));
+    this.cameraY = (item.getCenterY()) - (viewportHeight / (2 * this.zoom));
 
     this.updateBoard()
   }
+
+moveToItem(item: BoardTile){
+  item.forceToRender = true
+  this.cdr.detectChanges()
+  this.centerOnItem(item);
+  this.updateBoard();
+
+  Promise.resolve().then(() => {
+    const centerTile = this.tileComponents.find(tile => tile.tile.label === item.label);
+    if (centerTile) {
+      centerTile.setNavbarContext(centerTile.navbarContentTemplate);
+    }
+    item.forceToRender = false
+  });
+
+}
+
+
 
   setupListeners(){
     const board = this.boardRef.nativeElement;
@@ -144,13 +161,17 @@ export class BoardComponent implements OnInit {
 
 
     board.addEventListener('mousedown', (event: MouseEvent) => {
+      // Only start dragging if clicking directly on the board, not on tiles or their children
+      if (event.target !== board) return;
+      
+      this.navBarService.clear()
       this.isDragging = true;
       this.startX = event.clientX;
       this.startY = event.clientY;
       board.style.cursor = 'grabbing';
     });
 
-    window.addEventListener('mousemove', (event: MouseEvent) => {
+    board.addEventListener('mousemove', (event: MouseEvent) => {
       if (!this.isDragging) return;
 
       // Calculate delta in screen pixels
@@ -175,7 +196,7 @@ export class BoardComponent implements OnInit {
       })
     });
 
-    window.addEventListener('mouseup', () => {
+    board.addEventListener('mouseup', () => {
       this.isDragging = false;
       board.style.cursor = 'grab';
     });
