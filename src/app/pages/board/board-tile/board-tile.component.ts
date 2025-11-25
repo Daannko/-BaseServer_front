@@ -20,6 +20,7 @@ import { TableHeader } from '@tiptap/extension-table-header';
 import { Link } from '@tiptap/extension-link';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { TextStyle } from '@tiptap/extension-text-style';
+import { FontFamily } from '@tiptap/extension-font-family';
 import { NavbarService } from '../../../service/navbar.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
 import Color from '@tiptap/extension-color';
@@ -59,6 +60,19 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     '#111111',
   ];
 
+  fonts = [
+    {
+      name: 'Default',
+      value:
+        'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+    },
+    { name: 'Serif', value: 'Georgia, "Times New Roman", serif' },
+    { name: 'Monospace', value: '"Courier New", monospace' },
+    { name: 'Cursive', value: 'cursive' },
+    { name: 'Comic Sans', value: '"Comic Sans MS", cursive' },
+    { name: 'Arial', value: 'Arial, sans-serif' },
+  ];
+
   constructor(
     private navbarService: NavbarService,
     private sanitizer: DomSanitizer
@@ -81,13 +95,13 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     if (titleRoot) {
       titleRoot.addEventListener('click', () => {
         this.setNavbarContext(this.navbarTitleTemplate);
-        console.log(this.tile.label);
       });
     }
     if (contentRoot) {
-      contentRoot.addEventListener('click', () =>
-        this.setNavbarContext(this.navbarContentTemplate)
-      );
+      contentRoot.addEventListener('click', () => {
+        this.setNavbarContext(this.navbarContentTemplate);
+        console.log(this.tile.content);
+      });
     }
 
     // Listen for mouseup anywhere to detect text selection that ends outside the editor
@@ -186,6 +200,7 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
         }),
         TextStyle,
         Color.configure({ types: ['textStyle'] }),
+        FontFamily,
       ],
       content: this.tile.label || '<p></p>',
       onUpdate: ({ editor }) => {
@@ -206,6 +221,7 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
         StarterKit,
         TextStyle,
         Color.configure({ types: ['textStyle'] }),
+        FontFamily,
         Table.configure({
           resizable: true,
         }),
@@ -250,7 +266,6 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       toggleItalic: this.toggleItalic.bind(this),
       toggleUnderline: this.toggleUnderline.bind(this),
       toggleStrikethrough: this.toggleStrikethrough.bind(this),
-      toggleCode: this.toggleCode.bind(this),
       toggleQuote: this.toggleQuote.bind(this),
       toggleBulletList: this.toggleBulletList.bind(this),
       toggleOrderedList: this.toggleOrderedList.bind(this),
@@ -258,6 +273,10 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       insertTable: this.insertTable.bind(this),
       setLink: this.setLink.bind(this),
       setAlignment: this.setAlignment.bind(this),
+      setTextColor: this.setTextColor.bind(this),
+      setFont: this.setFont.bind(this),
+      fonts: this.fonts,
+      colors: this.colors,
     };
   }
 
@@ -282,10 +301,6 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
 
   toggleStrikethrough(editor: Editor) {
     editor.chain().focus().toggleStrike().run();
-  }
-
-  toggleCode(editor: Editor) {
-    editor.chain().focus().toggleCode().run();
   }
 
   toggleQuote(editor: Editor) {
@@ -332,6 +347,18 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     }
 
     editor.chain().focus().setMark('textStyle', { color }).run();
+  }
+
+  setFont(fontFamily: string, editor: Editor) {
+    const { from, to } = editor.state.selection;
+
+    // If no text is selected, select all
+    if (from === to) {
+      editor.chain().focus().selectAll().run();
+    }
+
+    // Apply font using the official FontFamily extension command
+    editor.chain().focus().setFontFamily(fontFamily).run();
   }
 
   getDisplayText(html: string): string {

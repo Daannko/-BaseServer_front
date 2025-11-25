@@ -17,7 +17,6 @@
     let-toggleItalic="toggleItalic"
     let-toggleUnderline="toggleUnderline"
     let-toggleStrikethrough="toggleStrikethrough"
-    let-toggleCode="toggleCode"
     let-toggleQuote="toggleQuote"
     let-toggleBulletList="toggleBulletList"
     let-toggleOrderedList="toggleOrderedList"
@@ -56,13 +55,6 @@
           title="Strikethrough"
         >
           <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
-        </button>
-        <button
-          (click)="toggleCode(contentEditor)"
-          aria-label="Code"
-          title="Code"
-        >
-          <app-svg-icon icon="editor-code"></app-svg-icon>
         </button>
         <button
           (click)="toggleBulletList(contentEditor)"
@@ -146,6 +138,17 @@
             ></button>
           </div>
         </div>
+        <select
+          #fontSelect
+          (change)="setFont(fontSelect.value, contentEditor)"
+          title="Font family"
+          class="font-selector"
+        >
+          <option value="" disabled selected>Font</option>
+          <option *ngFor="let font of fonts" [value]="font.value">
+            {{ font.name }}
+          </option>
+        </select>
       </div>
     </div>
   </ng-template>
@@ -210,6 +213,17 @@
             ></button>
           </div>
         </div>
+        <select
+          #fontSelectTitle
+          (change)="setFont(fontSelectTitle.value, titleEditor)"
+          title="Font family"
+          class="font-selector"
+        >
+          <option value="" disabled selected>Font</option>
+          <option *ngFor="let font of fonts" [value]="font.value">
+            {{ font.name }}
+          </option>
+        </select>
       </div>
     </div>
   </ng-template>

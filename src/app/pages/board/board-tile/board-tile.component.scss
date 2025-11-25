@@ -80,15 +80,69 @@ app-board-tile {
 
     &.ProseMirror-focused {
       outline: none;
-      background-color: red !important;
     }
   }
 }
 
-.content-editor {
+::ng-deep .content-editor {
   flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
+
+  /* Custom scrollbar styling */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.3) transparent;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    padding-left: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.5);
+    }
+
+    &:active {
+      background: rgba(255, 255, 255, 0.7);
+    }
+  }
+
+  code {
+    background-color: rgba(0, 0, 0, 0.3);
+    color: #ffd54f;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: "Courier New", monospace;
+    font-size: 0.9em;
+  }
+
+  pre {
+    background-color: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 12px;
+    overflow-x: auto;
+    margin: 8px 0;
+
+    code {
+      background-color: transparent;
+      color: #e6ebf0;
+      padding: 0;
+      border-radius: 0;
+      font-family: "Courier New", monospace;
+      font-size: 0.95em;
+      line-height: 1.5;
+    }
+  }
 }
 
 ::ng-deep .navbar-label *[style*="color"] {
@@ -97,7 +151,7 @@ app-board-tile {
   display: inline;
 }
 
-.editor-toolbar {
+::ng-deep .editor-toolbar {
   color: rgba(255, 255, 255, 0.85); // Current: light gray (85% white)
   display: flex;
   gap: 2px;
@@ -236,4 +290,30 @@ app-board-tile {
   padding: 1rem;
   left: -1rem;
   top: -1rem;
+}
+
+::ng-deep .font-selector {
+  padding: 6px 8px;
+  background: transparent;
+  color: #e6ebf0;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 200ms ease-out;
+
+  &:hover {
+    border-color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: #ffd54f;
+  }
+
+  option {
+    background: #2f3437;
+    color: #fff;
+  }
 }
