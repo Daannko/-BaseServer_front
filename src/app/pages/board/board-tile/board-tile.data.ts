@@ -1,4 +1,5 @@
-import { BoardConnector } from "../board-connector/board-connector";
+import { SafeHtml } from '@angular/platform-browser';
+import { BoardConnector } from '../board-connector/board-connector';
 
 export class BoardTile {
   x!: number;
@@ -6,7 +7,7 @@ export class BoardTile {
   width!: number;
   height!: number;
   tier!: number;
-  label!: string;
+  label!: SafeHtml;
   topic: string = '';
   note: string = '';
   content: string = '';
@@ -14,8 +15,7 @@ export class BoardTile {
   screenY!: number;
   screenWidth!: number;
   screenHeight!: number;
-  forceToRender: boolean = false
-
+  forceToRender: boolean = false;
 
   connectors: Set<BoardConnector> = new Set();
   constructor(
@@ -25,7 +25,7 @@ export class BoardTile {
     realHeight: number,
     connectors: Set<BoardConnector>,
     tier: number,
-    label: string,
+    label: string
   ) {
     this.x = realX;
     this.y = realY;
@@ -40,35 +40,35 @@ export class BoardTile {
     this.connectors = connectors;
   }
 
-  getCenterX(){
-    return this.x + this.width / 2
+  getCenterX() {
+    return this.x + this.width / 2;
   }
 
-  getCenterY(){
-    return this.y + this.height / 2
+  getCenterY() {
+    return this.y + this.height / 2;
   }
 
-  getCenterScreenX(){
-    return this.screenX + this.screenWidth / 2
+  getCenterScreenX() {
+    return this.screenX + this.screenWidth / 2;
   }
 
-  getCenterScreenY(){
-    return this.screenY + this.screenHeight / 2
+  getCenterScreenY() {
+    return this.screenY + this.screenHeight / 2;
   }
 
-  addConnector(item:BoardTile){
-    const connectorA = new BoardConnector(this,item)
-    this.connectors.add(connectorA)
-    const connectorB = new BoardConnector(item,this)
-    item.connectors.add(connectorB)
+  addConnector(item: BoardTile) {
+    const connectorA = new BoardConnector(this, item);
+    this.connectors.add(connectorA);
+    const connectorB = new BoardConnector(item, this);
+    item.connectors.add(connectorB);
   }
 
-  updateSize(zoom: number){
+  updateSize(zoom: number) {
     this.screenWidth = this.width * zoom;
     this.screenHeight = this.height * zoom;
   }
-  
-  updatePosition(cameraX: number, cameraY:number, zoom: number){
+
+  updatePosition(cameraX: number, cameraY: number, zoom: number) {
     this.screenX = (this.x - cameraX) * zoom;
     this.screenY = (this.y - cameraY) * zoom;
   }

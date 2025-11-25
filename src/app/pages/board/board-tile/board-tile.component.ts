@@ -1,4 +1,13 @@
-import { Component, ElementRef, Input, ViewChild, OnInit, OnDestroy, AfterViewInit, TemplateRef } from '@angular/core';
+import {
+  Component,
+  ElementRef,
+  Input,
+  ViewChild,
+  OnInit,
+  OnDestroy,
+  AfterViewInit,
+  TemplateRef,
+} from '@angular/core';
 import { BoardTile } from './board-tile.data';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
@@ -10,47 +19,92 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { Link } from '@tiptap/extension-link';
 import { TextAlign } from '@tiptap/extension-text-align';
+import { TextStyle } from '@tiptap/extension-text-style';
 import { NavbarService } from '../../../service/navbar.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
+import Color from '@tiptap/extension-color';
+import DOMPurify from 'dompurify';
+import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-board-tile',
   standalone: true,
   imports: [CommonModule, FormsModule, SvgIconComponent],
   templateUrl: './board-tile.component.html',
-  styleUrl: './board-tile.component.scss'
+  styleUrl: './board-tile.component.scss',
 })
 export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
   @Input() tile!: BoardTile;
   @ViewChild('titleElement', { static: false }) titleElement!: ElementRef;
   @ViewChild('contentElement', { static: false }) contentElement!: ElementRef;
-  @ViewChild('navbarContentTemplate', { static: false }) navbarContentTemplate!: TemplateRef<any>;
-  @ViewChild('navbarTitleTemplate', { static: false }) navbarTitleTemplate!: TemplateRef<any>;
+  @ViewChild('navbarContentTemplate', { static: false })
+  navbarContentTemplate!: TemplateRef<any>;
+  @ViewChild('navbarTitleTemplate', { static: false })
+  navbarTitleTemplate!: TemplateRef<any>;
 
   titleEditor!: Editor;
   contentEditor!: Editor;
+  isColorPaletteVisible: boolean = false;
 
-  constructor(private navbarService: NavbarService) {
-  }
+  colors = [
+    '#ffffff',
+    '#e6ebf0',
+    '#ffd54f',
+    '#ff6b6b',
+    '#4ecdc4',
+    '#45b7d1',
+    '#96ceb4',
+    '#dda15e',
+    '#bc6c25',
+    '#111111',
+  ];
+
+  constructor(
+    private navbarService: NavbarService,
+    private sanitizer: DomSanitizer
+  ) {}
 
   ngOnInit() {
     // Initialize after view is ready
     setTimeout(() => this.initEditors(), 0);
   }
 
-  ngAfterViewInit(){
+  ngAfterViewInit() {
     const root = this.contentElement.nativeElement as HTMLElement;
 
     // When user clicks inside this tile, publish its navbar template so the top navbar can render
-    const titleRoot = this.titleElement && (this.titleElement.nativeElement as HTMLElement);
-    const contentRoot = this.contentElement && (this.contentElement.nativeElement as HTMLElement);
+    const titleRoot =
+      this.titleElement && (this.titleElement.nativeElement as HTMLElement);
+    const contentRoot =
+      this.contentElement && (this.contentElement.nativeElement as HTMLElement);
 
     if (titleRoot) {
-      titleRoot.addEventListener('click', () => this.setNavbarContext(this.navbarTitleTemplate));
+      titleRoot.addEventListener('click', () => {
+        this.setNavbarContext(this.navbarTitleTemplate);
+        console.log(this.tile.label);
+      });
     }
     if (contentRoot) {
-      contentRoot.addEventListener('click', () => this.setNavbarContext(this.navbarContentTemplate));
+      contentRoot.addEventListener('click', () =>
+        this.setNavbarContext(this.navbarContentTemplate)
+      );
     }
+
+    // Listen for mouseup anywhere to detect text selection that ends outside the editor
+    document.addEventListener('mouseup', () => {
+      const selection = window.getSelection();
+      if (selection && selection.toString().length > 0) {
+        const isInTitle = titleRoot && titleRoot.contains(selection.anchorNode);
+        const isInContent =
+          contentRoot && contentRoot.contains(selection.anchorNode);
+
+        if (isInTitle) {
+          this.setNavbarContext(this.navbarTitleTemplate);
+        } else if (isInContent) {
+          this.setNavbarContext(this.navbarContentTemplate);
+        }
+      }
+    });
 
     root.addEventListener('mousemove', (e: MouseEvent) => {
       const el = (e.target as HTMLElement) || null;
@@ -67,7 +121,8 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       }
 
       // Custom link scheme example: check nearest anchor href
-      const anchor = el && el.closest ? el.closest('a') as HTMLAnchorElement|null : null;
+      const anchor =
+        el && el.closest ? (el.closest('a') as HTMLAnchorElement | null) : null;
       if (anchor && anchor.href && anchor.href.startsWith('tile:')) {
         root.style.cursor = 'pointer';
         return;
@@ -76,7 +131,45 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       // default: text caret
       root.style.cursor = 'text';
     });
-}
+  }
+
+  updateLabel(label: string) {
+    const clean = DOMPurify.sanitize(label, {
+      ALLOWED_TAGS: [
+        'p',
+        'span',
+        'b',
+        'i',
+        'u',
+        'br',
+        'em',
+        'strong',
+        's',
+        'del',
+        'code',
+        'pre',
+        'blockquote',
+        'ul',
+        'ol',
+        'li',
+        'table',
+        'thead',
+        'tbody',
+        'tr',
+        'th',
+        'td',
+        'h1',
+        'h2',
+        'h3',
+        'h4',
+        'h5',
+        'h6',
+        'a',
+      ],
+      ALLOWED_ATTR: ['style', 'href', 'class'],
+    });
+    this.tile.label = this.sanitizer.bypassSecurityTrustHtml(clean);
+  }
 
   initEditors() {
     // Title editor - simple, no toolbar features
@@ -91,17 +184,19 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
           codeBlock: false,
           horizontalRule: false,
         }),
+        TextStyle,
+        Color.configure({ types: ['textStyle'] }),
       ],
       content: this.tile.label || '<p></p>',
       onUpdate: ({ editor }) => {
-        this.tile.label = editor.getHTML();
+        this.updateLabel(editor.getHTML());
       },
       editorProps: {
         attributes: {
           class: 'title-content',
-          placeholder: 'Untitled'
-        }
-      }
+          placeholder: 'Untitled',
+        },
+      },
     });
 
     // Content editor - full features
@@ -109,6 +204,8 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       element: this.contentElement.nativeElement,
       extensions: [
         StarterKit,
+        TextStyle,
+        Color.configure({ types: ['textStyle'] }),
         Table.configure({
           resizable: true,
         }),
@@ -131,9 +228,9 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       },
       editorProps: {
         attributes: {
-          class: 'content-area'
-        }
-      }
+          class: 'content-area',
+        },
+      },
     });
   }
 
@@ -151,8 +248,13 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       tile: this.tile,
       toggleBold: this.toggleBold.bind(this),
       toggleItalic: this.toggleItalic.bind(this),
+      toggleUnderline: this.toggleUnderline.bind(this),
+      toggleStrikethrough: this.toggleStrikethrough.bind(this),
+      toggleCode: this.toggleCode.bind(this),
+      toggleQuote: this.toggleQuote.bind(this),
       toggleBulletList: this.toggleBulletList.bind(this),
       toggleOrderedList: this.toggleOrderedList.bind(this),
+      toggleCodeBlock: this.toggleCodeBlock.bind(this),
       insertTable: this.insertTable.bind(this),
       setLink: this.setLink.bind(this),
       setAlignment: this.setAlignment.bind(this),
@@ -165,13 +267,29 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  // Toolbar actions - operate on content editor
+  // Toolbar actions
   toggleBold(editor: Editor) {
     editor.chain().focus().toggleBold().run();
   }
 
   toggleItalic(editor: Editor) {
     editor.chain().focus().toggleItalic().run();
+  }
+
+  toggleUnderline(editor: Editor) {
+    editor.chain().focus().toggleUnderline().run();
+  }
+
+  toggleStrikethrough(editor: Editor) {
+    editor.chain().focus().toggleStrike().run();
+  }
+
+  toggleCode(editor: Editor) {
+    editor.chain().focus().toggleCode().run();
+  }
+
+  toggleQuote(editor: Editor) {
+    editor.chain().focus().toggleBlockquote().run();
   }
 
   toggleBulletList(editor: Editor) {
@@ -182,8 +300,16 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     editor.chain().focus().toggleOrderedList().run();
   }
 
+  toggleCodeBlock(editor: Editor) {
+    editor.chain().focus().toggleCodeBlock().run();
+  }
+
   insertTable(editor: Editor) {
-    editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run();
+    editor
+      .chain()
+      .focus()
+      .insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+      .run();
   }
 
   setLink(editor: Editor) {
@@ -193,8 +319,19 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  setAlignment(editor: Editor, align: 'left' | 'center' | 'right',) {
+  setAlignment(align: 'left' | 'center' | 'right' | 'justify', editor: Editor) {
     editor.chain().focus().setTextAlign(align).run();
+  }
+
+  setTextColor(color: string, editor: Editor) {
+    const { from, to } = editor.state.selection;
+
+    // If no text is selected, select all
+    if (from === to) {
+      editor.chain().focus().selectAll().run();
+    }
+
+    editor.chain().focus().setMark('textStyle', { color }).run();
   }
 
   getDisplayText(html: string): string {

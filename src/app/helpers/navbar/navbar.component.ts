@@ -1,5 +1,5 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, Input, OnInit, OnDestroy } from '@angular/core';
+import { Component, Input, OnInit, OnDestroy, ViewEncapsulation } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { NavbarService, NavbarState } from '../../service/navbar.service';
@@ -10,7 +10,7 @@ import { NavbarService, NavbarState } from '../../service/navbar.service';
   imports: [CommonModule],
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.scss',
-  providers: [DatePipe]
+  providers: [DatePipe],
 })
 export class NavbarComponent {
   dateTime: Date = new Date();

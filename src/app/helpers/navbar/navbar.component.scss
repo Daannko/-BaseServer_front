@@ -113,22 +113,13 @@
   line-height: 1 !important;
 }
 
-::ng-deep .navbar-tile-controls strong {
-  font-weight: 700 !important;
-  margin: 0 !important;
-  padding: 0 !important;
+::ng-deep .navbar-tile-controls {
+  position: relative;
 }
 
-::ng-deep .navbar-tile-controls em {
-  font-style: italic !important;
-  margin: 0 !important;
-  padding: 0 !important;
-}
-
+// Text formatting fixes
 ::ng-deep .navbar-tile-controls strong,
-::ng-deep .navbar-tile-controls em,
-::ng-deep .navbar-tile-controls strong strong,
-::ng-deep .navbar-tile-controls strong em {
+::ng-deep .navbar-tile-controls em {
   margin: 0 !important;
   padding: 0 !important;
 }

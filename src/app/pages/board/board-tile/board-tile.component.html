@@ -1,4 +1,4 @@
-<div 
+<div
   class="board-item"
   [style.width.px]="tile.screenWidth"
   [style.height.px]="tile.screenHeight"
@@ -10,38 +10,207 @@
     <div #contentElement class="content-editor"></div>
   </div>
 
-
-  <ng-template #navbarContentTemplate let-tile="tile" let-toggleBold="toggleBold" let-toggleItalic="toggleItalic" let-toggleBulletList="toggleBulletList" let-toggleOrderedList="toggleOrderedList" let-insertTable="insertTable" let-setLink="setLink" let-setAlignment="setAlignment">
-      <div class="bar">
-        <div class="navbar-tile-controls">
-          <div  [innerHTML]="tile.label"></div>
-          <button (click)="toggleBold(contentEditor)" aria-label="Bold" title="Bold">
-            <app-svg-icon icon="editor-bold"></app-svg-icon>
+  <ng-template
+    #navbarContentTemplate
+    let-tile="tile"
+    let-toggleBold="toggleBold"
+    let-toggleItalic="toggleItalic"
+    let-toggleUnderline="toggleUnderline"
+    let-toggleStrikethrough="toggleStrikethrough"
+    let-toggleCode="toggleCode"
+    let-toggleQuote="toggleQuote"
+    let-toggleBulletList="toggleBulletList"
+    let-toggleOrderedList="toggleOrderedList"
+    let-insertTable="insertTable"
+    let-setLink="setLink"
+    let-setAlignment="setAlignment"
+    let-toggleCodeBlock="toggleCodeBlock"
+  >
+    <div class="bar">
+      <div class="navbar-tile-controls">
+        <div [innerHTML]="tile.label"></div>
+        <button
+          (click)="toggleBold(contentEditor)"
+          aria-label="Bold"
+          title="Bold"
+        >
+          <app-svg-icon icon="editor-bold"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleItalic(contentEditor)"
+          aria-label="Italic"
+          title="Italic"
+        >
+          <app-svg-icon icon="editor-italic"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleUnderline(contentEditor)"
+          aria-label="Underline"
+          title="Underline"
+        >
+          <app-svg-icon icon="editor-underline"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleStrikethrough(contentEditor)"
+          aria-label="Strikethrough"
+          title="Strikethrough"
+        >
+          <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleCode(contentEditor)"
+          aria-label="Code"
+          title="Code"
+        >
+          <app-svg-icon icon="editor-code"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleBulletList(contentEditor)"
+          aria-label="Bullet list"
+          title="Bullet list"
+        >
+          <app-svg-icon icon="editor-ul"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleOrderedList(contentEditor)"
+          aria-label="Ordered list"
+          title="Ordered list"
+        >
+          <app-svg-icon icon="editor-ol"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleQuote(contentEditor)"
+          aria-label="Quote"
+          title="Quote"
+        >
+          <app-svg-icon icon="editor-quote"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleCodeBlock(contentEditor)"
+          aria-label="Code block"
+          title="Code block"
+        >
+          <app-svg-icon icon="editor-code-duplicate"></app-svg-icon>
+        </button>
+        <button
+          (click)="setAlignment('left', contentEditor)"
+          aria-label="Align left"
+          title="Align left"
+        >
+          <app-svg-icon icon="editor-alignleft"></app-svg-icon>
+        </button>
+        <button
+          (click)="setAlignment('center', contentEditor)"
+          aria-label="Align center"
+          title="Align center"
+        >
+          <app-svg-icon icon="editor-aligncenter"></app-svg-icon>
+        </button>
+        <button
+          (click)="setAlignment('right', contentEditor)"
+          aria-label="Align right"
+          title="Align right"
+        >
+          <app-svg-icon icon="editor-alignright"></app-svg-icon>
+        </button>
+        <button
+          (click)="setAlignment('justify', contentEditor)"
+          aria-label="Justify"
+          title="Justify"
+        >
+          <app-svg-icon icon="editor-justify"></app-svg-icon>
+        </button>
+        <button
+          (click)="insertTable(contentEditor)"
+          aria-label="Insert table"
+          title="Insert table"
+        >
+          <app-svg-icon icon="editor-table"></app-svg-icon>
+        </button>
+        <div
+          class="color-picker-container"
+          (mouseenter)="isColorPaletteVisible = true"
+          (mouseleave)="isColorPaletteVisible = false"
+        >
+          <button class="color-picker-btn" title="Text color">
+            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
           </button>
-          <button (click)="toggleItalic(contentEditor)" aria-label="Italic" title="Italic">
-            <app-svg-icon icon="editor-italic-svgrepo-com"></app-svg-icon>
-          </button>
-          <button (click)="toggleBulletList(contentEditor)" aria-label="Bullet list" title="Bullet list">
-            <app-svg-icon icon="editor-ul-svgrepo-com"></app-svg-icon>
-          </button>
-          <button (click)="insertTable(contentEditor)" aria-label="Insert table" title="Insert table">
-            <app-svg-icon icon="editor-table-svgrepo-com"></app-svg-icon>
-          </button>
+          <div class="color-palette" [class.open]="isColorPaletteVisible">
+            <div class="temp"></div>
+            <button
+              *ngFor="let color of colors"
+              [style.background-color]="color"
+              (click)="setTextColor(color, contentEditor)"
+              [title]="color"
+              class="color-option"
+            ></button>
+          </div>
         </div>
       </div>
-    </ng-template>
+    </div>
+  </ng-template>
 
-    <ng-template #navbarTitleTemplate let-tile="tile" let-toggleBold="toggleBold" let-toggleItalic="toggleItalic" let-toggleBulletList="toggleBulletList" let-toggleOrderedList="toggleOrderedList" let-insertTable="insertTable" let-setLink="setLink" let-setAlignment="setAlignment">
-      <div class="bar">
-        <div class="navbar-tile-controls">
+  <ng-template
+    #navbarTitleTemplate
+    let-tile="tile"
+    let-toggleBold="toggleBold"
+    let-toggleItalic="toggleItalic"
+    let-toggleUnderline="toggleUnderline"
+    let-toggleStrikethrough="toggleStrikethrough"
+  >
+    <div class="bar">
+      <div class="navbar-tile-controls">
+        <div class="navbar-label">
           <div [innerHTML]="tile.label"></div>
-          <button (click)="toggleBold(titleEditor)" aria-label="Bold" title="Bold">
-            <app-svg-icon icon="editor-bold"></app-svg-icon>
+        </div>
+        <button
+          (click)="toggleBold(titleEditor)"
+          aria-label="Bold"
+          title="Bold"
+        >
+          <app-svg-icon icon="editor-bold"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleItalic(titleEditor)"
+          aria-label="Italic"
+          title="Italic"
+        >
+          <app-svg-icon icon="editor-italic"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleUnderline(titleEditor)"
+          aria-label="Underline"
+          title="Underline"
+        >
+          <app-svg-icon icon="editor-underline"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleStrikethrough(titleEditor)"
+          aria-label="Strikethrough"
+          title="Strikethrough"
+        >
+          <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
+        </button>
+        <div
+          class="color-picker-container"
+          (mouseenter)="isColorPaletteVisible = true"
+          (mouseleave)="isColorPaletteVisible = false"
+        >
+          <button class="color-picker-btn" title="Text color">
+            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
           </button>
-          <button (click)="toggleItalic(titleEditor)" aria-label="Italic" title="Italic">
-            <app-svg-icon icon="editor-italic-svgrepo-com"></app-svg-icon>
-          </button>
+          <div class="color-palette" [class.open]="isColorPaletteVisible">
+            <div class="temp"></div>
+            <button
+              *ngFor="let color of colors"
+              [style.background-color]="color"
+              (click)="setTextColor(color, titleEditor)"
+              [title]="color"
+              class="color-option"
+            ></button>
+          </div>
         </div>
       </div>
-    </ng-template>
+    </div>
+  </ng-template>
 </div>

@@ -21,26 +21,27 @@ app-board-tile {
   pointer-events: auto;
   user-select: text;
   height: 100%;
-  width: 100%; 
+  width: 100%;
   cursor: default;
   transition: box-shadow 0.1s ease-in-out;
 
   &:hover {
-    box-shadow: rgba(0, 0, 0, 0.3) 0px 0px 0px 1px, rgba(0, 0, 0, 0.5) 0px 3px 9px, rgba(0, 0, 0, 0.3) 0px 2px 5px;
+    box-shadow: rgba(0, 0, 0, 0.3) 0px 0px 0px 1px,
+      rgba(0, 0, 0, 0.5) 0px 3px 9px, rgba(0, 0, 0, 0.3) 0px 2px 5px;
   }
 }
 
 .tile-top {
   padding: 16px 16px 8px 16px;
   flex-shrink: 0;
-  
+
   .label {
     font-size: 14px;
     font-weight: 600;
     color: rgba(255, 255, 255, 0.9);
     margin-bottom: 4px;
   }
-  
+
   .topic-badge {
     display: inline-block;
     padding: 2px 6px;
@@ -62,20 +63,21 @@ app-board-tile {
 
 .title-editor {
   flex-shrink: 0;
-  
+
   :global(.tiptap) {
     outline: none;
-    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, sans-serif;
+    font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI",
+      Helvetica, sans-serif;
     font-size: 24px;
     font-weight: 700;
     line-height: 1.2;
     color: rgba(255, 255, 255, 0.9);
-    
+
     p {
       margin: 0;
       padding: 0;
     }
-    
+
     &.ProseMirror-focused {
       outline: none;
       background-color: red !important;
@@ -87,12 +89,16 @@ app-board-tile {
   flex: 1 1 auto;
   overflow-y: auto;
   overflow-x: hidden;
-  
- 
+}
+
+::ng-deep .navbar-label *[style*="color"] {
+  /* force Tiptap inline color spans to take priority */
+  all: unset;
+  display: inline;
 }
 
 .editor-toolbar {
-  color: rgba(255, 255, 255, 0.85);  // Current: light gray (85% white)
+  color: rgba(255, 255, 255, 0.85); // Current: light gray (85% white)
   display: flex;
   gap: 2px;
   padding: 8px 12px;
@@ -100,7 +106,7 @@ app-board-tile {
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   flex-shrink: 0;
   flex-wrap: wrap;
-  
+
   button {
     padding: 4px 8px;
     border: none;
@@ -115,16 +121,17 @@ app-board-tile {
     justify-content: center;
     min-width: 28px;
     height: 28px;
-    
+
     &:hover {
       background: rgba(255, 255, 255, 0.08);
     }
-    
+
     &:active {
       background: rgba(255, 255, 255, 0.16);
     }
 
-    strong, em {
+    strong,
+    em {
       color: rgba(255, 255, 255, 0.7);
     }
   }
@@ -146,10 +153,10 @@ app-board-tile {
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.95rem;
-  background: rgba(255, 255, 255, 0.06);  /* increased from 0.02 */
-  border: 1px solid rgba(255, 255, 255, 0.12);  /* increased from 0.06 */
+  background: rgba(255, 255, 255, 0.06); /* increased from 0.02 */
+  border: 1px solid rgba(255, 255, 255, 0.12); /* increased from 0.06 */
   transition: all 200ms ease-out;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);  /* add subtle shadow for depth */
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); /* add subtle shadow for depth */
 }
 
 ::ng-deep .navbar-tile-controls strong {
@@ -199,22 +206,34 @@ app-board-tile {
   line-height: 1 !important;
 }
 
-// ::ng-deep .navbar-title-text p {
-//   margin: 0 !important;
-//   padding: 0 !important;
-//   display: inline !important;
-// }
+// Color picker styles - sent to navbar via board-tile
+::ng-deep .color-picker-container {
+  position: relative;
+  display: inline-block;
+}
 
-// ::ng-deep strong, em {
-//   color: red !important;
-//   margin: 0 !important;
-//   padding: 0 !important;
-// }
+::ng-deep .color-palette {
+  position: absolute;
+  background: rgba(30, 30, 40, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 8px;
+  display: none;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 6px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
 
+::ng-deep .color-palette.open {
+  display: grid;
+}
 
-
-
-
-
-
-
+::ng-deep .temp {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  padding: 1rem;
+  left: -1rem;
+  top: -1rem;
+}
