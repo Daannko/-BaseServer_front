@@ -143,6 +143,74 @@ app-board-tile {
       line-height: 1.5;
     }
   }
+
+  table {
+    border-collapse: collapse;
+    margin: 12px 0;
+    background-color: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+    width: auto;
+  }
+
+  /* Handle table alignment through parent paragraph */
+  p {
+    &[style*="text-align: center"] table {
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+    &[style*="text-align: right"] table {
+      margin-left: auto;
+    }
+
+    &[style*="text-align: left"] table {
+      margin-right: auto;
+    }
+  }
+
+  th,
+  td {
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    padding: 10px 12px;
+    text-align: left;
+    color: rgba(255, 255, 255, 0.9);
+    position: relative;
+    transition: background-color 150ms ease-out;
+
+    /* Show resize cursor on table cell borders */
+    &:hover {
+      border-right-color: rgba(255, 255, 255, 0.3);
+
+      /* Resize column (right border) - TipTap supports this */
+      &::after {
+        content: "";
+        position: absolute;
+        right: -4px;
+        top: 0;
+        bottom: 0;
+        width: 8px;
+        cursor: col-resize;
+      }
+    }
+  }
+
+  th {
+    background-color: rgba(255, 213, 79, 0.15);
+    color: #ffd54f;
+    font-weight: 600;
+  }
+
+  td:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+
+  /* Highlight selected cells */
+  th.selectedCell,
+  td.selectedCell {
+    background-color: rgba(255, 255, 255, 0.05);
+  }
 }
 
 ::ng-deep .navbar-label *[style*="color"] {
@@ -192,7 +260,7 @@ app-board-tile {
 }
 
 ::ng-deep .bar {
-  display: flex;
+  display: table-column;
   justify-content: center;
   width: 100%;
 }
@@ -203,11 +271,11 @@ app-board-tile {
   justify-content: center;
   width: fit-content;
   gap: 4px;
-  padding: 8px 12px;
+  padding: 4px 12px;
   border-radius: 8px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.95rem;
-  background: rgba(255, 255, 255, 0.06); /* increased from 0.02 */
+  background: rgba(55, 55, 55);
   border: 1px solid rgba(255, 255, 255, 0.12); /* increased from 0.06 */
   transition: all 200ms ease-out;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); /* add subtle shadow for depth */
@@ -228,12 +296,12 @@ app-board-tile {
   border: none;
   background: transparent;
   color: #e6ebf0;
-  padding: 6px 8px;
+  padding: 4px 8px;
   cursor: pointer;
   font-weight: 500;
-  min-width: 32px;
-  min-height: 32px;
-  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  display: flex;
   align-items: center;
   justify-content: center;
   border-radius: 6px;
@@ -263,7 +331,36 @@ app-board-tile {
 // Color picker styles - sent to navbar via board-tile
 ::ng-deep .color-picker-container {
   position: relative;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 4px 8px;
+    border: none;
+    background: transparent;
+    border-radius: 6px;
+    cursor: pointer;
+    color: #e6ebf0;
+    transition: all 200ms ease-out;
+    width: 32px;
+    height: 32px;
+
+    &:hover {
+      color: #ffd54f !important;
+      background: rgba(255, 213, 79, 0.08);
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      color: #ffb300 !important;
+      background: rgba(255, 179, 0, 0.12);
+      transform: translateY(0);
+    }
+  }
 }
 
 ::ng-deep .color-palette {
@@ -273,6 +370,7 @@ app-board-tile {
   border-radius: 8px;
   padding: 8px;
   display: none;
+  z-index: 1000;
   grid-template-columns: repeat(5, 1fr);
   gap: 6px;
   backdrop-filter: blur(10px);
@@ -315,5 +413,68 @@ app-board-tile {
   option {
     background: #2f3437;
     color: #fff;
+  }
+}
+
+// Table controls styling\
+::ng-deep .table-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 1rem;
+  width: fit-content;
+  gap: 4px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.95rem;
+  background: rgba(55, 55, 55);
+  border: 1px solid rgba(255, 255, 255, 0.12); /* increased from 0.06 */
+  transition: all 200ms ease-out;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2); /* add subtle shadow for depth */
+
+  button {
+    padding: 4px 8px;
+    border: 1px solid rgba(76, 175, 80, 0.3);
+    background: rgba(76, 175, 80, 0.08);
+    color: #4caf50;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    transition: all 200ms ease-out;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+
+    span {
+      display: block;
+    }
+
+    app-svg-icon {
+      width: 24px;
+      height: 24px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    &:hover {
+      background: rgba(76, 175, 80, 0.15) !important;
+      border-color: rgba(76, 175, 80, 0.6);
+      box-shadow: 0 0 6px rgba(76, 175, 80, 0.2);
+      transform: translateY(-1px);
+    }
+
+    &:active {
+      background: rgba(76, 175, 80, 0.2) !important;
+      transform: translateY(0);
+    }
   }
 }

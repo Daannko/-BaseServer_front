@@ -26,8 +26,52 @@
     let-toggleCodeBlock="toggleCodeBlock"
   >
     <div class="bar">
-      <div class="navbar-tile-controls">
+      <div #normalControls class="navbar-tile-controls">
         <div [innerHTML]="tile.label"></div>
+        <!-- Font Selection -->
+        <select
+          #fontSelect
+          (change)="setFont(fontSelect.value, contentEditor)"
+          title="Font family"
+          class="font-selector"
+        >
+          <option value="" disabled selected>Font</option>
+          <option *ngFor="let font of fonts" [value]="font.value">
+            {{ font.name }}
+          </option>
+        </select>
+        <select
+          #fontSizeSelect
+          (change)="setFontSize(fontSizeSelect.value, contentEditor)"
+          title="Font size"
+          class="font-selector"
+        >
+          <option value="" disabled selected>Size</option>
+          <option *ngFor="let size of fontSizes" [value]="size.value">
+            {{ size.name }}
+          </option>
+        </select>
+
+        <!-- Text Formatting -->
+        <div
+          class="color-picker-container"
+          (mouseenter)="isColorPaletteVisible = true"
+          (mouseleave)="isColorPaletteVisible = false"
+        >
+          <button title="Text color">
+            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
+          </button>
+          <div class="color-palette" [class.open]="isColorPaletteVisible">
+            <div class="temp"></div>
+            <button
+              *ngFor="let color of colors"
+              [style.background-color]="color"
+              (click)="setTextColor(color, contentEditor)"
+              [title]="color"
+              class="color-option"
+            ></button>
+          </div>
+        </div>
         <button
           (click)="toggleBold(contentEditor)"
           aria-label="Bold"
@@ -56,20 +100,8 @@
         >
           <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
         </button>
-        <button
-          (click)="toggleBulletList(contentEditor)"
-          aria-label="Bullet list"
-          title="Bullet list"
-        >
-          <app-svg-icon icon="editor-ul"></app-svg-icon>
-        </button>
-        <button
-          (click)="toggleOrderedList(contentEditor)"
-          aria-label="Ordered list"
-          title="Ordered list"
-        >
-          <app-svg-icon icon="editor-ol"></app-svg-icon>
-        </button>
+
+        <!-- Text Styles & Special Elements -->
         <button
           (click)="toggleQuote(contentEditor)"
           aria-label="Quote"
@@ -84,6 +116,24 @@
         >
           <app-svg-icon icon="editor-code-duplicate"></app-svg-icon>
         </button>
+
+        <!-- Lists -->
+        <button
+          (click)="toggleBulletList(contentEditor)"
+          aria-label="Bullet list"
+          title="Bullet list"
+        >
+          <app-svg-icon icon="editor-ul"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleOrderedList(contentEditor)"
+          aria-label="Ordered list"
+          title="Ordered list"
+        >
+          <app-svg-icon icon="editor-ol"></app-svg-icon>
+        </button>
+
+        <!-- Alignment -->
         <button
           (click)="setAlignment('left', contentEditor)"
           aria-label="Align left"
@@ -117,38 +167,95 @@
           aria-label="Insert table"
           title="Insert table"
         >
-          <app-svg-icon icon="editor-table"></app-svg-icon>
+          <app-svg-icon icon="table"></app-svg-icon>
         </button>
-        <div
-          class="color-picker-container"
-          (mouseenter)="isColorPaletteVisible = true"
-          (mouseleave)="isColorPaletteVisible = false"
+      </div>
+
+      <div #tableControls class="table-controls" *ngIf="isTableActive">
+        <button
+          (click)="addColumnBefore(contentEditor)"
+          aria-label="Add column before"
+          title="Add column before"
         >
-          <button class="color-picker-btn" title="Text color">
-            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
-          </button>
-          <div class="color-palette" [class.open]="isColorPaletteVisible">
-            <div class="temp"></div>
-            <button
-              *ngFor="let color of colors"
-              [style.background-color]="color"
-              (click)="setTextColor(color, contentEditor)"
-              [title]="color"
-              class="color-option"
-            ></button>
-          </div>
-        </div>
-        <select
-          #fontSelect
-          (change)="setFont(fontSelect.value, contentEditor)"
-          title="Font family"
-          class="font-selector"
+          <app-svg-icon icon="table-add-column-before"></app-svg-icon>
+        </button>
+        <button
+          (click)="addColumnAfter(contentEditor)"
+          aria-label="Add column after"
+          title="Add column after"
         >
-          <option value="" disabled selected>Font</option>
-          <option *ngFor="let font of fonts" [value]="font.value">
-            {{ font.name }}
-          </option>
-        </select>
+          <app-svg-icon icon="table-add-column-after"></app-svg-icon>
+        </button>
+        <button
+          (click)="addRowBefore(contentEditor)"
+          aria-label="Add row before"
+          title="Add row before"
+        >
+          <app-svg-icon icon="table-add-row-before"></app-svg-icon>
+        </button>
+        <button
+          (click)="addRowAfter(contentEditor)"
+          aria-label="Add row after"
+          title="Add row after"
+        >
+          <app-svg-icon icon="table-add-row-after"></app-svg-icon>
+        </button>
+        <button
+          (click)="deleteColumn(contentEditor)"
+          aria-label="Delete column"
+          title="Delete column"
+        >
+          <app-svg-icon icon="table-delete-column"></app-svg-icon>
+        </button>
+        <button
+          (click)="deleteRow(contentEditor)"
+          aria-label="Delete row"
+          title="Delete row"
+        >
+          <app-svg-icon icon="table-delete-row"></app-svg-icon>
+        </button>
+        <button
+          (click)="mergeCells(contentEditor)"
+          aria-label="Merge cells"
+          title="Merge cells"
+        >
+          <app-svg-icon icon="table-merge-cells"></app-svg-icon>
+        </button>
+        <button
+          (click)="splitCell(contentEditor)"
+          aria-label="Split cell"
+          title="Split cell"
+        >
+          <app-svg-icon icon="table-split-cell"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleHeaderColumn(contentEditor)"
+          aria-label="Toggle header column"
+          title="Toggle header column"
+        >
+          <app-svg-icon icon="table-freeze-column"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleHeaderRow(contentEditor)"
+          aria-label="Toggle header row"
+          title="Toggle header row"
+        >
+          <app-svg-icon icon="table-freeze-row"></app-svg-icon>
+        </button>
+        <button
+          (click)="toggleHeaderCell(contentEditor)"
+          aria-label="Toggle header cell"
+          title="Toggle header cell"
+        >
+          <app-svg-icon icon="table-freeze-cell"></app-svg-icon>
+        </button>
+        <button
+          (click)="deleteTable(contentEditor)"
+          aria-label="Delete table"
+          title="Delete table"
+        >
+          <app-svg-icon icon="table-delete"></app-svg-icon>
+        </button>
       </div>
     </div>
   </ng-template>
@@ -166,6 +273,20 @@
         <div class="navbar-label">
           <div [innerHTML]="tile.label"></div>
         </div>
+        <!-- Font Selection -->
+        <select
+          #fontSelectTitle
+          (change)="setFont(fontSelectTitle.value, titleEditor)"
+          title="Font family"
+          class="font-selector"
+        >
+          <option value="" disabled selected>Font</option>
+          <option *ngFor="let font of fonts" [value]="font.value">
+            {{ font.name }}
+          </option>
+        </select>
+
+        <!-- Text Formatting -->
         <button
           (click)="toggleBold(titleEditor)"
           aria-label="Bold"
@@ -194,6 +315,8 @@
         >
           <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
         </button>
+
+        <!-- Color -->
         <div
           class="color-picker-container"
           (mouseenter)="isColorPaletteVisible = true"
@@ -213,17 +336,6 @@
             ></button>
           </div>
         </div>
-        <select
-          #fontSelectTitle
-          (change)="setFont(fontSelectTitle.value, titleEditor)"
-          title="Font family"
-          class="font-selector"
-        >
-          <option value="" disabled selected>Font</option>
-          <option *ngFor="let font of fonts" [value]="font.value">
-            {{ font.name }}
-          </option>
-        </select>
       </div>
     </div>
   </ng-template>

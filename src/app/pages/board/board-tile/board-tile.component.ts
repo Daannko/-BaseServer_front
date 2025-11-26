@@ -17,9 +17,10 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
+import { CellSelection } from '@tiptap/pm/tables';
 import { Link } from '@tiptap/extension-link';
 import { TextAlign } from '@tiptap/extension-text-align';
-import { TextStyle } from '@tiptap/extension-text-style';
+import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import { NavbarService } from '../../../service/navbar.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
@@ -46,6 +47,7 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
   titleEditor!: Editor;
   contentEditor!: Editor;
   isColorPaletteVisible: boolean = false;
+  isTableActive: boolean = false;
 
   colors = [
     '#ffffff',
@@ -71,6 +73,17 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     { name: 'Cursive', value: 'cursive' },
     { name: 'Comic Sans', value: '"Comic Sans MS", cursive' },
     { name: 'Arial', value: 'Arial, sans-serif' },
+  ];
+
+  fontSizes = [
+    { name: '12px', value: '12px' },
+    { name: '14px', value: '14px' },
+    { name: '16px', value: '16px' },
+    { name: '18px', value: '18px' },
+    { name: '20px', value: '20px' },
+    { name: '24px', value: '24px' },
+    { name: '28px', value: '28px' },
+    { name: '32px', value: '32px' },
   ];
 
   constructor(
@@ -228,6 +241,7 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
         TableRow,
         TableHeader,
         TableCell,
+        FontSize,
         Link.configure({
           openOnClick: false,
           HTMLAttributes: {
@@ -242,12 +256,78 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       onUpdate: ({ editor }) => {
         this.tile.content = editor.getHTML();
       },
+      onSelectionUpdate: ({ editor }) => {
+        this.detectTableContext(editor);
+      },
       editorProps: {
         attributes: {
           class: 'content-area',
         },
       },
     });
+  }
+
+  detectTableContext(editor: Editor) {
+    this.isTableActive =
+      editor.isActive('tableCell') || editor.isActive('tableHeader');
+    
+    // Highlight selected cells
+    this.highlightSelectedCells(editor);
+  }
+
+  highlightSelectedCells(editor: Editor) {
+    // Clear previous highlights
+    const allCells = this.contentElement.nativeElement.querySelectorAll('td, th');
+    allCells.forEach((cell: HTMLElement) => {
+      cell.classList.remove('selectedCell');
+    });
+
+    // Check if we have a CellSelection
+    const selection = editor.state.selection;
+    if (selection && selection.constructor.name === 'CellSelection') {
+      // We have a cell selection - highlight all selected cells
+      const cellSelection = selection as any;
+      const { $anchorCell, $headCell } = cellSelection;
+      
+      if ($anchorCell && $headCell) {
+        // Get the table and cells positions
+        const table = $anchorCell.node(-1);
+        const tableStart = $anchorCell.start(-1);
+        
+        // Find all cells and determine which are selected
+        let cellIndex = 0;
+        allCells.forEach((cell: HTMLElement) => {
+          // Check if this cell is within the selection range
+          const cellPos = tableStart + cellIndex;
+          
+          // Simple approach: check if cell has selection-related attributes
+          // TipTap adds data-selected or similar during cell selection
+          if (cell.hasAttribute('data-selected') || 
+              cell.classList.contains('selectedCell') ||
+              this.isCellInSelection(editor, cell)) {
+            cell.classList.add('selectedCell');
+          }
+          cellIndex++;
+        });
+      }
+    }
+  }
+
+  isCellInSelection(editor: Editor, cellElement: HTMLElement): boolean {
+    // Get cell position in editor
+    const view = (editor as any).view;
+    const domNode = cellElement;
+    
+    try {
+      const pos = view.posAtDOM(domNode, 0);
+      const resolvedPos = editor.state.doc.resolve(pos);
+      
+      // Check if position is in a cell
+      return resolvedPos.parent.type.spec['tableRole'] === 'cell' ||
+             resolvedPos.parent.type.spec['tableRole'] === 'header_cell';
+    } catch {
+      return false;
+    }
   }
 
   ngOnDestroy() {
@@ -271,11 +351,30 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       toggleOrderedList: this.toggleOrderedList.bind(this),
       toggleCodeBlock: this.toggleCodeBlock.bind(this),
       insertTable: this.insertTable.bind(this),
+      addColumnBefore: this.addColumnBefore.bind(this),
+      addColumnAfter: this.addColumnAfter.bind(this),
+      deleteColumn: this.deleteColumn.bind(this),
+      addRowBefore: this.addRowBefore.bind(this),
+      addRowAfter: this.addRowAfter.bind(this),
+      deleteRow: this.deleteRow.bind(this),
+      deleteTable: this.deleteTable.bind(this),
+      mergeCells: this.mergeCells.bind(this),
+      splitCell: this.splitCell.bind(this),
+      toggleHeaderColumn: this.toggleHeaderColumn.bind(this),
+      toggleHeaderRow: this.toggleHeaderRow.bind(this),
+      toggleHeaderCell: this.toggleHeaderCell.bind(this),
+      mergeOrSplit: this.mergeOrSplit.bind(this),
+      fixTables: this.fixTables.bind(this),
+      goToNextCell: this.goToNextCell.bind(this),
+      goToPreviousCell: this.goToPreviousCell.bind(this),
       setLink: this.setLink.bind(this),
       setAlignment: this.setAlignment.bind(this),
       setTextColor: this.setTextColor.bind(this),
       setFont: this.setFont.bind(this),
+      setFontSize: this.setFontSize.bind(this),
+      isTableActive: this.isTableActive,
       fonts: this.fonts,
+      fontSizes: this.fontSizes,
       colors: this.colors,
     };
   }
@@ -361,7 +460,85 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     editor.chain().focus().setFontFamily(fontFamily).run();
   }
 
+  setFontSize(fontSize: string, editor: Editor) {
+    const { from, to } = editor.state.selection;
+
+    // If no text is selected, select all
+    if (from === to) {
+      editor.chain().focus().selectAll().run();
+    }
+
+    // Apply font size using textStyle mark
+    editor.chain().focus().setMark('textStyle', { fontSize }).run();
+  }
+
   getDisplayText(html: string): string {
     return html.replace(/<\/?p[^>]*>/g, '').trim();
+  }
+
+  // Table manipulation methods
+  addColumnBefore(editor: Editor) {
+    editor.chain().focus().addColumnBefore().run();
+  }
+
+  addColumnAfter(editor: Editor) {
+    editor.chain().focus().addColumnAfter().run();
+  }
+
+  deleteColumn(editor: Editor) {
+    editor.chain().focus().deleteColumn().run();
+  }
+
+  addRowBefore(editor: Editor) {
+    editor.chain().focus().addRowBefore().run();
+  }
+
+  addRowAfter(editor: Editor) {
+    editor.chain().focus().addRowAfter().run();
+  }
+
+  deleteRow(editor: Editor) {
+    editor.chain().focus().deleteRow().run();
+  }
+
+  deleteTable(editor: Editor) {
+    editor.chain().focus().deleteTable().run();
+    this.isTableActive = false;
+  }
+
+  mergeCells(editor: Editor) {
+    editor.chain().focus().mergeCells().run();
+  }
+
+  splitCell(editor: Editor) {
+    editor.chain().focus().splitCell().run();
+  }
+
+  toggleHeaderColumn(editor: Editor) {
+    editor.chain().focus().toggleHeaderColumn().run();
+  }
+
+  toggleHeaderRow(editor: Editor) {
+    editor.chain().focus().toggleHeaderRow().run();
+  }
+
+  toggleHeaderCell(editor: Editor) {
+    editor.chain().focus().toggleHeaderCell().run();
+  }
+
+  mergeOrSplit(editor: Editor) {
+    editor.chain().focus().mergeOrSplit().run();
+  }
+
+  fixTables(editor: Editor) {
+    editor.chain().focus().fixTables().run();
+  }
+
+  goToNextCell(editor: Editor) {
+    editor.chain().focus().goToNextCell().run();
+  }
+
+  goToPreviousCell(editor: Editor) {
+    editor.chain().focus().goToPreviousCell().run();
   }
 }
