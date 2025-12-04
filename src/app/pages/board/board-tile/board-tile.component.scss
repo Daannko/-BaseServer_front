@@ -154,22 +154,6 @@ app-board-tile {
     width: auto;
   }
 
-  /* Handle table alignment through parent paragraph */
-  p {
-    &[style*="text-align: center"] table {
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    &[style*="text-align: right"] table {
-      margin-left: auto;
-    }
-
-    &[style*="text-align: left"] table {
-      margin-right: auto;
-    }
-  }
-
   th,
   td {
     border: 1px solid rgba(255, 255, 255, 0.15);
@@ -209,7 +193,7 @@ app-board-tile {
   /* Highlight selected cells */
   th.selectedCell,
   td.selectedCell {
-    background-color: rgba(255, 255, 255, 0.05);
+    background-color: rgba(26, 167, 185, 0.24);
   }
 }
 
@@ -416,7 +400,6 @@ app-board-tile {
   }
 }
 
-// Table controls styling\
 ::ng-deep .table-controls {
   display: flex;
   align-items: center;

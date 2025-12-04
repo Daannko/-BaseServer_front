@@ -113,7 +113,6 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     if (contentRoot) {
       contentRoot.addEventListener('click', () => {
         this.setNavbarContext(this.navbarContentTemplate);
-        console.log(this.tile.content);
       });
     }
 
@@ -237,6 +236,7 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
         FontFamily,
         Table.configure({
           resizable: true,
+          allowTableNodeSelection: true,
         }),
         TableRow,
         TableHeader,
@@ -270,64 +270,6 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
   detectTableContext(editor: Editor) {
     this.isTableActive =
       editor.isActive('tableCell') || editor.isActive('tableHeader');
-    
-    // Highlight selected cells
-    this.highlightSelectedCells(editor);
-  }
-
-  highlightSelectedCells(editor: Editor) {
-    // Clear previous highlights
-    const allCells = this.contentElement.nativeElement.querySelectorAll('td, th');
-    allCells.forEach((cell: HTMLElement) => {
-      cell.classList.remove('selectedCell');
-    });
-
-    // Check if we have a CellSelection
-    const selection = editor.state.selection;
-    if (selection && selection.constructor.name === 'CellSelection') {
-      // We have a cell selection - highlight all selected cells
-      const cellSelection = selection as any;
-      const { $anchorCell, $headCell } = cellSelection;
-      
-      if ($anchorCell && $headCell) {
-        // Get the table and cells positions
-        const table = $anchorCell.node(-1);
-        const tableStart = $anchorCell.start(-1);
-        
-        // Find all cells and determine which are selected
-        let cellIndex = 0;
-        allCells.forEach((cell: HTMLElement) => {
-          // Check if this cell is within the selection range
-          const cellPos = tableStart + cellIndex;
-          
-          // Simple approach: check if cell has selection-related attributes
-          // TipTap adds data-selected or similar during cell selection
-          if (cell.hasAttribute('data-selected') || 
-              cell.classList.contains('selectedCell') ||
-              this.isCellInSelection(editor, cell)) {
-            cell.classList.add('selectedCell');
-          }
-          cellIndex++;
-        });
-      }
-    }
-  }
-
-  isCellInSelection(editor: Editor, cellElement: HTMLElement): boolean {
-    // Get cell position in editor
-    const view = (editor as any).view;
-    const domNode = cellElement;
-    
-    try {
-      const pos = view.posAtDOM(domNode, 0);
-      const resolvedPos = editor.state.doc.resolve(pos);
-      
-      // Check if position is in a cell
-      return resolvedPos.parent.type.spec['tableRole'] === 'cell' ||
-             resolvedPos.parent.type.spec['tableRole'] === 'header_cell';
-    } catch {
-      return false;
-    }
   }
 
   ngOnDestroy() {
@@ -367,6 +309,9 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
       fixTables: this.fixTables.bind(this),
       goToNextCell: this.goToNextCell.bind(this),
       goToPreviousCell: this.goToPreviousCell.bind(this),
+      alignTableLeft: this.alignTableLeft.bind(this),
+      alignTableCenter: this.alignTableCenter.bind(this),
+      alignTableRight: this.alignTableRight.bind(this),
       setLink: this.setLink.bind(this),
       setAlignment: this.setAlignment.bind(this),
       setTextColor: this.setTextColor.bind(this),
@@ -540,5 +485,52 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
 
   goToPreviousCell(editor: Editor) {
     editor.chain().focus().goToPreviousCell().run();
+  }
+
+  alignTableLeft(editor: Editor) {
+    this.alignTable(editor, 'left');
+  }
+
+  alignTableCenter(editor: Editor) {
+    this.alignTable(editor, 'center');
+  }
+
+  alignTableRight(editor: Editor) {
+    this.alignTable(editor, 'right');
+  }
+
+  private alignTable(editor: Editor, align: 'left' | 'center' | 'right') {
+    const { $from } = editor.state.selection;
+
+    // Walk up the tree to find the table
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === 'table') {
+        // Found table at depth d
+        // Get table start position
+        const tableStart = $from.start(d);
+
+        // Apply styles directly to the table DOM element
+        const view = (editor as any).view;
+        const dom = view.domAtPos(tableStart).node;
+        const el = dom.nodeType === 3 ? dom.parentElement : dom;
+        const table = el.closest('table');
+
+        if (table) {
+          // Apply specific alignment
+          if (align === 'left') {
+            table.style.marginLeft = '0';
+            table.style.marginRight = 'auto';
+          } else if (align === 'center') {
+            table.style.marginLeft = 'auto';
+            table.style.marginRight = 'auto';
+          } else if (align === 'right') {
+            table.style.marginLeft = 'auto';
+            table.style.marginRight = '0';
+          }
+        }
+
+        return;
+      }
+    }
   }
 }

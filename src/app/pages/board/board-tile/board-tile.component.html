@@ -250,6 +250,27 @@
           <app-svg-icon icon="table-freeze-cell"></app-svg-icon>
         </button>
         <button
+          (click)="alignTableLeft(contentEditor)"
+          aria-label="Align table left"
+          title="Align table left"
+        >
+          <app-svg-icon icon="editor-alignleft"></app-svg-icon>
+        </button>
+        <button
+          (click)="alignTableCenter(contentEditor)"
+          aria-label="Align table center"
+          title="Align table center"
+        >
+          <app-svg-icon icon="editor-aligncenter"></app-svg-icon>
+        </button>
+        <button
+          (click)="alignTableRight(contentEditor)"
+          aria-label="Align table right"
+          title="Align table right"
+        >
+          <app-svg-icon icon="editor-alignright"></app-svg-icon>
+        </button>
+        <button
           (click)="deleteTable(contentEditor)"
           aria-label="Delete table"
           title="Delete table"
