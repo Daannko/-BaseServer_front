@@ -1,7 +1,12 @@
 import { Injectable } from '@angular/core';
-import { HttpEvent, HttpInterceptor, HttpHandler, HttpRequest, HTTP_INTERCEPTORS, HttpErrorResponse } from '@angular/common/http';
-
-
+import {
+  HttpEvent,
+  HttpInterceptor,
+  HttpHandler,
+  HttpRequest,
+  HTTP_INTERCEPTORS,
+  HttpErrorResponse,
+} from '@angular/common/http';
 
 import { Observable, throwError } from 'rxjs';
 import { catchError, switchMap } from 'rxjs/operators';
@@ -9,8 +14,6 @@ import { StorageService } from '../service/storage.service';
 import { AuthService } from '../service/auth.service';
 import { EventData } from '../shared/event.class';
 import { EventService } from '../service/event.service';
-
-
 
 @Injectable()
 export class HttpRequestInterceptor implements HttpInterceptor {
@@ -22,11 +25,12 @@ export class HttpRequestInterceptor implements HttpInterceptor {
     private eventService: EventService
   ) {}
 
-
-
-  intercept(req: HttpRequest<any>, next: HttpHandler): Observable<HttpEvent<any>> {
-    if(req.url.includes('geolocation-db.com/json/') ){
-      return next.handle(req)
+  intercept(
+    req: HttpRequest<any>,
+    next: HttpHandler
+  ): Observable<HttpEvent<any>> {
+    if (req.url.includes('geolocation-db.com/json/')) {
+      return next.handle(req);
     }
     req = req.clone({
       withCredentials: true,

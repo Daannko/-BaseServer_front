@@ -6,7 +6,7 @@ import { StorageService } from '../service/storage.service';
 import { UserService } from '../service/user.service';
 import { catchError, map, Observable, of, tap } from 'rxjs';
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class authGuard implements CanActivate {
   constructor(
@@ -24,7 +24,7 @@ export class authGuard implements CanActivate {
         if (this.storageService.isLoggedIn()) {
           return true;
         } else {
-          console.log("Failed to load user")
+          console.log('Failed to load user');
           this.router.navigate(['/auth']);
           return false;
         }

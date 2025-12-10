@@ -1,37 +1,35 @@
 <div id="background">
-    <app-navbar style="z-index: 1000;" #navbar [isClockVisible]="true" [isLogoutVisible]="true"></app-navbar>
-        <!-- <div class="debug-overlay">
-            <div>cameraX: {{cameraX}} cameraY: {{cameraY}}</div>
-            <div>zoom: {{zoom}}</div>
-        </div> -->
-        <div class="board-container" #board>
+  <app-navbar
+    style="z-index: 1000"
+    #navbar
+    [isClockVisible]="true"
+    [isLogoutVisible]="true"
+  ></app-navbar>
+  <div class="board-container" #board>
+    <div #itemsContainer>
+      <ng-container *ngFor="let item of tiles">
+        <app-board-tile
+          [tile]="item"
+          (dblclick)="centerOnItem(item)"
+          *ngIf="isItemVisible(item)"
+        >
+        </app-board-tile>
+      </ng-container>
+    </div>
 
-            <!-- Draw squares using divs -->
-            <div #itemsContainer>
-                <ng-container *ngFor="let item of tiles">
-                    <app-board-tile
-                        [tile]="item"
-                        (dblclick)="centerOnItem(item)"
-                        *ngIf="isItemVisible(item)"
-                    >
-                    </app-board-tile>
-                </ng-container>
-            </div>
+    <div style="display: block">
+      <ng-container *ngFor="let connector of connectors">
+        <app-board-connector
+          [data]="connector"
+          [zoom]="zoom"
+          (click)="moveToItem(connector.itemB)"
+        >
+        </app-board-connector>
+      </ng-container>
+    </div>
 
-            <!-- Drawn squares (outside items-container so they can receive clicks) -->
-             <div style="display: block;">
-                <ng-container  *ngFor="let connector of connectors" >
-                    <app-board-connector 
-                        [data]="connector"
-                        [zoom]="zoom"
-                        (click)="moveToItem(connector.itemB)"
-                    >
-                    </app-board-connector>
-                </ng-container>
-             </div>
-
-             <!-- SVG lines for connectors -->
-             <!-- <svg class="connector-lines" width="100%" height="100%">
+    <!-- SVG lines for connectors -->
+    <!-- <svg class="connector-lines" width="100%" height="100%">
                 <line *ngFor="let connector of connectors"
                     [attr.x1]="(connector.itemA.screenX + connector.itemA.screenWidth / 2)"
                     [attr.y1]="(connector.itemA.screenY + connector.itemA.screenHeight / 2)"
@@ -41,5 +39,5 @@
                     stroke-width="2"
                 />
              </svg> -->
-    </div>
+  </div>
 </div>

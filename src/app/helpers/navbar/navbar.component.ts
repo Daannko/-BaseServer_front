@@ -1,5 +1,11 @@
 import { CommonModule, DatePipe } from '@angular/common';
-import { Component, Input, OnInit, OnDestroy, ViewEncapsulation } from '@angular/core';
+import {
+  Component,
+  Input,
+  OnInit,
+  OnDestroy,
+  ViewEncapsulation,
+} from '@angular/core';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
 import { NavbarService, NavbarState } from '../../service/navbar.service';
@@ -21,11 +27,13 @@ export class NavbarComponent {
   private sub?: Subscription;
 
   constructor(private router: Router, private navbarService: NavbarService) {
-    setInterval(() => this.dateTime = new Date());
+    setInterval(() => (this.dateTime = new Date()));
   }
 
   ngOnInit(): void {
-    this.sub = this.navbarService.state$.subscribe(s => this.state = s || {});
+    this.sub = this.navbarService.state$.subscribe(
+      (s) => (this.state = s || {})
+    );
   }
 
   ngOnDestroy(): void {
@@ -36,11 +44,11 @@ export class NavbarComponent {
     // kept for debug
   }
 
-  logout(){
-    this.router.navigate(['../logout'])
+  logout() {
+    this.router.navigate(['../logout']);
   }
 
-  goHome(){
-    this.router.navigate(['../'])
+  goHome() {
+    this.router.navigate(['../']);
   }
 }

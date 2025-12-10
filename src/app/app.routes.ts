@@ -6,13 +6,14 @@ import { HomeComponent } from './pages/home/home.component';
 import { LogoutComponent } from './helpers/logout';
 import { BoardComponent } from './pages/board/board.component';
 
-
 export const routes: Routes = [
   { path: 'auth', component: AuthComponent },
-  { path: 'board', component: BoardComponent },// Updated path and component
+  { path: 'board', component: BoardComponent }, // Updated path and component
   { path: 'logout', component: LogoutComponent },
-  { path: '', component: HomeComponent,
+  {
+    path: '',
+    component: HomeComponent,
 
-    canActivate: [authGuard]
+    canActivate: [authGuard],
   },
 ];
