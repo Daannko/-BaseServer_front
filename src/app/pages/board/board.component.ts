@@ -124,10 +124,16 @@ export class BoardComponent implements OnInit {
     );
   }
 
-  centerOnItem(item: any) {
+  centerOnItem(item: BoardTile) {
     const board = this.boardRef.nativeElement;
     const viewportWidth = board.offsetWidth;
     const viewportHeight = board.offsetHeight;
+
+    //substracting here to make place for the connectors
+    const zoomHeightRatio = viewportHeight / item.height - 0.3;
+    const zoomWidthRatio = viewportWidth / item.width - 0.4;
+
+    this.zoom = Math.min(zoomHeightRatio, zoomWidthRatio);
 
     this.cameraX = item.getCenterX() - viewportWidth / (2 * this.zoom);
     this.cameraY = item.getCenterY() - viewportHeight / (2 * this.zoom);
