@@ -5,7 +5,179 @@
     [isClockVisible]="true"
     [isLogoutVisible]="true"
   ></app-navbar>
+
+  <ng-template
+    #defaultNavbarTemplate
+    let-getIsSearchOpen="getIsSearchOpen"
+    let-toggleSearch="toggleSearch"
+  >
+    <button
+      *ngIf="!getIsSearchOpen()"
+      class="transparent-glass-button"
+      type="button"
+      (click)="toggleSearch()"
+      aria-label="Search boards"
+      title="Search boards"
+    >
+      Search boards
+    </button>
+  </ng-template>
+
   <div class="board-container" #board>
+    <div *ngIf="isSearchOpen">
+      <div class="search" *ngIf="boards$ | async as boards">
+        <section
+          class="search-window"
+          aria-label="Board search"
+          (wheel)="$event.stopPropagation()"
+        >
+          <div class="search-header">
+            <div class="search-title">
+              <h3>Boards</h3>
+              <ng-container *ngIf="!isCreateOpen; else create">
+                <ng-container *ngIf="boards.length > 0; else noBoardsFound">
+                  <p class="search-subtitle">Search and select a board</p>
+                </ng-container>
+                <ng-template #noBoardsFound>
+                  <p class="search-subtitle">No boards found</p>
+                </ng-template>
+              </ng-container>
+              <ng-template #create>
+                <p class="search-subtitle">Create new board</p>
+              </ng-template>
+            </div>
+
+            <ng-container *ngIf="!isCreateOpen; else leftIcon">
+              <button
+                (click)="toggleSearchState()"
+                class="close-button"
+                type="button"
+                aria-label="Close"
+              >
+                <app-svg-icon icon="close-x"></app-svg-icon>
+              </button>
+            </ng-container>
+            <ng-template #leftIcon>
+              <button
+                (click)="toggleCreateState()"
+                class="close-button"
+                type="button"
+                aria-label="Close"
+              >
+                <app-svg-icon icon="chevron-left"></app-svg-icon>
+              </button>
+            </ng-template>
+          </div>
+
+          <div #searchOptions>
+            <ng-container *ngIf="!isCreateOpen; else createOption">
+              <div class="search-controls" *ngIf="boards.length > 0">
+                <input
+                  class="search-input"
+                  type="search"
+                  [(ngModel)]="searchQuery"
+                  placeholder="Search boards…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+              </div>
+
+              <div class="search-results" role="list">
+                <ng-container
+                  *ngIf="
+                    filteredBoards(boards).length || searchQuery.length == 0;
+                    else noResults
+                  "
+                >
+                  <div
+                    class="search-result"
+                    role="listitem"
+                    *ngFor="let b of filteredBoards(boards)"
+                    (click)="selectBoard(b.id)"
+                  >
+                    <div class="search-result-name">
+                      {{ b.name }}
+                    </div>
+                  </div>
+                </ng-container>
+                <ng-template #noResults>
+                  <div class="search-empty">No boards match your search.</div>
+                </ng-template>
+              </div>
+              <div class="search-footer">
+                <button
+                  class="new-board"
+                  type="button"
+                  (click)="toggleCreateState()"
+                >
+                  Create new board
+                </button>
+              </div>
+            </ng-container>
+            <ng-template #createOption>
+              <div class="create-board">
+                <div class="create-fields">
+                  <label class="field">
+                    <span class="field-label">Name</span>
+                    <input
+                      #newBoardNameInput
+                      class="search-input"
+                      type="text"
+                      placeholder=""
+                      autocomplete="off"
+                      spellcheck="false"
+                      [class.is-invalid]="
+                        newBoardNameTouched && !isCreateNameValid
+                      "
+                      [attr.aria-invalid]="
+                        newBoardNameTouched && !isCreateNameValid
+                      "
+                      [(ngModel)]="newBoardName"
+                      [attr.placeholder]="
+                        newBoardNameTouched && !isCreateNameValid
+                          ? 'Name is required…'
+                          : 'e.g. Cooking'
+                      "
+                    />
+                  </label>
+
+                  <label class="field">
+                    <span class="field-label">Description</span>
+                    <textarea
+                      class="search-textarea"
+                      placeholder="What is this board about?"
+                      rows="4"
+                      spellcheck="false"
+                      [(ngModel)]="newBoardDescription"
+                    ></textarea>
+                  </label>
+                </div>
+
+                <div class="search-footer">
+                  <div class="create-actions">
+                    <button
+                      class="new-board"
+                      type="button"
+                      (click)="submitNewBoardRequest()"
+                    >
+                      Create board
+                    </button>
+                    <button
+                      class="new-board new-board-secondary"
+                      type="button"
+                      (click)="toggleCreateState()"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </ng-template>
+          </div>
+        </section>
+      </div>
+    </div>
+
     <div #itemsContainer>
       <ng-container *ngFor="let item of tiles">
         <app-board-tile
@@ -21,7 +193,6 @@
       <ng-container *ngFor="let connector of connectors">
         <app-board-connector
           [data]="connector"
-          [zoom]="zoom"
           (click)="moveToItem(connector.itemB)"
         >
         </app-board-connector>

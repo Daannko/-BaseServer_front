@@ -1,5 +1,6 @@
 import { connect } from 'http2';
 import { BoardTile } from '../board-tile/board-tile.data';
+import { Topic } from '../models/topic.model';
 
 export class BoardConnector {
   x!: number;

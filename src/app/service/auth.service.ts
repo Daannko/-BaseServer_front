@@ -1,44 +1,56 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpContext, HttpContextToken, HttpHeaders, HttpResponse } from '@angular/common/http';
-import { Observable, of, from, throwError, map, catchError, tap, lastValueFrom, finalize } from 'rxjs';
+import {
+  HttpClient,
+  HttpContext,
+  HttpContextToken,
+  HttpHeaders,
+  HttpResponse,
+} from '@angular/common/http';
+import {
+  Observable,
+  of,
+  from,
+  throwError,
+  map,
+  catchError,
+  tap,
+  lastValueFrom,
+  finalize,
+} from 'rxjs';
 import { error } from 'node:console';
 import { Router } from '@angular/router';
-import { CustomSnackbar } from '../helpers/snackbar';
+import { SnackBarService } from './snackbar.service';
 import { response } from 'express';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class AuthService {
-
-
   private apiUrl = 'http://localhost:8080/auth/';
-  private firstLogin= true;
+  private firstLogin = true;
 
   constructor(
     private http: HttpClient,
-    private router:Router,
-    private snackBar:CustomSnackbar
+    private router: Router,
+    private snackBar: SnackBarService
   ) {}
 
-  refresh(options?:any): Observable<any>{
-    return this.http.get<any>(this.apiUrl + "refresh", options)
+  refresh(options?: any): Observable<any> {
+    return this.http.get<any>(this.apiUrl + 'refresh', options);
   }
 
-  public getFirstLogin():boolean{
+  public getFirstLogin(): boolean {
     return this.firstLogin;
   }
 
-
-
-  checkSession() : Observable<any>{
-    return this.refresh({ observe: 'response' })
+  checkSession(): Observable<any> {
+    return this.refresh({ observe: 'response' });
   }
 
   login(email: string, password: string): Observable<boolean> {
     const body = {
       email: email,
-      password: password
+      password: password,
     };
 
     const headers = new HttpHeaders({
@@ -46,17 +58,17 @@ export class AuthService {
     });
 
     return this.http.post<any>(this.apiUrl + 'login', body, {
-      headers
-    })
-    console.log("login called");
+      headers,
+    });
+    console.log('login called');
     console.log(this.apiUrl + 'login');
   }
 
-  register(email: string, password: string,name:string): Observable<any> {
+  register(email: string, password: string, name: string): Observable<any> {
     const body = {
       email: email,
       password: password,
-      name: name
+      name: name,
     };
 
     const headers = new HttpHeaders({
@@ -64,17 +76,17 @@ export class AuthService {
     });
 
     return this.http.post<any>(this.apiUrl + 'register', body, {
-      headers
-    },);
+      headers,
+    });
   }
 
-  logout(){
-    window.sessionStorage.clear()
-    localStorage.clear()
+  logout() {
+    window.sessionStorage.clear();
+    localStorage.clear();
     this.firstLogin = false;
-    this.http.get<any>(this.apiUrl + 'logout' ).subscribe({
-      complete:()=> this.router.navigate(['/auth'])
+    this.http.get<any>(this.apiUrl + 'logout').subscribe({
+      complete: () => this.router.navigate(['/auth']),
     });
-    this.snackBar.success("Successfuly loged out")
+    this.snackBar.success('Successfuly loged out');
   }
 }

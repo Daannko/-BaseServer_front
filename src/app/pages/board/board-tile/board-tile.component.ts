@@ -22,7 +22,7 @@ import { Link } from '@tiptap/extension-link';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
-import { NavbarService } from '../../../service/navbar.service';
+import { NavbarService } from '../../../helpers/navbar/navbar.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
 import Color from '@tiptap/extension-color';
 import DOMPurify from 'dompurify';

@@ -1,7 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import { CanActivate, CanActivateFn, Router } from '@angular/router';
 import { AuthService } from '../service/auth.service';
-import { CustomSnackbar } from '../helpers/snackbar';
+import { SnackBarService } from '../service/snackbar.service';
 import { StorageService } from '../service/storage.service';
 import { UserService } from '../service/user.service';
 import { catchError, map, Observable, of, tap } from 'rxjs';

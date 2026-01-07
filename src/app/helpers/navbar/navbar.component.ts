@@ -8,7 +8,7 @@ import {
 } from '@angular/core';
 import { Router } from '@angular/router';
 import { Subscription } from 'rxjs';
-import { NavbarService, NavbarState } from '../../service/navbar.service';
+import { NavbarService, NavbarState } from './navbar.service';
 
 @Component({
   selector: 'app-navbar',

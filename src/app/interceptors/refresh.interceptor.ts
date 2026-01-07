@@ -14,6 +14,7 @@ import { StorageService } from '../service/storage.service';
 import { AuthService } from '../service/auth.service';
 import { EventData } from '../shared/event.class';
 import { EventService } from '../service/event.service';
+import { debug } from 'console';
 
 @Injectable()
 export class HttpRequestInterceptor implements HttpInterceptor {

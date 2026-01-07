@@ -12,7 +12,7 @@ import { ActivatedRoute, Router } from '@angular/router';
 import { StorageService } from '../../service/storage.service';
 import { CommonModule, DatePipe } from '@angular/common';
 import { UserService } from '../../service/user.service';
-import { CustomSnackbar } from '../../helpers/snackbar';
+import { SnackBarService } from '../../service/snackbar.service';
 import { Observable, switchMap, timer } from 'rxjs';
 import { AuthService } from '../../service/auth.service';
 import { NavbarComponent } from '../../helpers/navbar/navbar.component';
@@ -30,7 +30,7 @@ export class HomeComponent implements AfterViewInit, OnInit, OnDestroy {
   constructor(
     private storageService: StorageService,
     private userService: UserService,
-    private snackBar: CustomSnackbar,
+    private snackBar: SnackBarService,
     private router: Router
   ) {}
 

@@ -49,6 +49,8 @@ export class SvgIconComponent {
       'table-freeze-row': 'board_icons/table/table-freeze-row.svg',
       'table-move-left': 'board_icons/table/table-move-left.svg',
       'table-move-right': 'board_icons/table/table-move-right.svg',
+      'close-x': 'general/close-x.svg',
+      'chevron-left': 'general/chevron-left.svg',
       table: 'board_icons/table/table.svg',
     };
 

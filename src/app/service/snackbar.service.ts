@@ -1,11 +1,10 @@
-import { Injectable } from "@angular/core";
-import { MatSnackBar } from "@angular/material/snack-bar";
+import { Injectable } from '@angular/core';
+import { MatSnackBar } from '@angular/material/snack-bar';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
-export class CustomSnackbar {
-
+export class SnackBarService {
   constructor(private snackBar: MatSnackBar) {}
 
   success(message: string) {
@@ -13,7 +12,7 @@ export class CustomSnackbar {
       duration: 3000, // Slightly longer duration for better visibility
       horizontalPosition: 'center',
       verticalPosition: 'top',
-      panelClass: ['snackbar-success']
+      panelClass: ['snackbar-success'],
     });
   }
 
@@ -22,7 +21,7 @@ export class CustomSnackbar {
       duration: 3000,
       horizontalPosition: 'center',
       verticalPosition: 'top',
-      panelClass: ['snackbar-error']
+      panelClass: ['snackbar-error'],
     });
   }
 
@@ -31,7 +30,7 @@ export class CustomSnackbar {
       duration: 3000,
       horizontalPosition: 'center',
       verticalPosition: 'top',
-      panelClass: ['snackbar-info']
+      panelClass: ['snackbar-info'],
     });
   }
 }

@@ -1,10 +1,12 @@
-import { ElementRef, Injectable } from '@angular/core';
+import { ElementRef, Injectable, TemplateRef } from '@angular/core';
 import { BoardTile } from './board-tile/board-tile.data';
 
 @Injectable({ providedIn: 'root' })
 export class BoardMainService {
   // internal state - set by caller via `initialize`
   boardRef: ElementRef | null = null;
+  defaultNavbarTemplate: TemplateRef<any> | null = null;
+  defaultNavbarContext: any = null;
   zoom: number = 1;
   cameraX: number = 0;
   cameraY: number = 0;
@@ -16,9 +18,6 @@ export class BoardMainService {
   startX: number = 0;
   startY: number = 0;
 
-  /**
-   * Initialize service context. Call from component to provide element refs and helpers.
-   */
   initialize(options: {
     boardRef: ElementRef;
     tiles?: Array<BoardTile>;
@@ -28,6 +27,8 @@ export class BoardMainService {
     zoom?: number;
     cameraX?: number;
     cameraY?: number;
+    defaultNavbarTemplate?: TemplateRef<any>;
+    defaultNavbarContext?: any;
   }) {
     this.boardRef = options.boardRef;
     this.tiles = options.tiles || this.tiles;
@@ -37,11 +38,10 @@ export class BoardMainService {
     this.zoom = options.zoom ?? this.zoom;
     this.cameraX = options.cameraX ?? this.cameraX;
     this.cameraY = options.cameraY ?? this.cameraY;
+    this.defaultNavbarTemplate = options.defaultNavbarTemplate ?? null;
+    this.defaultNavbarContext = options.defaultNavbarContext ?? null;
   }
 
-  /**
-   * Update board visual state using the service's own context (boardRef, tiles, zoom, camera)
-   */
   updateBoard() {
     if (!this.boardRef) return;
     const board = this.boardRef.nativeElement as HTMLElement;
@@ -143,11 +143,11 @@ export class BoardMainService {
       // Only start dragging if clicking directly on the board, not on tiles or their children
       if (event.target !== board) return;
 
-      if (
-        this.navBarService &&
-        typeof this.navBarService.clear === 'function'
-      ) {
-        this.navBarService.clear();
+      if (this.navBarService && this.defaultNavbarTemplate) {
+        this.navBarService.setTemplate(
+          this.defaultNavbarTemplate,
+          this.defaultNavbarContext
+        );
       }
       this.isDragging = true;
       this.startX = event.clientX;
