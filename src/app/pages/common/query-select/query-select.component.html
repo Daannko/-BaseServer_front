@@ -1,0 +1,25 @@
+<div class="query-select">
+  <input
+    class="query-input"
+    [placeholder]="placeholder"
+    [title]="title"
+    autocomplete="off"
+    spellcheck="false"
+    [value]="query"
+    (focus)="open()"
+    (input)="onInput($any($event.target).value)"
+    (keydown.enter)="onEnter()"
+    (blur)="onBlur()"
+  />
+
+  <div class="query-dropdown" *ngIf="isOpen">
+    <button
+      type="button"
+      class="query-option"
+      *ngFor="let opt of filtered; trackBy: trackByIndex"
+      (mousedown)="onOptionMouseDown(opt)"
+    >
+      {{ readOption(opt).label }}
+    </button>
+  </div>
+</div>
