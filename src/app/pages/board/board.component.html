@@ -11,16 +11,19 @@
     let-getIsSearchOpen="getIsSearchOpen"
     let-toggleSearch="toggleSearch"
   >
-    <button
-      *ngIf="!getIsSearchOpen()"
-      class="transparent-glass-button"
-      type="button"
-      (click)="toggleSearch()"
-      aria-label="Search boards"
-      title="Search boards"
-    >
-      Search boards
-    </button>
+    <div class="bar" *ngIf="!getIsSearchOpen()">
+      <div class="board-navbar-controls">
+        <button
+          class="board-search-button"
+          type="button"
+          (click)="toggleSearch()"
+          aria-label="Search boards"
+          title="Search boards"
+        >
+          <span>Search boards</span>
+        </button>
+      </div>
+    </div>
   </ng-template>
 
   <div class="board-container" #board>
@@ -178,25 +181,30 @@
       </div>
     </div>
 
-    <div #itemsContainer>
-      <ng-container *ngFor="let item of tiles">
-        <app-board-tile
-          [tile]="item"
-          (dblclick)="centerOnItem(item)"
-          *ngIf="isItemVisible(item)"
-        >
-        </app-board-tile>
-      </ng-container>
-    </div>
+    <div class="board-viewport" #viewport>
+      <div #itemsContainer>
+        <ng-container *ngFor="let item of tiles">
+          <app-board-tile
+            [tile]="item"
+            [zoom]="zoom"
+            (dblclick)="centerOnItem(item)"
+            (navbarChange)="onTileNavbarChange($event)"
+            *ngIf="isItemVisible(item)"
+          >
+          </app-board-tile>
+        </ng-container>
+      </div>
 
-    <div style="display: block">
-      <ng-container *ngFor="let connector of connectors">
-        <app-board-connector
-          [data]="connector"
-          (click)="moveToItem(connector.itemB)"
-        >
-        </app-board-connector>
-      </ng-container>
+      <div style="display: block">
+        <ng-container *ngFor="let connector of connectors">
+          <app-board-connector
+            [data]="connector"
+            [zoom]="zoom"
+            (click)="moveToItem(connector.itemB)"
+          >
+          </app-board-connector>
+        </ng-container>
+      </div>
     </div>
 
     <!-- SVG lines for connectors -->

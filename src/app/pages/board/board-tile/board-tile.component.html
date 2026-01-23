@@ -1,9 +1,18 @@
 <div
+  boardTileResize
+  [rect]="{
+    x: tile.x,
+    y: tile.y,
+    width: tile.width,
+    height: tile.height,
+  }"
+  [zoom]="zoom"
+  (rectChange)="onTileWorldRectChange($event)"
   class="board-item"
-  [style.width.px]="tile.screenWidth"
-  [style.height.px]="tile.screenHeight"
-  [style.left.px]="tile.screenX"
-  [style.top.px]="tile.screenY"
+  [style.width.px]="tile.width"
+  [style.height.px]="tile.height"
+  [style.left.px]="tile.x"
+  [style.top.px]="tile.y"
 >
   <div class="editor-wrap">
     <div #titleElement class="title-editor"></div>
@@ -27,31 +36,28 @@
   >
     <div class="bar">
       <div #normalControls class="navbar-tile-controls">
-        <div [innerHTML]="tile.label"></div>
+        <div class="navbar-title" [innerHTML]="tile.label"></div>
+        <div class="navbar-spacer"></div>
         <!-- Font Selection -->
-        <select
-          #fontSelect
-          (change)="setFont(fontSelect.value, contentEditor)"
+        <app-query-select
+          [options]="fonts"
+          labelKey="name"
+          valueKey="name"
+          placeholder="Font"
           title="Font family"
-          class="font-selector"
-        >
-          <option value="" disabled selected>Font</option>
-          <option *ngFor="let font of fonts" [value]="font.value">
-            {{ font.name }}
-          </option>
-        </select>
-        <select
-          #fontSizeSelect
-          (change)="setFontSize(fontSizeSelect.value, contentEditor)"
-          title="Font size"
-          class="font-selector"
-        >
-          <option value="" disabled selected>Size</option>
-          <option *ngFor="let size of fontSizes" [value]="size.value">
-            {{ size.name }}
-          </option>
-        </select>
+          [allowCustom]="false"
+          (commit)="applyFont($event, contentEditor)"
+        ></app-query-select>
 
+        <app-query-select
+          [options]="fontSizes"
+          labelKey="name"
+          valueKey="value"
+          placeholder="Size"
+          title="Font size"
+          (commit)="applyFontSize($event, contentEditor)"
+        ></app-query-select>
+        <div class="navbar-spacer"></div>
         <!-- Text Formatting -->
         <div
           class="color-picker-container"
@@ -100,7 +106,7 @@
         >
           <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
         </button>
-
+        <div class="navbar-spacer"></div>
         <!-- Text Styles & Special Elements -->
         <button
           (click)="toggleQuote(contentEditor)"
@@ -117,6 +123,7 @@
           <app-svg-icon icon="editor-code-duplicate"></app-svg-icon>
         </button>
 
+        <div class="navbar-spacer"></div>
         <!-- Lists -->
         <button
           (click)="toggleBulletList(contentEditor)"
@@ -132,7 +139,7 @@
         >
           <app-svg-icon icon="editor-ol"></app-svg-icon>
         </button>
-
+        <div class="navbar-spacer"></div>
         <!-- Alignment -->
         <button
           (click)="setAlignment('left', contentEditor)"
@@ -162,6 +169,7 @@
         >
           <app-svg-icon icon="editor-justify"></app-svg-icon>
         </button>
+        <div class="navbar-spacer"></div>
         <button
           (click)="insertTable(contentEditor)"
           aria-label="Insert table"
@@ -294,20 +302,41 @@
         <div class="navbar-label">
           <div [innerHTML]="tile.label"></div>
         </div>
+        <div class="navbar-spacer"></div>
         <!-- Font Selection -->
-        <select
-          #fontSelectTitle
-          (change)="setFont(fontSelectTitle.value, titleEditor)"
+        <app-query-select
+          [options]="fonts"
+          labelKey="name"
+          valueKey="name"
+          placeholder="Font"
           title="Font family"
-          class="font-selector"
-        >
-          <option value="" disabled selected>Font</option>
-          <option *ngFor="let font of fonts" [value]="font.value">
-            {{ font.name }}
-          </option>
-        </select>
+          [allowCustom]="false"
+          (commit)="applyFont($event, titleEditor)"
+        ></app-query-select>
 
-        <!-- Text Formatting -->
+        <div class="navbar-spacer"></div>
+
+        <!-- Color -->
+        <div
+          class="color-picker-container"
+          (mouseenter)="isColorPaletteVisible = true"
+          (mouseleave)="isColorPaletteVisible = false"
+        >
+          <button class="color-picker-btn" title="Text color">
+            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
+          </button>
+          <div class="color-palette" [class.open]="isColorPaletteVisible">
+            <div class="temp"></div>
+            <button
+              *ngFor="let color of colors"
+              [style.background-color]="color"
+              (click)="setTextColor(color, titleEditor)"
+              [title]="color"
+              class="color-option"
+            ></button>
+          </div>
+        </div>
+
         <button
           (click)="toggleBold(titleEditor)"
           aria-label="Bold"
@@ -336,33 +365,9 @@
         >
           <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
         </button>
-
-        <!-- Color -->
-        <div
-          class="color-picker-container"
-          (mouseenter)="isColorPaletteVisible = true"
-          (mouseleave)="isColorPaletteVisible = false"
-        >
-          <button class="color-picker-btn" title="Text color">
-            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
-          </button>
-          <div class="color-palette" [class.open]="isColorPaletteVisible">
-            <div class="temp"></div>
-            <button
-              *ngFor="let color of colors"
-              [style.background-color]="color"
-              (click)="setTextColor(color, titleEditor)"
-              [title]="color"
-              class="color-option"
-            ></button>
-          </div>
-        </div>
       </div>
     </div>
   </ng-template>
 
-  <ng-template
-    #defaultNavbarTemplate>
-   
-  </ng-template>
+  <ng-template #defaultNavbarTemplate> </ng-template>
 </div>

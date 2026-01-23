@@ -42,12 +42,42 @@
   min-width: 120px;
   max-height: 220px;
   overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
 
   background: rgba(30, 30, 40, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
   border-radius: 8px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
   padding: 6px;
+
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(230, 235, 240, 0.35) transparent;
+
+  /* Chromium / Safari */
+  &::-webkit-scrollbar {
+    width: 10px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0);
+    border-radius: 999px;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(230, 235, 240, 0.32);
+    border-radius: 999px;
+    border: 2px solid rgba(30, 30, 40, 0.98);
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: rgba(230, 235, 240, 0.5);
+  }
+
+  &::-webkit-scrollbar-thumb:active {
+    background: rgba(230, 235, 240, 0.62);
+  }
 }
 
 .query-option {

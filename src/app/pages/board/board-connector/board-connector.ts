@@ -23,7 +23,7 @@ export class BoardConnector {
     this.itemA = itemA;
     this.itemB = itemB;
     this.updateAngles();
-    this.updatePosition(1);
+    this.updatePosition();
   }
 
   getCenterX() {
@@ -34,18 +34,16 @@ export class BoardConnector {
     return this.y;
   }
 
-  updatePosition(zoom: number) {
-    var connectorShift = 20;
+  updatePosition() {
+    const connectorShift = 20;
 
     const tx =
-      ((this.itemA.screenWidth / 2 + connectorShift + this.width / 2) /
-        Math.abs(this.cos)) *
-      zoom;
+      (this.itemA.width / 2 + connectorShift + this.width / 2) /
+      Math.max(0.0001, Math.abs(this.cos));
     const ty =
-      ((this.itemA.screenHeight / 2 + connectorShift + this.height / 2) /
-        Math.abs(this.sin)) *
-      zoom;
-    const r = Math.min(tx, ty) / zoom;
+      (this.itemA.height / 2 + connectorShift + this.height / 2) /
+      Math.max(0.0001, Math.abs(this.sin));
+    const r = Math.min(tx, ty);
 
     var x = this.itemA.screenX + this.itemA.screenWidth / 2 + r * this.cos;
     var y = this.itemA.screenY + this.itemA.screenHeight / 2 + r * this.sin;

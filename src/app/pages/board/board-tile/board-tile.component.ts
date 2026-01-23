@@ -2,11 +2,14 @@ import {
   Component,
   ElementRef,
   Input,
+  Output,
+  EventEmitter,
   ViewChild,
   OnInit,
   OnDestroy,
   AfterViewInit,
   TemplateRef,
+  HostListener,
 } from '@angular/core';
 import { BoardTile } from './board-tile.data';
 import { CommonModule } from '@angular/common';
@@ -22,21 +25,38 @@ import { Link } from '@tiptap/extension-link';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
-import { NavbarService } from '../../../helpers/navbar/navbar.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
+import { QuerySelectComponent } from '../../common/query-select/query-select.component';
 import Color from '@tiptap/extension-color';
 import DOMPurify from 'dompurify';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import {
+  PersistentSelection,
+  PersistentSelectionKey,
+} from '../../../helpers/tiptap/PersistentSelector';
+import { TileRect, TileResizeDirective } from './tile.resize.directive';
+import { BoardMainService } from '../board.main.service';
 
 @Component({
   selector: 'app-board-tile',
   standalone: true,
-  imports: [CommonModule, FormsModule, SvgIconComponent],
+  imports: [
+    CommonModule,
+    FormsModule,
+    SvgIconComponent,
+    QuerySelectComponent,
+    TileResizeDirective,
+  ],
   templateUrl: './board-tile.component.html',
   styleUrl: './board-tile.component.scss',
 })
 export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
   @Input() tile!: BoardTile;
+  @Input() zoom = 1;
+  @Output() navbarChange = new EventEmitter<{
+    template: TemplateRef<any>;
+    context: any;
+  }>();
   @ViewChild('titleElement', { static: false }) titleElement!: ElementRef;
   @ViewChild('contentElement', { static: false }) contentElement!: ElementRef;
   @ViewChild('navbarContentTemplate', { static: false })
@@ -48,6 +68,45 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
   contentEditor!: Editor;
   isColorPaletteVisible: boolean = false;
   isTableActive: boolean = false;
+
+  // Options
+  disableTextDrag = true;
+
+  private lastTitleSelection: { from: number; to: number } | null = null;
+  private lastContentSelection: { from: number; to: number } | null = null;
+
+  private clearPersistentSelectionDecoration(editor?: Editor) {
+    const view = (editor as any)?.view;
+    if (!view) return;
+    view.dispatch(
+      view.state.tr.setMeta(PersistentSelectionKey, { type: 'focus' }),
+    );
+  }
+
+  /**
+   * Called by the board when clicking empty background.
+   * Ensures no persistent selection highlight remains visible.
+   */
+  clearSelectionHighlight() {
+    this.lastTitleSelection = null;
+    this.lastContentSelection = null;
+
+    // Blur both editors (if one is focused) to remove native selection paint.
+    try {
+      this.titleEditor?.commands?.blur();
+    } catch {}
+    try {
+      this.contentEditor?.commands?.blur();
+    } catch {}
+
+    // Clear persistent-selection decoration immediately and again after blur handlers run.
+    this.clearPersistentSelectionDecoration(this.titleEditor);
+    this.clearPersistentSelectionDecoration(this.contentEditor);
+    queueMicrotask(() => {
+      this.clearPersistentSelectionDecoration(this.titleEditor);
+      this.clearPersistentSelectionDecoration(this.contentEditor);
+    });
+  }
 
   colors = [
     '#ffffff',
@@ -87,9 +146,28 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
   ];
 
   constructor(
-    private navbarService: NavbarService,
-    private sanitizer: DomSanitizer
+    private sanitizer: DomSanitizer,
+    private host: ElementRef<HTMLElement>,
+    private mainBoardService: BoardMainService,
   ) {}
+
+  @HostListener('document:mousedown', ['$event'])
+  onDocumentMouseDown(ev: MouseEvent) {
+    const target = ev.target as HTMLElement | null;
+
+    // Never clear while interacting with the top navbar / search UI.
+    if (target?.closest('app-navbar') || target?.closest('.search-window')) {
+      return;
+    }
+
+    // If click is inside this tile (including its editors), don't clear.
+    if (this.host.nativeElement.contains(target as Node)) {
+      return;
+    }
+
+    // Click was outside this tile: clear its selection highlight.
+    this.clearSelectionHighlight();
+  }
 
   ngOnInit() {
     // Initialize after view is ready
@@ -107,12 +185,12 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
 
     if (titleRoot) {
       titleRoot.addEventListener('click', () => {
-        this.setNavbarContext(this.navbarTitleTemplate);
+        this.requestNavbar(this.navbarTitleTemplate);
       });
     }
     if (contentRoot) {
       contentRoot.addEventListener('click', () => {
-        this.setNavbarContext(this.navbarContentTemplate);
+        this.requestNavbar(this.navbarContentTemplate);
       });
     }
 
@@ -125,9 +203,9 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
           contentRoot && contentRoot.contains(selection.anchorNode);
 
         if (isInTitle) {
-          this.setNavbarContext(this.navbarTitleTemplate);
+          this.requestNavbar(this.navbarTitleTemplate);
         } else if (isInContent) {
-          this.setNavbarContext(this.navbarContentTemplate);
+          this.requestNavbar(this.navbarContentTemplate);
         }
       }
     });
@@ -153,10 +231,28 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
         root.style.cursor = 'pointer';
         return;
       }
-
-      // default: text caret
       root.style.cursor = 'text';
     });
+  }
+
+  onTileWorldRectChange(r: TileRect) {
+    this.tile.x = r.x;
+    this.tile.y = r.y;
+    this.tile.width = r.width;
+    this.tile.height = r.height;
+
+    this.tile.updateSize(this.zoom);
+    this.tile.updatePosition(
+      this.mainBoardService.cameraX,
+      this.mainBoardService.cameraY,
+      this.zoom,
+    );
+
+    // This might not be the best ... will see
+    for (const connector of this.tile.connectors) {
+      connector.updateAngles();
+      connector.updatePosition();
+    }
   }
 
   updateLabel(label: string) {
@@ -210,13 +306,22 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
           codeBlock: false,
           horizontalRule: false,
         }),
+        PersistentSelection,
         TextStyle,
         Color.configure({ types: ['textStyle'] }),
         FontFamily,
       ],
       content: this.tile.label || '<p></p>',
+      onFocus: () => {
+        // Switching to title: clear any persistent highlight from content.
+        this.clearPersistentSelectionDecoration(this.contentEditor);
+        this.lastContentSelection = null;
+      },
       onUpdate: ({ editor }) => {
         this.updateLabel(editor.getHTML());
+      },
+      onSelectionUpdate: ({ editor }) => {
+        this.captureLastSelection(editor);
       },
       editorProps: {
         attributes: {
@@ -239,6 +344,7 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
           allowTableNodeSelection: true,
         }),
         TableRow,
+        PersistentSelection,
         TableHeader,
         TableCell,
         FontSize,
@@ -253,11 +359,17 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
         }),
       ],
       content: this.tile.content || '<p></p>',
+      onFocus: () => {
+        // Switching to content: clear any persistent highlight from title.
+        this.clearPersistentSelectionDecoration(this.titleEditor);
+        this.lastTitleSelection = null;
+      },
       onUpdate: ({ editor }) => {
         this.tile.content = editor.getHTML();
       },
       onSelectionUpdate: ({ editor }) => {
         this.detectTableContext(editor);
+        this.captureLastSelection(editor);
       },
       editorProps: {
         attributes: {
@@ -265,11 +377,68 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
         },
       },
     });
+
+    this.applyDisableTextDrag(this.disableTextDrag);
+  }
+
+  applyDisableTextDrag(disabled: boolean) {
+    this.disableTextDrag = disabled;
+
+    const patchEditor = (editor?: Editor) => {
+      if (!editor) return;
+
+      const currentProps = editor.options.editorProps ?? {};
+      const currentEvents = (currentProps as any).handleDOMEvents ?? {};
+
+      editor.setOptions({
+        editorProps: {
+          ...currentProps,
+          handleDOMEvents: {
+            ...currentEvents,
+
+            dragstart: (_view: any, ev: DragEvent) => {
+              if (!this.disableTextDrag) return false; // allow default ProseMirror behavior
+              ev.preventDefault();
+              return true; // handled
+            },
+
+            drop: (_view: any, ev: DragEvent) => {
+              if (!this.disableTextDrag) return false;
+              ev.preventDefault();
+              return true;
+            },
+          },
+        },
+      });
+    };
+
+    patchEditor(this.titleEditor);
+    patchEditor(this.contentEditor);
   }
 
   detectTableContext(editor: Editor) {
     this.isTableActive =
       editor.isActive('tableCell') || editor.isActive('tableHeader');
+  }
+
+  private captureLastSelection(editor: Editor) {
+    const { from, to } = editor.state.selection;
+    if (from === to) return;
+
+    const selection = { from: Math.min(from, to), to: Math.max(from, to) };
+    if (editor === this.titleEditor) {
+      this.lastTitleSelection = selection;
+    } else if (editor === this.contentEditor) {
+      this.lastContentSelection = selection;
+    }
+  }
+
+  private getLastSelection(
+    editor: Editor,
+  ): { from: number; to: number } | null {
+    if (editor === this.titleEditor) return this.lastTitleSelection;
+    if (editor === this.contentEditor) return this.lastContentSelection;
+    return null;
   }
 
   ngOnDestroy() {
@@ -324,10 +493,12 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     };
   }
 
-  setNavbarContext(template: TemplateRef<any>) {
-    if (template) {
-      this.navbarService.setTemplate(template, this.getNavbarContext());
-    }
+  requestNavbar(template: TemplateRef<any>) {
+    if (!template) return;
+    this.navbarChange.emit({
+      template,
+      context: this.getNavbarContext(),
+    });
   }
 
   // Toolbar actions
@@ -385,36 +556,119 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
   setTextColor(color: string, editor: Editor) {
     const { from, to } = editor.state.selection;
 
-    // If no text is selected, select all
-    if (from === to) {
-      editor.chain().focus().selectAll().run();
+    const last = this.getLastSelection(editor);
+    const canRestore =
+      from === to &&
+      last &&
+      typeof last.from === 'number' &&
+      last.from < last.to;
+
+    const chain = editor.chain().focus();
+
+    // If selection got lost due to clicking toolbar UI, restore it.
+    if (canRestore) {
+      chain.setTextSelection({ from: last.from, to: last.to });
+    } else if (from === to) {
+      chain.selectAll();
     }
 
-    editor.chain().focus().setMark('textStyle', { color }).run();
+    chain.setMark('textStyle', { color }).run();
   }
 
   setFont(fontFamily: string, editor: Editor) {
     const { from, to } = editor.state.selection;
 
-    // If no text is selected, select all
-    if (from === to) {
-      editor.chain().focus().selectAll().run();
+    const last = this.getLastSelection(editor);
+    const canRestore =
+      from === to &&
+      last &&
+      typeof last.from === 'number' &&
+      last.from < last.to;
+
+    const chain = editor.chain().focus();
+
+    // If selection got lost due to clicking toolbar UI, restore it.
+    if (canRestore) {
+      chain.setTextSelection({ from: last.from, to: last.to });
+    } else if (from === to) {
+      chain.selectAll();
     }
 
     // Apply font using the official FontFamily extension command
-    editor.chain().focus().setFontFamily(fontFamily).run();
+    chain.setFontFamily(fontFamily).run();
+  }
+
+  applyFont(input: string, editor: Editor) {
+    const raw = (input || '').trim();
+    if (!raw) return;
+
+    const match = this.fonts.find(
+      (f) => f.name.toLowerCase() === raw.toLowerCase(),
+    );
+    const fontFamily = match ? match.value : raw;
+
+    this.setFont(fontFamily, editor);
   }
 
   setFontSize(fontSize: string, editor: Editor) {
     const { from, to } = editor.state.selection;
 
-    // If no text is selected, select all
-    if (from === to) {
-      editor.chain().focus().selectAll().run();
+    const last = this.getLastSelection(editor);
+    const canRestore =
+      from === to &&
+      last &&
+      typeof last.from === 'number' &&
+      last.from < last.to;
+
+    const chain = editor.chain().focus();
+
+    // If selection got lost due to clicking toolbar UI, restore it.
+    if (canRestore) {
+      chain.setTextSelection({ from: last.from, to: last.to });
+    } else if (from === to) {
+      chain.selectAll();
     }
 
     // Apply font size using textStyle mark
-    editor.chain().focus().setMark('textStyle', { fontSize }).run();
+    chain.setMark('textStyle', { fontSize }).run();
+  }
+
+  applyFontSize(input: string, editor: Editor) {
+    const fontSize = this.normalizeFontSize(input);
+    if (!fontSize) return;
+
+    this.setFontSize(fontSize, editor);
+  }
+
+  private normalizeFontSize(input: string): string | null {
+    const raw = (input || '').trim();
+    if (!raw) return null;
+
+    // Allow just a number (treated as px)
+    if (/^\d+(?:\.\d+)?$/.test(raw)) {
+      return `${raw}px`;
+    }
+
+    // Allow common CSS length units
+    if (
+      /^\d+(?:\.\d+)?(px|em|rem|%|pt|pc|cm|mm|in|vh|vw|vmin|vmax|ch|ex)$/.test(
+        raw,
+      )
+    ) {
+      return raw;
+    }
+
+    // If user typed something like "16 px" or "16PX", try a forgiving parse
+    const compact = raw.replace(/\s+/g, '').toLowerCase();
+    if (
+      /^\d+(?:\.\d+)?(px|em|rem|%|pt|pc|cm|mm|in|vh|vw|vmin|vmax|ch|ex)$/.test(
+        compact,
+      )
+    ) {
+      return compact;
+    }
+
+    return null;
   }
 
   getDisplayText(html: string): string {

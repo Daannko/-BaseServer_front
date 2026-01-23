@@ -3,6 +3,7 @@ import {
   ElementRef,
   ViewChild,
   OnInit,
+  OnDestroy,
   HostListener,
   ViewChildren,
   QueryList,
@@ -20,7 +21,7 @@ import { BoardConnectorComponent } from './board-connector/board-connector.compo
 import { NavbarService } from '../../helpers/navbar/navbar.service';
 import { BoardMainService } from './board.main.service';
 import { BoardSearchService } from './board.search.service';
-import { Observable } from 'rxjs';
+import { Observable, Subject, takeUntil } from 'rxjs';
 import { SvgIconComponent } from '../../helpers/svg-icon/svg-icon.component';
 import { Board } from './models/board.model';
 import { Topic } from './models/topic.model';
@@ -39,8 +40,9 @@ import { Topic } from './models/topic.model';
   templateUrl: './board.component.html',
   styleUrls: ['./board.component.scss'],
 })
-export class BoardComponent implements OnInit, AfterViewInit {
+export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('board', { static: true }) boardRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('viewport', { static: false }) viewportRef!: ElementRef<HTMLDivElement>;
   @ViewChild('navbar', { static: true, read: ElementRef })
   navbarRef!: ElementRef;
   @ViewChild('defaultNavbarTemplate', { static: true })
@@ -60,6 +62,8 @@ export class BoardComponent implements OnInit, AfterViewInit {
   newBoardNameTouched = false;
   newBoardDescription = '';
   searchQuery = '';
+  zoom = 1;
+  private readonly destroy$ = new Subject<void>();
 
   tiles: BoardTile[] = [];
   connectors: Array<BoardConnector> = [];
@@ -73,6 +77,11 @@ export class BoardComponent implements OnInit, AfterViewInit {
       getIsSearchOpen: () => this.isSearchOpen,
       toggleSearch: () => this.toggleSearchState(),
     };
+  }
+
+  onTileNavbarChange(event: { template: TemplateRef<any>; context: any }) {
+    if (!event?.template) return;
+    this.navBarService.setTemplate(event.template, event.context);
   }
 
   private resetTileState(): void {
@@ -97,7 +106,7 @@ export class BoardComponent implements OnInit, AfterViewInit {
     private navBarService: NavbarService,
     private cdr: ChangeDetectorRef,
     private mainBoardService: BoardMainService,
-    private boardSearchService: BoardSearchService
+    private boardSearchService: BoardSearchService,
   ) {
     this.boards$ = this.boardSearchService.boards$;
     this.topics$ = this.boardSearchService.topics$;
@@ -128,7 +137,7 @@ export class BoardComponent implements OnInit, AfterViewInit {
 
       const topics = await this.boardSearchService.getTopicsByIds(
         board.topics,
-        false
+        false,
       );
       for (const topic of topics) {
         this.addBoardTile(topic);
@@ -141,21 +150,24 @@ export class BoardComponent implements OnInit, AfterViewInit {
 
       this.mainBoardService.initialize({
         boardRef: this.boardRef,
+        viewportRef: this.viewportRef,
         tiles: this.tiles,
         tileComponents: this.tileComponents
           ? this.tileComponents.toArray()
           : [],
         cdr: this.cdr,
-        navBarService: this.navBarService,
-        defaultNavbarTemplate: this.defaultNavbarTemplate,
-        defaultNavbarContext,
+        onBackgroundMouseDown: () =>
+          this.navBarService.setTemplate(
+            this.defaultNavbarTemplate,
+            defaultNavbarContext,
+          ),
       });
       this.isSearchOpen = false;
 
       // ensure navbar updates even if it was showing the default template
       this.navBarService.setTemplate(
         this.defaultNavbarTemplate,
-        defaultNavbarContext
+        defaultNavbarContext,
       );
       this.connectorComponents?.forEach((c) => c.updateSize());
       if (this.tiles.length > 0) {
@@ -174,7 +186,7 @@ export class BoardComponent implements OnInit, AfterViewInit {
     return safeBoards.filter((b) =>
       String(b?.name ?? '')
         .toLowerCase()
-        .includes(query)
+        .includes(query),
     );
   }
 
@@ -211,7 +223,7 @@ export class BoardComponent implements OnInit, AfterViewInit {
       this.newBoardName,
       this.newBoardDescription,
       viewportWidth,
-      viewportHeight
+      viewportHeight,
     );
     if (board != null) {
       this.resetNewBoardForm();
@@ -220,7 +232,20 @@ export class BoardComponent implements OnInit, AfterViewInit {
     }
   }
 
-  ngOnInit() {}
+  ngOnInit() {
+    this.mainBoardService.zoom$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((z) => {
+        this.zoom = z;
+        // Keep template bindings in sync (especially important during wheel zoom)
+        this.cdr.detectChanges();
+      });
+  }
+
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
   ngAfterViewInit() {
     this.boardSearchService.refreshBoards();
@@ -229,20 +254,23 @@ export class BoardComponent implements OnInit, AfterViewInit {
 
     this.mainBoardService.initialize({
       boardRef: this.boardRef,
+      viewportRef: this.viewportRef,
       tiles: this.tiles,
       tileComponents: this.tileComponents ? this.tileComponents.toArray() : [],
       cdr: this.cdr,
-      navBarService: this.navBarService,
-      zoom: 1,
+      zoom: this.zoom,
       cameraX: 0,
       cameraY: 0,
-      defaultNavbarTemplate: this.defaultNavbarTemplate,
-      defaultNavbarContext,
+      onBackgroundMouseDown: () =>
+        this.navBarService.setTemplate(
+          this.defaultNavbarTemplate,
+          defaultNavbarContext,
+        ),
     });
 
     this.navBarService.setTemplate(
       this.defaultNavbarTemplate,
-      defaultNavbarContext
+      defaultNavbarContext,
     );
     this.mainBoardService.setupListeners();
     if (this.tiles.length > 0) {

@@ -1,8 +1,20 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
+
+<!-- Uploaded to: SVG Repo, www.svgrepo.com, Generator: SVG Repo Mixer Tools -->
 <svg width="800px" height="800px" viewBox="0 0 20 20" xmlns="http://www.w3.org/2000/svg">
-<rect x="0" fill="none" width="20" height="20"/>
-<g>
-<path d="M13.23 15h1.9L11 4H9L5 15h1.88l1.07-3h4.18zm-1.53-4.54H8.51L10 5.6z"/>
-</g>
-</svg>
+
+<rect x="0" fill="none" width="20" height="20"/>
+
+<g>
+
+	<!-- Slightly widen to match other editor icons without making it feel taller/larger -->
+	<g transform="translate(10 10) scale(1.18 1.06) translate(-10 -10)">
+		<path d="M13.23 15h1.9L11 4H9L5 15h1.88l1.07-3h4.18zm-1.53-4.54H8.51L10 5.6z"/>
+
+		<!-- Bottom color bar to match other editor icons' visual weight/alignment -->
+		<path d="M5 16h10v1H5z"/>
+	</g>
+
+</g>
+
+</svg>

@@ -28,7 +28,7 @@ export class BoardTile {
     connectors: Set<BoardConnector>,
     tier: number,
     label: string,
-    content: string
+    content: string,
   ) {
     this.id = id;
     this.x = realX;
@@ -88,7 +88,7 @@ export class BoardTile {
       new Set(),
       0,
       topic.title ?? '',
-      topic.content ?? ''
+      topic.content ?? '',
     );
   }
 }

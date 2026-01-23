@@ -1,78 +1,111 @@
-import { ElementRef, Injectable, TemplateRef } from '@angular/core';
+import { ElementRef, Injectable } from '@angular/core';
+import { BehaviorSubject } from 'rxjs';
 import { BoardTile } from './board-tile/board-tile.data';
 
 @Injectable({ providedIn: 'root' })
 export class BoardMainService {
   // internal state - set by caller via `initialize`
   boardRef: ElementRef | null = null;
-  defaultNavbarTemplate: TemplateRef<any> | null = null;
-  defaultNavbarContext: any = null;
-  zoom: number = 1;
-  cameraX: number = 0;
-  cameraY: number = 0;
+  viewportRef: ElementRef | null = null;
+  private readonly zoomSubject = new BehaviorSubject<number>(1);
+  private readonly cameraSubject = new BehaviorSubject<{
+    x: number;
+    y: number;
+  }>({ x: 0, y: 0 });
+  readonly zoom$ = this.zoomSubject.asObservable();
+  readonly camera$ = this.cameraSubject.asObservable();
+
+  get cameraX(): number {
+    return this.cameraSubject.value.x;
+  }
+  get cameraY(): number {
+    return this.cameraSubject.value.y;
+  }
+
+  get zoom(): number {
+    return this.zoomSubject.value;
+  }
+
+  setZoom(nextZoom: number) {
+    this.zoomSubject.next(nextZoom);
+  }
+
+  setCamera(x: number, y: number) {
+    this.cameraSubject.next({ x, y });
+  }
+
   tiles: Array<BoardTile> = [];
   tileComponents: any[] = [];
   cdr: any = null; // optional ChangeDetectorRef
-  navBarService: any = null; // optional external service with `clear()`
+  onBackgroundMouseDown: (() => void) | null = null;
   isDragging: boolean = false;
   startX: number = 0;
   startY: number = 0;
 
   initialize(options: {
     boardRef: ElementRef;
+    viewportRef?: ElementRef;
     tiles?: Array<BoardTile>;
     tileComponents?: any[];
     cdr?: any;
-    navBarService?: any;
     zoom?: number;
     cameraX?: number;
     cameraY?: number;
-    defaultNavbarTemplate?: TemplateRef<any>;
-    defaultNavbarContext?: any;
+    onBackgroundMouseDown?: () => void;
   }) {
     this.boardRef = options.boardRef;
+    this.viewportRef = options.viewportRef ?? this.viewportRef;
     this.tiles = options.tiles || this.tiles;
     this.tileComponents = options.tileComponents || this.tileComponents;
     this.cdr = options.cdr || this.cdr;
-    this.navBarService = options.navBarService || this.navBarService;
-    this.zoom = options.zoom ?? this.zoom;
-    this.cameraX = options.cameraX ?? this.cameraX;
-    this.cameraY = options.cameraY ?? this.cameraY;
-    this.defaultNavbarTemplate = options.defaultNavbarTemplate ?? null;
-    this.defaultNavbarContext = options.defaultNavbarContext ?? null;
+    if (typeof options.zoom === 'number') {
+      this.setZoom(options.zoom);
+    }
+    this.setCamera(
+      options.cameraX ?? this.cameraX,
+      options.cameraY ?? this.cameraY,
+    );
+    this.onBackgroundMouseDown = options.onBackgroundMouseDown ?? null;
   }
 
   updateBoard() {
     if (!this.boardRef) return;
     const board = this.boardRef.nativeElement as HTMLElement;
 
-    // Update background scaling/position
-    board.style.backgroundSize = `scale(${this.zoom})`;
-    board.style.backgroundPosition = `${-this.cameraX}px ${-this.cameraY}px`;
+    // Apply a single transform for pan/zoom. Children are positioned in world px.
+    if (this.viewportRef) {
+      const viewport = this.viewportRef.nativeElement as HTMLElement;
+      viewport.style.transformOrigin = '0 0';
+      viewport.style.transform = `scale(${this.zoom}) translate(${-this.cameraX}px, ${-this.cameraY}px)`;
+    }
 
-    // Update items positions in screen pixels
-    (this.tiles || []).forEach((item) => {
-      item.updateSize(this.zoom);
-      item.updatePosition(this.cameraX, this.cameraY, this.zoom);
-      item.connectors.forEach((connector: any) => {
-        connector.updateSize(this.zoom);
-        connector.updatePosition(this.zoom);
-      });
-    });
+    // Keep background "stuck" to world coordinates.
+    // (Background moves in screen px, so multiply camera by zoom.)
+    board.style.backgroundPosition = `${-this.cameraX * this.zoom}px ${-this.cameraY * this.zoom}px`;
   }
 
   isItemVisible(item: any): boolean {
     if (!this.boardRef) return true;
     const board = this.boardRef.nativeElement as HTMLElement;
-    const boardWidth = board.offsetWidth / this.zoom;
-    const boardHeight = board.offsetHeight / this.zoom;
+    const viewW = board.offsetWidth / this.zoom;
+    const viewH = board.offsetHeight / this.zoom;
+
+    const left = item.x;
+    const top = item.y;
+    const right = item.x + item.width;
+    const bottom = item.y + item.height;
+
+    const viewLeft = this.cameraX;
+    const viewTop = this.cameraY;
+    const viewRight = this.cameraX + viewW;
+    const viewBottom = this.cameraY + viewH;
 
     return (
       item.forceToRender ||
-      (item.screenX > -item.screenWidth &&
-        item.screenX / this.zoom < boardWidth &&
-        item.screenY > -item.screenHeight &&
-        item.screenY / this.zoom < boardHeight)
+      (right > viewLeft &&
+        left < viewRight &&
+        bottom > viewTop &&
+        top < viewBottom)
     );
   }
 
@@ -86,10 +119,12 @@ export class BoardMainService {
     const zoomHeightRatio = viewportHeight / item.height - 0.3;
     const zoomWidthRatio = viewportWidth / item.width - 0.4;
 
-    this.zoom = Math.min(zoomHeightRatio, zoomWidthRatio);
+    this.setZoom(Math.min(zoomHeightRatio, zoomWidthRatio));
 
-    this.cameraX = item.getCenterX() - viewportWidth / (2 * this.zoom);
-    this.cameraY = item.getCenterY() - viewportHeight / (2 * this.zoom);
+    this.setCamera(
+      item.getCenterX() - viewportWidth / (2 * this.zoom),
+      item.getCenterY() - viewportHeight / (2 * this.zoom),
+    );
 
     this.updateBoard();
   }
@@ -104,10 +139,13 @@ export class BoardMainService {
 
     Promise.resolve().then(() => {
       const centerTile = this.tileComponents.find(
-        (tile) => tile.tile.label === item.label
+        (tile) => tile.tile.label === item.label,
       );
       if (centerTile) {
-        centerTile.setNavbarContext(centerTile.navbarContentTemplate);
+        // Let the tile request its navbar; BoardComponent owns NavbarService.
+        if (typeof centerTile.requestNavbar === 'function') {
+          centerTile.requestNavbar(centerTile.navbarContentTemplate);
+        }
       }
       item.forceToRender = false;
     });
@@ -131,24 +169,36 @@ export class BoardMainService {
       const worldMouseX = mouseX / this.zoom + this.cameraX;
       const worldMouseY = mouseY / this.zoom + this.cameraY;
 
-      this.zoom = newZoom;
+      this.setZoom(newZoom);
 
-      this.cameraX = worldMouseX - mouseX / this.zoom;
-      this.cameraY = worldMouseY - mouseY / this.zoom;
+      this.setCamera(
+        worldMouseX - mouseX / this.zoom,
+        worldMouseY - mouseY / this.zoom,
+      );
 
       this.updateBoard();
     });
 
     board.addEventListener('mousedown', (event: MouseEvent) => {
-      // Only start dragging if clicking directly on the board, not on tiles or their children
-      if (event.target !== board) return;
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
 
-      if (this.navBarService && this.defaultNavbarTemplate) {
-        this.navBarService.setTemplate(
-          this.defaultNavbarTemplate,
-          this.defaultNavbarContext
-        );
+      // Only start panning when interacting with the background.
+      // (The viewport is transformed, so clicks often target children; we still want pan.)
+      if (
+        target.closest('app-board-tile') ||
+        target.closest('.board-item') ||
+        target.closest('app-board-connector') ||
+        target.closest('.search-window') ||
+        target.closest('app-navbar')
+      ) {
+        return;
       }
+
+      event.preventDefault();
+      document.body.style.userSelect = 'none';
+
+      this.onBackgroundMouseDown?.();
       this.isDragging = true;
       this.startX = event.clientX;
       this.startY = event.clientY;
@@ -162,27 +212,24 @@ export class BoardMainService {
       const deltaX = event.clientX - this.startX;
       const deltaY = event.clientY - this.startY;
 
-      // Convert delta to world coordinates by dividing by zoom
-      this.cameraX -= deltaX / this.zoom;
-      this.cameraY -= deltaY / this.zoom;
+      // Convert delta to world coordinates by dividing by zoo
+      this.setCamera(
+        this.cameraX - deltaX / this.zoom,
+        this.cameraY - deltaY / this.zoom,
+      );
 
       this.startX = event.clientX;
       this.startY = event.clientY;
 
-      board.style.backgroundPosition = `${-this.cameraX}px ${-this.cameraY}px`;
-
-      (this.tiles || []).forEach((item) => {
-        item.updatePosition(this.cameraX, this.cameraY, this.zoom);
-        item.connectors.forEach((connector: any) => {
-          if (typeof connector.updatePosition === 'function')
-            connector.updatePosition(this.zoom);
-        });
-      });
+      this.updateBoard();
     });
 
-    board.addEventListener('mouseup', () => {
+    const stopDragging = () => {
       this.isDragging = false;
       board.style.cursor = 'grab';
-    });
+    };
+
+    window.addEventListener('mouseup', stopDragging);
+    board.addEventListener('mouseup', stopDragging);
   }
 }
