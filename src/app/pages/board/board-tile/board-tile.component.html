@@ -14,9 +14,13 @@
   [style.left.px]="tile.x"
   [style.top.px]="tile.y"
 >
-  <div class="editor-wrap">
-    <div #titleElement class="title-editor"></div>
-    <div #contentElement class="content-editor"></div>
+  <div class="tile-surface">
+    <div class="tile-header">
+      <div #titleElement class="title-editor"></div>
+    </div>
+    <div class="tile-body">
+      <div #contentElement class="content-editor"></div>
+    </div>
   </div>
 
   <ng-template
