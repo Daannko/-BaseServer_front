@@ -15,7 +15,15 @@
   [style.top.px]="tile.y"
 >
   <div class="tile-surface">
-    <div class="tile-header">
+    <div
+      class="tile-header"
+      boardTileMove=""
+      [pos]="{ x: tile.x, y: tile.y }"
+      [zoom]="zoom"
+      (posChange)="onTileWorldPosChange($event)"
+      (moveStart)="onMoveStart()"
+      (moveEnd)="onMoveEnd()"
+    >
       <div #titleElement class="title-editor"></div>
     </div>
     <div class="tile-body">

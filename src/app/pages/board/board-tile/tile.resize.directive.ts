@@ -9,7 +9,6 @@ import {
   Output,
   Renderer2,
 } from '@angular/core';
-import { h } from '@tiptap/core';
 
 export type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 

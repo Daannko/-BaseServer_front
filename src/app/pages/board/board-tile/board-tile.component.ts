@@ -10,6 +10,7 @@ import {
   AfterViewInit,
   TemplateRef,
   HostListener,
+  SecurityContext,
 } from '@angular/core';
 import { BoardTile } from './board-tile.data';
 import { CommonModule } from '@angular/common';
@@ -35,6 +36,7 @@ import {
   PersistentSelectionKey,
 } from '../../../helpers/tiptap/PersistentSelector';
 import { TileRect, TileResizeDirective } from './tile.resize.directive';
+import { TileMoveDirective, Position } from './tile.move.directive';
 import { BoardMainService } from '../board.main.service';
 
 @Component({
@@ -46,6 +48,7 @@ import { BoardMainService } from '../board.main.service';
     SvgIconComponent,
     QuerySelectComponent,
     TileResizeDirective,
+    TileMoveDirective,
   ],
   templateUrl: './board-tile.component.html',
   styleUrl: './board-tile.component.scss',
@@ -68,6 +71,9 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
   contentEditor!: Editor;
   isColorPaletteVisible: boolean = false;
   isTableActive: boolean = false;
+
+  private navbarPinned = false;
+  private isDraggingTile = false;
 
   // Options
   disableTextDrag = true;
@@ -167,6 +173,12 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
 
     // Click was outside this tile: clear its selection highlight.
     this.clearSelectionHighlight();
+
+    // If this tile was providing the navbar, allow it to be virtualized again.
+    this.navbarPinned = false;
+    if (!this.isDraggingTile) {
+      this.tile.forceToRender = false;
+    }
   }
 
   ngOnInit() {
@@ -255,6 +267,22 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
+  onTileWorldPosChange(p: Position) {
+    this.tile.x = p.x;
+    this.tile.y = p.y;
+
+    this.tile.updatePosition(
+      this.mainBoardService.cameraX,
+      this.mainBoardService.cameraY,
+      this.zoom,
+    );
+
+    for (const connector of this.tile.connectors) {
+      connector.updateAngles();
+      connector.updatePosition();
+    }
+  }
+
   updateLabel(label: string) {
     const clean = DOMPurify.sanitize(label, {
       ALLOWED_TAGS: [
@@ -295,6 +323,10 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
 
   initEditors() {
     // Title editor - simple, no toolbar features
+    const titleHtml =
+      this.sanitizer.sanitize(SecurityContext.HTML, this.tile.label as any) ||
+      '<p></p>';
+
     this.titleEditor = new Editor({
       element: this.titleElement.nativeElement,
       extensions: [
@@ -311,7 +343,7 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
         Color.configure({ types: ['textStyle'] }),
         FontFamily,
       ],
-      content: this.tile.label || '<p></p>',
+      content: titleHtml,
       onFocus: () => {
         // Switching to title: clear any persistent highlight from content.
         this.clearPersistentSelectionDecoration(this.contentEditor);
@@ -495,10 +527,27 @@ export class BoardTileComponent implements OnInit, OnDestroy, AfterViewInit {
 
   requestNavbar(template: TemplateRef<any>) {
     if (!template) return;
+
+    // Keep tile rendered while its template is being used by the global navbar.
+    this.navbarPinned = true;
+    this.tile.forceToRender = true;
+
     this.navbarChange.emit({
       template,
       context: this.getNavbarContext(),
     });
+  }
+
+  onMoveStart() {
+    this.isDraggingTile = true;
+    this.tile.forceToRender = true;
+  }
+
+  onMoveEnd() {
+    this.isDraggingTile = false;
+    if (!this.navbarPinned) {
+      this.tile.forceToRender = false;
+    }
   }
 
   // Toolbar actions

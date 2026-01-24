@@ -73,9 +73,13 @@ app-board-tile {
 
 .tile-header {
   flex: 0 0 auto;
-  padding: 10px 12px 8px;
+  padding-top: 15px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(0, 0, 0, 0.14);
+  cursor: grab;
+
+  display: flex;
+  justify-content: center;
 }
 
 .tile-body {
@@ -110,8 +114,17 @@ app-board-tile {
 .title-editor {
   padding-top: 10px;
   flex-shrink: 0;
+  cursor: text;
+  display: inline-block;
+  width: fit-content;
+  max-width: 90%;
 
+  :global(.ProseMirror),
   :global(.tiptap) {
+    cursor: text;
+    display: inline-block;
+    width: fit-content;
+    max-width: 100%;
     outline: none;
     font-family:
       ui-sans-serif,
@@ -147,6 +160,7 @@ app-board-tile {
   overflow-x: hidden;
   height: 100%;
   padding-right: 6px;
+  cursor: text;
 
   /* Make the editor surface fill the whole body so clicks anywhere focus typing. */
   :global(.ProseMirror),
@@ -154,6 +168,7 @@ app-board-tile {
     min-height: 100%;
     height: 100%;
     box-sizing: border-box;
+    cursor: text;
   }
 
   /* Custom scrollbar styling */

@@ -71,6 +71,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   requiredConnectors: Map<string, string[]> = new Map();
 
   selectedBoard: Board | null = null;
+  private activeNavbarTile: BoardTile | null = null;
 
   private buildDefaultNavbarContext() {
     return {
@@ -81,7 +82,28 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   onTileNavbarChange(event: { template: TemplateRef<any>; context: any }) {
     if (!event?.template) return;
+
+    const nextTile = (event.context as any)?.tile as BoardTile | undefined;
+    if (nextTile && nextTile !== this.activeNavbarTile) {
+      if (this.activeNavbarTile) {
+        this.activeNavbarTile.forceToRender = false;
+      }
+      nextTile.forceToRender = true;
+      this.activeNavbarTile = nextTile;
+    }
+
     this.navBarService.setTemplate(event.template, event.context);
+  }
+
+  private onBackgroundMouseDown() {
+    if (this.activeNavbarTile) {
+      this.activeNavbarTile.forceToRender = false;
+      this.activeNavbarTile = null;
+    }
+    this.navBarService.setTemplate(
+      this.defaultNavbarTemplate,
+      this.buildDefaultNavbarContext(),
+    );
   }
 
   private resetTileState(): void {
@@ -261,11 +283,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       zoom: this.zoom,
       cameraX: 0,
       cameraY: 0,
-      onBackgroundMouseDown: () =>
-        this.navBarService.setTemplate(
-          this.defaultNavbarTemplate,
-          defaultNavbarContext,
-        ),
+      onBackgroundMouseDown: () => this.onBackgroundMouseDown(),
     });
 
     this.navBarService.setTemplate(
