@@ -19,8 +19,8 @@ import { BoardTileComponent } from './board-tile/board-tile.component';
 import { BoardConnector } from './board-connector/board-connector';
 import { BoardConnectorComponent } from './board-connector/board-connector.component';
 import { NavbarService } from '../../helpers/navbar/navbar.service';
-import { BoardMainService } from './board.main.service';
-import { BoardSearchService } from './board.search.service';
+import { BoardMainService } from './board-main.service';
+import { BoardApiService } from './board-api.service';
 import { Observable, Subject, takeUntil } from 'rxjs';
 import { SvgIconComponent } from '../../helpers/svg-icon/svg-icon.component';
 import { Board } from './models/board.model';
@@ -42,7 +42,8 @@ import { Topic } from './models/topic.model';
 })
 export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   @ViewChild('board', { static: true }) boardRef!: ElementRef<HTMLDivElement>;
-  @ViewChild('viewport', { static: false }) viewportRef!: ElementRef<HTMLDivElement>;
+  @ViewChild('viewport', { static: false })
+  viewportRef!: ElementRef<HTMLDivElement>;
   @ViewChild('navbar', { static: true, read: ElementRef })
   navbarRef!: ElementRef;
   @ViewChild('defaultNavbarTemplate', { static: true })
@@ -128,7 +129,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private navBarService: NavbarService,
     private cdr: ChangeDetectorRef,
     private mainBoardService: BoardMainService,
-    private boardSearchService: BoardSearchService,
+    private boardSearchService: BoardApiService,
   ) {
     this.boards$ = this.boardSearchService.boards$;
     this.topics$ = this.boardSearchService.topics$;
@@ -254,6 +255,17 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  @HostListener('window:keydown', ['$event'])
+  onGlobalKeydown(event: KeyboardEvent) {
+    const isSave =
+      (event.ctrlKey || event.metaKey) &&
+      (event.key === 's' || event.key === 'S');
+    if (!isSave) return;
+
+    event.preventDefault();
+    this.saveBoard();
+  }
+
   ngOnInit() {
     this.mainBoardService.zoom$
       .pipe(takeUntil(this.destroy$))
@@ -316,7 +328,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const waitingId of waitingIds) {
       const waitingTile = this.tilesMap.get(waitingId);
       if (waitingTile) {
-        waitingTile.addConnector(tile);
+        waitingTile.addConnectors(tile);
       }
     }
     if (waitingIds.length) {
@@ -328,7 +340,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const relatedTile = this.tilesMap.get(relatedTopicId);
       if (relatedTile) {
-        tile.addConnector(relatedTile);
+        tile.addConnectors(relatedTile);
         continue;
       }
 
@@ -336,5 +348,11 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       pending.push(tile.id);
       this.requiredConnectors.set(relatedTopicId, pending);
     }
+  }
+
+  saveBoard() {
+    this.tiles.forEach((tile) => {
+      this.boardSearchService.saveTopic(tile);
+    });
   }
 }

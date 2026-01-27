@@ -22,6 +22,7 @@ export class BoardConnectorComponent implements AfterViewInit {
   updateSize() {
     this.data.width = this.connectorRef.nativeElement.offsetWidth;
     this.data.height = this.connectorRef.nativeElement.offsetHeight;
+    this.data.updatePosition();
   }
 
   ngAfterViewInit(): void {

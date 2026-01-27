@@ -31,43 +31,29 @@
     </div>
   </div>
 
-  <ng-template
-    #navbarContentTemplate
-    let-tile="tile"
-    let-toggleBold="toggleBold"
-    let-toggleItalic="toggleItalic"
-    let-toggleUnderline="toggleUnderline"
-    let-toggleStrikethrough="toggleStrikethrough"
-    let-toggleQuote="toggleQuote"
-    let-toggleBulletList="toggleBulletList"
-    let-toggleOrderedList="toggleOrderedList"
-    let-insertTable="insertTable"
-    let-setLink="setLink"
-    let-setAlignment="setAlignment"
-    let-toggleCodeBlock="toggleCodeBlock"
-  >
+  <ng-template #navbarContentTemplate let-tile="tile">
     <div class="bar">
       <div #normalControls class="navbar-tile-controls">
         <div class="navbar-title" [innerHTML]="tile.label"></div>
         <div class="navbar-spacer"></div>
         <!-- Font Selection -->
         <app-query-select
-          [options]="fonts"
+          [options]="tiptap.fonts"
           labelKey="name"
           valueKey="name"
           placeholder="Font"
           title="Font family"
           [allowCustom]="false"
-          (commit)="applyFont($event, contentEditor)"
+          (commit)="tiptap.applyFont($event, contentEditor)"
         ></app-query-select>
 
         <app-query-select
-          [options]="fontSizes"
+          [options]="tiptap.fontSizes"
           labelKey="name"
           valueKey="value"
           placeholder="Size"
           title="Font size"
-          (commit)="applyFontSize($event, contentEditor)"
+          (commit)="tiptap.applyFontSize($event, contentEditor)"
         ></app-query-select>
         <div class="navbar-spacer"></div>
         <!-- Text Formatting -->
@@ -82,37 +68,37 @@
           <div class="color-palette" [class.open]="isColorPaletteVisible">
             <div class="temp"></div>
             <button
-              *ngFor="let color of colors"
+              *ngFor="let color of tiptap.colors"
               [style.background-color]="color"
-              (click)="setTextColor(color, contentEditor)"
+              (click)="tiptap.setTextColor(color, contentEditor)"
               [title]="color"
               class="color-option"
             ></button>
           </div>
         </div>
         <button
-          (click)="toggleBold(contentEditor)"
+          (click)="tiptap.toggleBold(contentEditor)"
           aria-label="Bold"
           title="Bold"
         >
           <app-svg-icon icon="editor-bold"></app-svg-icon>
         </button>
         <button
-          (click)="toggleItalic(contentEditor)"
+          (click)="tiptap.toggleItalic(contentEditor)"
           aria-label="Italic"
           title="Italic"
         >
           <app-svg-icon icon="editor-italic"></app-svg-icon>
         </button>
         <button
-          (click)="toggleUnderline(contentEditor)"
+          (click)="tiptap.toggleUnderline(contentEditor)"
           aria-label="Underline"
           title="Underline"
         >
           <app-svg-icon icon="editor-underline"></app-svg-icon>
         </button>
         <button
-          (click)="toggleStrikethrough(contentEditor)"
+          (click)="tiptap.toggleStrikethrough(contentEditor)"
           aria-label="Strikethrough"
           title="Strikethrough"
         >
@@ -121,14 +107,14 @@
         <div class="navbar-spacer"></div>
         <!-- Text Styles & Special Elements -->
         <button
-          (click)="toggleQuote(contentEditor)"
+          (click)="tiptap.toggleQuote(contentEditor)"
           aria-label="Quote"
           title="Quote"
         >
           <app-svg-icon icon="editor-quote"></app-svg-icon>
         </button>
         <button
-          (click)="toggleCodeBlock(contentEditor)"
+          (click)="tiptap.toggleCodeBlock(contentEditor)"
           aria-label="Code block"
           title="Code block"
         >
@@ -138,14 +124,14 @@
         <div class="navbar-spacer"></div>
         <!-- Lists -->
         <button
-          (click)="toggleBulletList(contentEditor)"
+          (click)="tiptap.toggleBulletList(contentEditor)"
           aria-label="Bullet list"
           title="Bullet list"
         >
           <app-svg-icon icon="editor-ul"></app-svg-icon>
         </button>
         <button
-          (click)="toggleOrderedList(contentEditor)"
+          (click)="tiptap.toggleOrderedList(contentEditor)"
           aria-label="Ordered list"
           title="Ordered list"
         >
@@ -154,28 +140,28 @@
         <div class="navbar-spacer"></div>
         <!-- Alignment -->
         <button
-          (click)="setAlignment('left', contentEditor)"
+          (click)="tiptap.setAlignment('left', contentEditor)"
           aria-label="Align left"
           title="Align left"
         >
           <app-svg-icon icon="editor-alignleft"></app-svg-icon>
         </button>
         <button
-          (click)="setAlignment('center', contentEditor)"
+          (click)="tiptap.setAlignment('center', contentEditor)"
           aria-label="Align center"
           title="Align center"
         >
           <app-svg-icon icon="editor-aligncenter"></app-svg-icon>
         </button>
         <button
-          (click)="setAlignment('right', contentEditor)"
+          (click)="tiptap.setAlignment('right', contentEditor)"
           aria-label="Align right"
           title="Align right"
         >
           <app-svg-icon icon="editor-alignright"></app-svg-icon>
         </button>
         <button
-          (click)="setAlignment('justify', contentEditor)"
+          (click)="tiptap.setAlignment('justify', contentEditor)"
           aria-label="Justify"
           title="Justify"
         >
@@ -183,7 +169,7 @@
         </button>
         <div class="navbar-spacer"></div>
         <button
-          (click)="insertTable(contentEditor)"
+          (click)="tiptap.insertTable(contentEditor)"
           aria-label="Insert table"
           title="Insert table"
         >
@@ -191,107 +177,107 @@
         </button>
       </div>
 
-      <div #tableControls class="table-controls" *ngIf="isTableActive">
+      <div #tableControls class="table-controls" *ngIf="tiptap.isTableActive">
         <button
-          (click)="addColumnBefore(contentEditor)"
+          (click)="tiptap.addColumnBefore(contentEditor)"
           aria-label="Add column before"
           title="Add column before"
         >
           <app-svg-icon icon="table-add-column-before"></app-svg-icon>
         </button>
         <button
-          (click)="addColumnAfter(contentEditor)"
+          (click)="tiptap.addColumnAfter(contentEditor)"
           aria-label="Add column after"
           title="Add column after"
         >
           <app-svg-icon icon="table-add-column-after"></app-svg-icon>
         </button>
         <button
-          (click)="addRowBefore(contentEditor)"
+          (click)="tiptap.addRowBefore(contentEditor)"
           aria-label="Add row before"
           title="Add row before"
         >
           <app-svg-icon icon="table-add-row-before"></app-svg-icon>
         </button>
         <button
-          (click)="addRowAfter(contentEditor)"
+          (click)="tiptap.addRowAfter(contentEditor)"
           aria-label="Add row after"
           title="Add row after"
         >
           <app-svg-icon icon="table-add-row-after"></app-svg-icon>
         </button>
         <button
-          (click)="deleteColumn(contentEditor)"
+          (click)="tiptap.deleteColumn(contentEditor)"
           aria-label="Delete column"
           title="Delete column"
         >
           <app-svg-icon icon="table-delete-column"></app-svg-icon>
         </button>
         <button
-          (click)="deleteRow(contentEditor)"
+          (click)="tiptap.deleteRow(contentEditor)"
           aria-label="Delete row"
           title="Delete row"
         >
           <app-svg-icon icon="table-delete-row"></app-svg-icon>
         </button>
         <button
-          (click)="mergeCells(contentEditor)"
+          (click)="tiptap.mergeCells(contentEditor)"
           aria-label="Merge cells"
           title="Merge cells"
         >
           <app-svg-icon icon="table-merge-cells"></app-svg-icon>
         </button>
         <button
-          (click)="splitCell(contentEditor)"
+          (click)="tiptap.splitCell(contentEditor)"
           aria-label="Split cell"
           title="Split cell"
         >
           <app-svg-icon icon="table-split-cell"></app-svg-icon>
         </button>
         <button
-          (click)="toggleHeaderColumn(contentEditor)"
+          (click)="tiptap.toggleHeaderColumn(contentEditor)"
           aria-label="Toggle header column"
           title="Toggle header column"
         >
           <app-svg-icon icon="table-freeze-column"></app-svg-icon>
         </button>
         <button
-          (click)="toggleHeaderRow(contentEditor)"
+          (click)="tiptap.toggleHeaderRow(contentEditor)"
           aria-label="Toggle header row"
           title="Toggle header row"
         >
           <app-svg-icon icon="table-freeze-row"></app-svg-icon>
         </button>
         <button
-          (click)="toggleHeaderCell(contentEditor)"
+          (click)="tiptap.toggleHeaderCell(contentEditor)"
           aria-label="Toggle header cell"
           title="Toggle header cell"
         >
           <app-svg-icon icon="table-freeze-cell"></app-svg-icon>
         </button>
         <button
-          (click)="alignTableLeft(contentEditor)"
+          (click)="tiptap.alignTableLeft(contentEditor)"
           aria-label="Align table left"
           title="Align table left"
         >
           <app-svg-icon icon="editor-alignleft"></app-svg-icon>
         </button>
         <button
-          (click)="alignTableCenter(contentEditor)"
+          (click)="tiptap.alignTableCenter(contentEditor)"
           aria-label="Align table center"
           title="Align table center"
         >
           <app-svg-icon icon="editor-aligncenter"></app-svg-icon>
         </button>
         <button
-          (click)="alignTableRight(contentEditor)"
+          (click)="tiptap.alignTableRight(contentEditor)"
           aria-label="Align table right"
           title="Align table right"
         >
           <app-svg-icon icon="editor-alignright"></app-svg-icon>
         </button>
         <button
-          (click)="deleteTable(contentEditor)"
+          (click)="tiptap.deleteTable(contentEditor)"
           aria-label="Delete table"
           title="Delete table"
         >
@@ -301,14 +287,7 @@
     </div>
   </ng-template>
 
-  <ng-template
-    #navbarTitleTemplate
-    let-tile="tile"
-    let-toggleBold="toggleBold"
-    let-toggleItalic="toggleItalic"
-    let-toggleUnderline="toggleUnderline"
-    let-toggleStrikethrough="toggleStrikethrough"
-  >
+  <ng-template #navbarTitleTemplate let-tile="tile">
     <div class="bar">
       <div class="navbar-tile-controls">
         <div class="navbar-label">
@@ -317,13 +296,13 @@
         <div class="navbar-spacer"></div>
         <!-- Font Selection -->
         <app-query-select
-          [options]="fonts"
+          [options]="tiptap.fonts"
           labelKey="name"
           valueKey="name"
           placeholder="Font"
           title="Font family"
           [allowCustom]="false"
-          (commit)="applyFont($event, titleEditor)"
+          (commit)="tiptap.applyFont($event, titleEditor)"
         ></app-query-select>
 
         <div class="navbar-spacer"></div>
@@ -340,9 +319,9 @@
           <div class="color-palette" [class.open]="isColorPaletteVisible">
             <div class="temp"></div>
             <button
-              *ngFor="let color of colors"
+              *ngFor="let color of tiptap.colors"
               [style.background-color]="color"
-              (click)="setTextColor(color, titleEditor)"
+              (click)="tiptap.setTextColor(color, titleEditor)"
               [title]="color"
               class="color-option"
             ></button>
@@ -350,28 +329,28 @@
         </div>
 
         <button
-          (click)="toggleBold(titleEditor)"
+          (click)="tiptap.toggleBold(titleEditor)"
           aria-label="Bold"
           title="Bold"
         >
           <app-svg-icon icon="editor-bold"></app-svg-icon>
         </button>
         <button
-          (click)="toggleItalic(titleEditor)"
+          (click)="tiptap.toggleItalic(titleEditor)"
           aria-label="Italic"
           title="Italic"
         >
           <app-svg-icon icon="editor-italic"></app-svg-icon>
         </button>
         <button
-          (click)="toggleUnderline(titleEditor)"
+          (click)="tiptap.toggleUnderline(titleEditor)"
           aria-label="Underline"
           title="Underline"
         >
           <app-svg-icon icon="editor-underline"></app-svg-icon>
         </button>
         <button
-          (click)="toggleStrikethrough(titleEditor)"
+          (click)="tiptap.toggleStrikethrough(titleEditor)"
           aria-label="Strikethrough"
           title="Strikethrough"
         >

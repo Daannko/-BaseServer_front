@@ -4,12 +4,15 @@ import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { SnackBarService } from '../../service/snackbar.service';
 import { Topic } from './models/topic.model';
 import { Board } from './models/board.model';
+import { BoardTile } from './board-tile/board-tile.data';
+import { UpdateTopic } from './models/updateTopic.model';
+import { error } from 'node:console';
 
 @Injectable({ providedIn: 'root' })
-export class BoardSearchService {
+export class BoardApiService {
   constructor(
     private http: HttpClient,
-    private snackBarService: SnackBarService
+    private snackBarService: SnackBarService,
   ) {}
   private apiUrl = 'http://localhost:8080';
   private _boards = new BehaviorSubject<Board[] | null>(null);
@@ -63,7 +66,7 @@ export class BoardSearchService {
     name: string,
     description: string,
     width: number | null,
-    height: number | null
+    height: number | null,
   ): Promise<Board | null> {
     const createBoardUrl = '/board';
     const payload = {
@@ -74,7 +77,7 @@ export class BoardSearchService {
     };
     try {
       const createdBoard = await firstValueFrom(
-        this.http.post<Board>(this.apiUrl + createBoardUrl, payload)
+        this.http.post<Board>(this.apiUrl + createBoardUrl, payload),
       );
       const current = this._boards.value ?? [];
       this._boards.next(this.upsertBoard(current, createdBoard));
@@ -97,7 +100,7 @@ export class BoardSearchService {
     const getBoardUrl = '/board/' + boardId;
     try {
       return await firstValueFrom(
-        this.http.get<Board>(this.apiUrl + getBoardUrl)
+        this.http.get<Board>(this.apiUrl + getBoardUrl),
       );
     } catch (e) {
       this.snackBarService.error('Failed to fetch board');
@@ -109,7 +112,7 @@ export class BoardSearchService {
     const getTopicUrl = '/topic/' + topicId;
     try {
       const topic = await firstValueFrom(
-        this.http.get<Topic>(this.apiUrl + getTopicUrl)
+        this.http.get<Topic>(this.apiUrl + getTopicUrl),
       );
       if (store) {
         this.addTopic(topic);
@@ -123,15 +126,41 @@ export class BoardSearchService {
 
   async getTopicsByIds(
     topicIds: string[],
-    store: boolean = true
+    store: boolean = true,
   ): Promise<Topic[]> {
     const uniqueIds = Array.from(new Set(topicIds.filter(Boolean)));
     const topics = await Promise.all(
-      uniqueIds.map((id) => this.getTopic(id, false))
+      uniqueIds.map((id) => this.getTopic(id, false)),
     );
     if (store) {
       this.addTopics(topics);
     }
     return topics;
+  }
+
+  createTopic(topic: BoardTile, boardId: string) {}
+
+  async saveTopic(topic: BoardTile) {
+    const payload: Partial<UpdateTopic> = {
+      ...(topic.titleUpdated && { title: topic.title }),
+      ...(topic.contentUpdated && { content: topic.content }),
+      ...(topic.positionUpdated && { x: topic.x, y: topic.y }),
+      ...(topic.sizeUpdated && { width: topic.width, height: topic.height }),
+      ...(topic.connectorsAdded.length > 0 && {
+        topicsToBeAdded: topic.connectorsAdded,
+      }),
+      ...(topic.connectorsRemoved.length > 0 && {
+        topicsToBeRemoved: topic.connectorsRemoved,
+      }),
+    };
+    if (Object.keys(payload).length == 0) return;
+    console.log(payload);
+    const saveTopicUrl = `${this.apiUrl}/topic/${topic.id}`;
+    try {
+      await firstValueFrom(this.http.patch(saveTopicUrl, payload));
+      topic.saved();
+    } catch (e) {
+      console.log('sie zjebało:' + e);
+    }
   }
 }

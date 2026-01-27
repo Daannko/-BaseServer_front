@@ -1,14 +1,11 @@
-import { connect } from 'http2';
 import { BoardTile } from '../board-tile/board-tile.data';
-import { Topic } from '../models/topic.model';
 
 export class BoardConnector {
+  id!: string;
   x!: number;
   y!: number;
   width: number = 0;
   height: number = 0;
-  screenWidth!: number;
-  screenHeight!: number;
   itemA!: BoardTile;
   itemB!: BoardTile;
   angle!: number;
@@ -19,7 +16,8 @@ export class BoardConnector {
   shiftX: number = 0;
   shiftY: number = 0;
 
-  constructor(itemA: BoardTile, itemB: BoardTile) {
+  constructor(id: string, itemA: BoardTile, itemB: BoardTile) {
+    this.id = id;
     this.itemA = itemA;
     this.itemB = itemB;
     this.updateAngles();
@@ -45,8 +43,8 @@ export class BoardConnector {
       Math.max(0.0001, Math.abs(this.sin));
     const r = Math.min(tx, ty);
 
-    var x = this.itemA.screenX + this.itemA.screenWidth / 2 + r * this.cos;
-    var y = this.itemA.screenY + this.itemA.screenHeight / 2 + r * this.sin;
+    var x = this.itemA.x + this.itemA.width / 2 + r * this.cos;
+    var y = this.itemA.y + this.itemA.height / 2 + r * this.sin;
 
     this.x = x;
     this.y = y;
