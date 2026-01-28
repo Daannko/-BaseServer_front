@@ -1,7 +1,8 @@
-<div class="drawn-square" #connector
-    [style.left.px]="data.x"
-    [style.top.px]="data.y"
-    [style.opacity]="data.opacity"
-    [innerHTML]="data.itemB.label"
->
-</div>
+<div
+  class="drawn-square"
+  #connector
+  [style.left.px]="data.x"
+  [style.top.px]="data.y"
+  [style.opacity]="data.opacity"
+  [innerHTML]="getTitleHtml()"
+></div>

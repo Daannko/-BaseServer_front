@@ -139,7 +139,7 @@ export class BoardMainService {
 
     Promise.resolve().then(() => {
       const centerTile = this.tileComponents.find(
-        (tile) => tile.tile.label === item.label,
+        (tile) => tile.tile.id === item.id,
       );
       if (centerTile) {
         // Let the tile request its navbar; BoardComponent owns NavbarService.

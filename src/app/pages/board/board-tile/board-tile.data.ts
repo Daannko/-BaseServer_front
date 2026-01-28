@@ -1,4 +1,4 @@
-import { SafeHtml } from '@angular/platform-browser';
+import type { JSONContent } from '@tiptap/core';
 import { BoardConnector } from '../board-connector/board-connector';
 import { Topic } from '../models/topic.model';
 import { randomUUID } from 'crypto';
@@ -9,19 +9,17 @@ export class BoardTile {
   private _y!: number;
   private _width!: number;
   private _height!: number;
-  private _topic: string = '';
-  private _content: string = '';
+  private _name: JSONContent = BoardTile.emptyDoc();
+  private _content: JSONContent = BoardTile.emptyDoc();
   private connectorsToBeAdded: Set<string> = new Set();
   private connectorsToBeRemoved: Set<string> = new Set();
   tier!: number;
   forceToRender: boolean = false;
   connectors: Set<BoardConnector> = new Set();
-  label!: SafeHtml; //Connectors name
-
   positionUpdated = false;
   sizeUpdated = false;
   contentUpdated = false;
-  titleUpdated = false;
+  nameUpdated = false;
 
   constructor(
     id: string,
@@ -31,8 +29,8 @@ export class BoardTile {
     realHeight: number,
     connectors: Set<BoardConnector>,
     tier: number,
-    label: string,
-    content: string,
+    name: JSONContent,
+    content: JSONContent,
   ) {
     this.id = id;
     this._x = realX;
@@ -40,9 +38,13 @@ export class BoardTile {
     this._width = realWidth;
     this._height = realHeight;
     this.tier = tier;
-    this.label = label;
+    this.name = name;
     this.content = content;
     this.connectors = connectors;
+  }
+
+  private static emptyDoc(): JSONContent {
+    return { type: 'doc', content: [{ type: 'paragraph' }] };
   }
 
   set x(x: number) {
@@ -155,29 +157,29 @@ export class BoardTile {
       topic.height,
       new Set(),
       0,
-      topic.title ?? '',
-      topic.content ?? '',
+      topic.title ?? BoardTile.emptyDoc(),
+      topic.content ?? BoardTile.emptyDoc(),
     );
   }
 
-  set content(value: string) {
+  set content(value: JSONContent) {
     if (value === this._content) return;
     this.contentUpdated = true;
     this._content = value;
   }
 
-  set title(value: string) {
-    if (value === this._topic) return;
-    this.titleUpdated = true;
-    this._topic = value;
+  set name(value: JSONContent) {
+    if (value === this._name) return;
+    this.nameUpdated = true;
+    this._name = value;
   }
 
   get content() {
     return this._content;
   }
 
-  get topic() {
-    return this._topic;
+  get name() {
+    return this._name;
   }
 
   updatePosition(x: number, y: number) {
@@ -195,7 +197,7 @@ export class BoardTile {
   toBeUpdated(): Boolean {
     return (
       this.contentUpdated ||
-      this.titleUpdated ||
+      this.nameUpdated ||
       this.positionUpdated ||
       this.sizeUpdated
     );
@@ -205,7 +207,7 @@ export class BoardTile {
     this.positionUpdated = false;
     this.sizeUpdated = false;
     this.contentUpdated = false;
-    this.titleUpdated = false;
+    this.nameUpdated = false;
     this.connectorsToBeAdded.clear();
     this.connectorsToBeRemoved.clear();
   }

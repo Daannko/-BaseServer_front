@@ -1,7 +1,8 @@
+import { JSONContent } from '@tiptap/core';
+
 export interface UpdateTopic {
-  title: string;
-  content: string;
-  note: string;
+  name: JSONContent;
+  content: JSONContent;
   x: number;
   y: number;
   width: number;

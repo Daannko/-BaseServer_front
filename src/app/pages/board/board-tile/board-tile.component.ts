@@ -20,6 +20,7 @@ import { TileRect, TileResizeDirective } from './tile.resize.directive';
 import { TileMoveDirective, Position } from './tile.move.directive';
 import { BoardMainService } from '../board-main.service';
 import { TiptapService } from './tiptap.service';
+import { RichTextService } from '../../../helpers/rich-text.service';
 
 @Component({
   selector: 'app-board-tile',
@@ -59,10 +60,15 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     private host: ElementRef<HTMLElement>,
     private mainBoardService: BoardMainService,
     public tiptap: TiptapService,
+    private richText: RichTextService,
   ) {}
 
-  get titleEditor(): Editor {
-    return this.tiptap.titleEditor!;
+  getTitleHtml(tile: BoardTile) {
+    return this.richText.renderJsonToSafeHtml(tile.name);
+  }
+
+  get nameEditor(): Editor {
+    return this.tiptap.nameEditor!;
   }
 
   get contentEditor(): Editor {
@@ -157,7 +163,6 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
         return;
       }
 
-      // Custom link scheme example: check nearest anchor href
       const anchor =
         el && el.closest ? (el.closest('a') as HTMLAnchorElement | null) : null;
       if (anchor && anchor.href && anchor.href.startsWith('tile:')) {

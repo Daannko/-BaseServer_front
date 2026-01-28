@@ -142,7 +142,7 @@ export class BoardApiService {
 
   async saveTopic(topic: BoardTile) {
     const payload: Partial<UpdateTopic> = {
-      ...(topic.titleUpdated && { title: topic.title }),
+      ...(topic.nameUpdated && { title: topic.name }),
       ...(topic.contentUpdated && { content: topic.content }),
       ...(topic.positionUpdated && { x: topic.x, y: topic.y }),
       ...(topic.sizeUpdated && { width: topic.width, height: topic.height }),

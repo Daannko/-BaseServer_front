@@ -1,17 +1,15 @@
-import { Injectable, SecurityContext } from '@angular/core';
-import { DomSanitizer } from '@angular/platform-browser';
+import { Injectable } from '@angular/core';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
-import { Link } from '@tiptap/extension-link';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
-import DOMPurify from 'dompurify';
+import { RichTextService } from '../../../helpers/rich-text.service';
 
 import {
   PersistentSelection,
@@ -23,7 +21,7 @@ type SelectionRange = { from: number; to: number };
 
 @Injectable()
 export class TiptapService {
-  titleEditor?: Editor;
+  nameEditor?: Editor;
   contentEditor?: Editor;
 
   disableTextDrag = true;
@@ -69,7 +67,7 @@ export class TiptapService {
     { name: '32px', value: '32px' },
   ];
 
-  constructor(private sanitizer: DomSanitizer) {}
+  constructor(private richText: RichTextService) {}
 
   initEditors(options: {
     tile: BoardTile;
@@ -81,11 +79,7 @@ export class TiptapService {
     // Destroy any existing editors (can happen if tile is re-rendered)
     this.destroyEditors();
 
-    const titleHtml =
-      this.sanitizer.sanitize(SecurityContext.HTML, tile.label as any) ||
-      '<p></p>';
-
-    this.titleEditor = new Editor({
+    this.nameEditor = new Editor({
       element: titleElement,
       extensions: [
         StarterKit.configure({
@@ -95,19 +89,21 @@ export class TiptapService {
           blockquote: false,
           codeBlock: false,
           horizontalRule: false,
+          link: false,
         }),
         PersistentSelection,
         TextStyle,
         Color.configure({ types: ['textStyle'] }),
         FontFamily,
       ],
-      content: titleHtml,
+      content: tile.name,
       onFocus: () => {
         this.clearPersistentSelectionDecoration(this.contentEditor);
         this.lastContentSelection = null;
       },
       onUpdate: ({ editor }) => {
-        this.updateLabel(tile, editor.getHTML());
+        tile.name = editor.getJSON();
+        console.log(tile.name);
       },
       onSelectionUpdate: ({ editor }) => {
         this.captureLastSelection(editor);
@@ -123,7 +119,14 @@ export class TiptapService {
     this.contentEditor = new Editor({
       element: contentElement,
       extensions: [
-        StarterKit,
+        StarterKit.configure({
+          link: {
+            openOnClick: false,
+            HTMLAttributes: {
+              class: 'tile-link',
+            },
+          },
+        }),
         TextStyle,
         Color.configure({ types: ['textStyle'] }),
         FontFamily,
@@ -136,23 +139,17 @@ export class TiptapService {
         TableHeader,
         TableCell,
         FontSize,
-        Link.configure({
-          openOnClick: false,
-          HTMLAttributes: {
-            class: 'tile-link',
-          },
-        }),
         TextAlign.configure({
           types: ['heading', 'paragraph'],
         }),
       ],
-      content: tile.content || '<p></p>',
+      content: tile.content,
       onFocus: () => {
-        this.clearPersistentSelectionDecoration(this.titleEditor);
+        this.clearPersistentSelectionDecoration(this.nameEditor);
         this.lastTitleSelection = null;
       },
       onUpdate: ({ editor }) => {
-        tile.content = editor.getHTML();
+        tile.content = editor.getJSON();
       },
       onSelectionUpdate: ({ editor }) => {
         this.detectTableContext(editor);
@@ -170,12 +167,12 @@ export class TiptapService {
 
   destroyEditors() {
     try {
-      this.titleEditor?.destroy();
+      this.nameEditor?.destroy();
     } catch {}
     try {
       this.contentEditor?.destroy();
     } catch {}
-    this.titleEditor = undefined;
+    this.nameEditor = undefined;
     this.contentEditor = undefined;
   }
 
@@ -184,16 +181,16 @@ export class TiptapService {
     this.lastContentSelection = null;
 
     try {
-      this.titleEditor?.commands?.blur();
+      this.nameEditor?.commands?.blur();
     } catch {}
     try {
       this.contentEditor?.commands?.blur();
     } catch {}
 
-    this.clearPersistentSelectionDecoration(this.titleEditor);
+    this.clearPersistentSelectionDecoration(this.nameEditor);
     this.clearPersistentSelectionDecoration(this.contentEditor);
     queueMicrotask(() => {
-      this.clearPersistentSelectionDecoration(this.titleEditor);
+      this.clearPersistentSelectionDecoration(this.nameEditor);
       this.clearPersistentSelectionDecoration(this.contentEditor);
     });
   }
@@ -204,44 +201,6 @@ export class TiptapService {
     view.dispatch(
       view.state.tr.setMeta(PersistentSelectionKey, { type: 'focus' }),
     );
-  }
-
-  private updateLabel(tile: BoardTile, label: string) {
-    const clean = DOMPurify.sanitize(label, {
-      ALLOWED_TAGS: [
-        'p',
-        'span',
-        'b',
-        'i',
-        'u',
-        'br',
-        'em',
-        'strong',
-        's',
-        'del',
-        'code',
-        'pre',
-        'blockquote',
-        'ul',
-        'ol',
-        'li',
-        'table',
-        'thead',
-        'tbody',
-        'tr',
-        'th',
-        'td',
-        'h1',
-        'h2',
-        'h3',
-        'h4',
-        'h5',
-        'h6',
-        'a',
-      ],
-      ALLOWED_ATTR: ['style', 'href', 'class'],
-    });
-    tile.label = this.sanitizer.bypassSecurityTrustHtml(clean);
   }
 
   applyDisableTextDrag(disabled: boolean) {
@@ -275,7 +234,7 @@ export class TiptapService {
       });
     };
 
-    patchEditor(this.titleEditor);
+    patchEditor(this.nameEditor);
     patchEditor(this.contentEditor);
   }
 
@@ -289,7 +248,7 @@ export class TiptapService {
     if (from === to) return;
 
     const selection = { from: Math.min(from, to), to: Math.max(from, to) };
-    if (editor === this.titleEditor) {
+    if (editor === this.nameEditor) {
       this.lastTitleSelection = selection;
     } else if (editor === this.contentEditor) {
       this.lastContentSelection = selection;
@@ -297,7 +256,7 @@ export class TiptapService {
   }
 
   private getLastSelection(editor: Editor): SelectionRange | null {
-    if (editor === this.titleEditor) return this.lastTitleSelection;
+    if (editor === this.nameEditor) return this.lastTitleSelection;
     if (editor === this.contentEditor) return this.lastContentSelection;
     return null;
   }

@@ -34,7 +34,7 @@
   <ng-template #navbarContentTemplate let-tile="tile">
     <div class="bar">
       <div #normalControls class="navbar-tile-controls">
-        <div class="navbar-title" [innerHTML]="tile.label"></div>
+        <div class="navbar-title" [innerHTML]="getTitleHtml(tile)"></div>
         <div class="navbar-spacer"></div>
         <!-- Font Selection -->
         <app-query-select
@@ -291,7 +291,7 @@
     <div class="bar">
       <div class="navbar-tile-controls">
         <div class="navbar-label">
-          <div [innerHTML]="tile.label"></div>
+          <div [innerHTML]="getTitleHtml(tile)"></div>
         </div>
         <div class="navbar-spacer"></div>
         <!-- Font Selection -->
@@ -302,7 +302,7 @@
           placeholder="Font"
           title="Font family"
           [allowCustom]="false"
-          (commit)="tiptap.applyFont($event, titleEditor)"
+          (commit)="tiptap.applyFont($event, nameEditor)"
         ></app-query-select>
 
         <div class="navbar-spacer"></div>
@@ -321,7 +321,7 @@
             <button
               *ngFor="let color of tiptap.colors"
               [style.background-color]="color"
-              (click)="tiptap.setTextColor(color, titleEditor)"
+              (click)="tiptap.setTextColor(color, nameEditor)"
               [title]="color"
               class="color-option"
             ></button>
@@ -329,28 +329,28 @@
         </div>
 
         <button
-          (click)="tiptap.toggleBold(titleEditor)"
+          (click)="tiptap.toggleBold(nameEditor)"
           aria-label="Bold"
           title="Bold"
         >
           <app-svg-icon icon="editor-bold"></app-svg-icon>
         </button>
         <button
-          (click)="tiptap.toggleItalic(titleEditor)"
+          (click)="tiptap.toggleItalic(nameEditor)"
           aria-label="Italic"
           title="Italic"
         >
           <app-svg-icon icon="editor-italic"></app-svg-icon>
         </button>
         <button
-          (click)="tiptap.toggleUnderline(titleEditor)"
+          (click)="tiptap.toggleUnderline(nameEditor)"
           aria-label="Underline"
           title="Underline"
         >
           <app-svg-icon icon="editor-underline"></app-svg-icon>
         </button>
         <button
-          (click)="tiptap.toggleStrikethrough(titleEditor)"
+          (click)="tiptap.toggleStrikethrough(nameEditor)"
           aria-label="Strikethrough"
           title="Strikethrough"
         >

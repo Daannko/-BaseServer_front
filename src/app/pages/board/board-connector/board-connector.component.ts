@@ -5,6 +5,7 @@ import {
   Input,
   ViewChild,
 } from '@angular/core';
+import { RichTextService } from '../../../helpers/rich-text.service';
 import { BoardConnector } from './board-connector';
 
 @Component({
@@ -19,6 +20,8 @@ export class BoardConnectorComponent implements AfterViewInit {
   @Input() zoom: number = 1;
   @ViewChild('connector') connectorRef!: ElementRef;
 
+  constructor(private richText: RichTextService) {}
+
   updateSize() {
     this.data.width = this.connectorRef.nativeElement.offsetWidth;
     this.data.height = this.connectorRef.nativeElement.offsetHeight;
@@ -32,5 +35,9 @@ export class BoardConnectorComponent implements AfterViewInit {
 
   getDisplayText(html: string): string {
     return html.replace(/<\/?p[^>]*>/g, '').trim();
+  }
+
+  getTitleHtml() {
+    return this.richText.renderJsonToSafeHtml(this.data.itemB.name);
   }
 }
