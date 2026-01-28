@@ -180,6 +180,7 @@ export class BoardMainService {
     });
 
     board.addEventListener('mousedown', (event: MouseEvent) => {
+      if (event.button !== 0) return;
       const target = event.target as HTMLElement | null;
       if (!target) return;
 
@@ -231,5 +232,14 @@ export class BoardMainService {
 
     window.addEventListener('mouseup', stopDragging);
     board.addEventListener('mouseup', stopDragging);
+
+    board.addEventListener('contextmenu', (ev: MouseEvent) =>
+      this.showContextMenu(ev),
+    );
+  }
+
+  showContextMenu(ev: MouseEvent) {
+    // ev.stopPropagation();
+    ev.preventDefault();
   }
 }

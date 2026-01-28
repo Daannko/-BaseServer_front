@@ -4,44 +4,49 @@ import {
   Input,
   OnInit,
   OnDestroy,
-  ViewEncapsulation,
+  ChangeDetectorRef,
 } from '@angular/core';
-import { Router } from '@angular/router';
-import { Subscription } from 'rxjs';
+import { Router, ɵEmptyOutletComponent } from '@angular/router';
+import { Observable, Subscription } from 'rxjs';
 import { NavbarService, NavbarState } from './navbar.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, ɵEmptyOutletComponent],
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.scss',
   providers: [DatePipe],
 })
-export class NavbarComponent {
+export class NavbarComponent implements OnInit, OnDestroy {
   dateTime: Date = new Date();
   @Input() isClockVisible: boolean = false;
   @Input() isLogoutVisible: boolean = false;
 
-  state: NavbarState = {};
+  readonly state$: Observable<NavbarState>;
+
   private sub?: Subscription;
 
-  constructor(private router: Router, private navbarService: NavbarService) {
-    setInterval(() => (this.dateTime = new Date()));
+  private clockId?: number;
+
+  constructor(
+    private router: Router,
+    private navbarService: NavbarService,
+    private cdr: ChangeDetectorRef,
+  ) {
+    this.state$ = this.navbarService.state$;
   }
 
   ngOnInit(): void {
-    this.sub = this.navbarService.state$.subscribe(
-      (s) => (this.state = s || {})
-    );
+    this.clockId = window.setInterval(() => {
+      this.dateTime = new Date();
+      this.cdr.markForCheck();
+    }, 1000);
   }
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
-  }
-
-  ngOnChanges() {
-    // kept for debug
+    if (this.clockId != null) window.clearInterval(this.clockId);
   }
 
   logout() {

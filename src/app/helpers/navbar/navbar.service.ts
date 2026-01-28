@@ -13,7 +13,12 @@ export class NavbarService {
   readonly state$ = this._state.asObservable();
 
   setTemplate(template: TemplateRef<any>, context?: any) {
-    this._state.next({ ...this._state.value, template, context, visible: true });
+    this._state.next({
+      ...this._state.value,
+      template,
+      context,
+      visible: true,
+    });
   }
 
   setState(state: NavbarState) {

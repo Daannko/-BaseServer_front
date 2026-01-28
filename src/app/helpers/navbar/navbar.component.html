@@ -4,16 +4,28 @@
       <button class="navbar-logo" (click)="goHome()">BaseServer</button>
     </div>
     <div class="up-center">
-       <div class="center-content">
-        <ng-container *ngIf="state.template">
-          <ng-container [ngTemplateOutlet]="state.template" [ngTemplateOutletContext]="state.context"></ng-container>
+      <div class="center-content">
+        <ng-container *ngIf="state$ | async as state">
+          <ng-container *ngIf="state.template">
+            <ng-container
+              [ngTemplateOutlet]="state.template"
+              [ngTemplateOutletContext]="state.context"
+            ></ng-container>
+          </ng-container>
         </ng-container>
-       </div>
-      
+      </div>
     </div>
     <div class="up-right">
-      <div *ngIf="isClockVisible" class="clock-small">{{ dateTime | date: 'H:mm' }}</div>
-      <button *ngIf="isLogoutVisible" class="navbar-logout-button" (click)="logout()">Log out</button>
+      <div *ngIf="isClockVisible" class="clock-small">
+        {{ dateTime | date: "H:mm" }}
+      </div>
+      <button
+        *ngIf="isLogoutVisible"
+        class="navbar-logout-button"
+        (click)="logout()"
+      >
+        Log out
+      </button>
     </div>
   </div>
-</div> 
+</div>
