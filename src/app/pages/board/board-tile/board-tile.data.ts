@@ -1,18 +1,20 @@
 import type { JSONContent } from '@tiptap/core';
 import { BoardConnector } from '../board-connector/board-connector';
 import { Topic } from '../models/topic.model';
-import { randomUUID } from 'crypto';
+import { docFromText, emptyDoc, getDoc } from '../../../helpers/rich-text.util';
 
 export class BoardTile {
   readonly id: string;
+  /** Backend topic id (undefined for not-yet-created topics). */
+  serverId?: string;
   private _x!: number;
   private _y!: number;
   private _width!: number;
   private _height!: number;
-  private _name: JSONContent = BoardTile.emptyDoc();
-  private _content: JSONContent = BoardTile.emptyDoc();
-  private connectorsToBeAdded: Set<string> = new Set();
-  private connectorsToBeRemoved: Set<string> = new Set();
+  private _name: JSONContent = docFromText('Name');
+  private _content: JSONContent = docFromText('Content');
+  private relatedTopicsToBeAdded: Set<string> = new Set();
+  private relatedTopicsToBeRemoved: Set<string> = new Set();
   tier!: number;
   forceToRender: boolean = false;
   connectors: Set<BoardConnector> = new Set();
@@ -43,8 +45,18 @@ export class BoardTile {
     this.connectors = connectors;
   }
 
-  private static emptyDoc(): JSONContent {
-    return { type: 'doc', content: [{ type: 'paragraph' }] };
+  static newTile(x: number, y: number, width: number, height: number) {
+    return new BoardTile(
+      globalThis.crypto.randomUUID(),
+      x,
+      y,
+      width,
+      height,
+      new Set(),
+      0,
+      docFromText('Name'),
+      docFromText('Content'),
+    );
   }
 
   set x(x: number) {
@@ -93,50 +105,56 @@ export class BoardTile {
   }
 
   addConnectors(t: BoardTile) {
-    const id = crypto.randomUUID();
+    const id = globalThis.crypto.randomUUID();
 
     const connectorA = new BoardConnector(id, this, t);
     this.connectors.add(connectorA);
-    this.handleAddConnectorHistory(id);
+    this.handleAddRelatedTopicHistory(t.id);
 
     const connectorB = new BoardConnector(id, t, this);
     t.connectors.add(connectorB);
-    t.handleAddConnectorHistory(id);
+    t.handleAddRelatedTopicHistory(this.id);
   }
 
   get connectorsAdded(): string[] {
-    return Array.from(this.connectorsToBeAdded);
+    return Array.from(this.relatedTopicsToBeAdded);
   }
 
   get connectorsRemoved(): string[] {
-    return Array.from(this.connectorsToBeRemoved);
+    return Array.from(this.relatedTopicsToBeRemoved);
   }
 
   clearConnectorChanges() {
-    this.connectorsToBeAdded.clear();
-    this.connectorsToBeRemoved.clear();
+    this.relatedTopicsToBeAdded.clear();
+    this.relatedTopicsToBeRemoved.clear();
   }
 
-  private handleAddConnectorHistory(id: string) {
-    if (this.connectorsToBeRemoved.has(id)) {
-      this.connectorsToBeRemoved.delete(id);
+  private handleAddRelatedTopicHistory(topicId: string) {
+    if (this.relatedTopicsToBeRemoved.has(topicId)) {
+      this.relatedTopicsToBeRemoved.delete(topicId);
     }
-    this.connectorsToBeAdded.add(id);
+    this.relatedTopicsToBeAdded.add(topicId);
   }
 
-  private handleRemoveConnectorHistory(id: string) {
-    if (this.connectorsToBeAdded.has(id)) {
-      this.connectorsToBeAdded.delete(id);
+  private handleRemoveRelatedTopicHistory(topicId: string) {
+    if (this.relatedTopicsToBeAdded.has(topicId)) {
+      this.relatedTopicsToBeAdded.delete(topicId);
     }
-    this.connectorsToBeRemoved.add(id);
+    this.relatedTopicsToBeRemoved.add(topicId);
   }
 
   removeConnector(c: BoardConnector) {
     if (!c?.id) return;
+
+    const otherIdForThis = c.itemB?.id;
+    const otherIdForOther = c.itemA?.id;
+
     this.removeConnectorById(c.id);
-    this.handleRemoveConnectorHistory(c.id);
+    if (otherIdForThis) this.handleRemoveRelatedTopicHistory(otherIdForThis);
     c.itemB?.removeConnectorById(c.id);
-    c.itemB?.handleRemoveConnectorHistory(c.id);
+    if (otherIdForOther) {
+      c.itemB?.handleRemoveRelatedTopicHistory(otherIdForOther);
+    }
   }
 
   private removeConnectorById(connectorId: string) {
@@ -149,7 +167,7 @@ export class BoardTile {
   }
 
   static fromTopic(topic: Topic): BoardTile {
-    return new BoardTile(
+    const tile = new BoardTile(
       topic.id,
       topic.x,
       topic.y,
@@ -157,9 +175,11 @@ export class BoardTile {
       topic.height,
       new Set(),
       0,
-      topic.title ?? BoardTile.emptyDoc(),
-      topic.content ?? BoardTile.emptyDoc(),
+      topic.title ?? emptyDoc(),
+      topic.content ?? emptyDoc(),
     );
+    tile.serverId = topic.id;
+    return tile;
   }
 
   set content(value: JSONContent) {
@@ -208,7 +228,7 @@ export class BoardTile {
     this.sizeUpdated = false;
     this.contentUpdated = false;
     this.nameUpdated = false;
-    this.connectorsToBeAdded.clear();
-    this.connectorsToBeRemoved.clear();
+    this.relatedTopicsToBeAdded.clear();
+    this.relatedTopicsToBeRemoved.clear();
   }
 }

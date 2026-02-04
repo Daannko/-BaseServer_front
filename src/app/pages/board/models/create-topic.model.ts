@@ -1,12 +1,12 @@
 import { JSONContent } from '@tiptap/core';
 
-export interface UpdateTopic {
+export interface CreateTopic {
+  boardId: string;
   title: JSONContent;
   content: JSONContent;
   x: number;
   y: number;
   width: number;
   height: number;
-  topicsToBeAdded?: string[];
-  topicsToBeRemoved?: string[];
+  relatedTopics: Array<string>;
 }

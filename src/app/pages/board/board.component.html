@@ -207,4 +207,13 @@
       </div>
     </div>
   </div>
+
+  <app-context-menu
+    [visible]="ctxMenu.visible"
+    [x]="ctxMenu.x"
+    [y]="ctxMenu.y"
+    [items]="ctxMenu.items"
+    (closed)="closeContextMenu()"
+    (itemSelected)="onContextMenuItem($event)"
+  ></app-context-menu>
 </div>

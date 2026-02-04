@@ -86,14 +86,15 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
   @HostListener('document:mousedown', ['$event'])
   onDocumentMouseDown(ev: MouseEvent) {
     const target = ev.target as HTMLElement | null;
-
-    // Never clear while interacting with the top navbar / search UI.
     if (target?.closest('app-navbar') || target?.closest('.search-window')) {
       return;
     }
 
-    // If click is inside this tile (including its editors), don't clear.
-    if (this.host.nativeElement.contains(target as Node)) {
+    if (
+      target?.isContentEditable ||
+      target?.closest?.('.ProseMirror') ||
+      target?.closest?.('[contenteditable="true"]')
+    ) {
       return;
     }
 

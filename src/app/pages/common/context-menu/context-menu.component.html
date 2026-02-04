@@ -1,0 +1,30 @@
+<div
+  class="context-menu-backdrop"
+  *ngIf="visible"
+  (mousedown)="close()"
+  (contextmenu)="$event.preventDefault(); close()"
+></div>
+
+<div
+  class="context-menu"
+  *ngIf="visible"
+  role="menu"
+  [style.left.px]="x"
+  [style.top.px]="y"
+  (mousedown)="$event.stopPropagation()"
+  (contextmenu)="$event.preventDefault()"
+>
+  <button
+    class="context-menu-item"
+    type="button"
+    *ngFor="let item of items; trackBy: trackByLabel"
+    [disabled]="item.disabled"
+    [class.is-danger]="item.danger"
+    (click)="onItemClick(item)"
+  >
+    <span class="label">{{ item.label }}</span>
+    <span class="shortcut" *ngIf="item.shortcut">{{ item.shortcut }}</span>
+  </button>
+
+  <div class="context-menu-empty" *ngIf="items.length === 0">No actions</div>
+</div>

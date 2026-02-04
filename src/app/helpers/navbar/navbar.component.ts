@@ -6,14 +6,14 @@ import {
   OnDestroy,
   ChangeDetectorRef,
 } from '@angular/core';
-import { Router, ɵEmptyOutletComponent } from '@angular/router';
+import { Router } from '@angular/router';
 import { Observable, Subscription } from 'rxjs';
 import { NavbarService, NavbarState } from './navbar.service';
 
 @Component({
   selector: 'app-navbar',
   standalone: true,
-  imports: [CommonModule, ɵEmptyOutletComponent],
+  imports: [CommonModule],
   templateUrl: './navbar.component.html',
   styleUrl: './navbar.component.scss',
   providers: [DatePipe],

@@ -25,6 +25,11 @@ import { Observable, Subject, takeUntil } from 'rxjs';
 import { SvgIconComponent } from '../../helpers/svg-icon/svg-icon.component';
 import { Board } from './models/board.model';
 import { Topic } from './models/topic.model';
+import { emptyDoc } from '../../helpers/rich-text.util';
+import {
+  ContextMenuComponent,
+  ContextMenuItem,
+} from '../common/context-menu/context-menu.component';
 
 @Component({
   selector: 'app-board',
@@ -36,6 +41,7 @@ import { Topic } from './models/topic.model';
     BoardTileComponent,
     BoardConnectorComponent,
     SvgIconComponent,
+    ContextMenuComponent,
   ],
   templateUrl: './board.component.html',
   styleUrls: ['./board.component.scss'],
@@ -74,6 +80,16 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedBoard: Board | null = null;
   private activeNavbarTile: BoardTile | null = null;
 
+  ctxMenu = {
+    visible: false,
+    x: 0,
+    y: 0,
+    items: [] as ContextMenuItem[],
+  };
+
+  private lastWorldX = 0;
+  private lastWorldY = 0;
+
   private buildDefaultNavbarContext() {
     return {
       getIsSearchOpen: () => this.isSearchOpen,
@@ -97,6 +113,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private onBackgroundMouseDown() {
+    this.closeContextMenu();
     if (this.activeNavbarTile) {
       this.activeNavbarTile.forceToRender = false;
       this.activeNavbarTile = null;
@@ -274,6 +291,21 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         // Keep template bindings in sync (especially important during wheel zoom)
         this.cdr.detectChanges();
       });
+
+    this.mainBoardService.contextMenu$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((req) => {
+        this.lastWorldX = req.worldX;
+        this.lastWorldY = req.worldY;
+
+        this.ctxMenu.x = req.clientX;
+        this.ctxMenu.y = req.clientY;
+        this.ctxMenu.items = [
+          { id: 'create', label: 'Create tile here' },
+          { id: 'save', label: 'Save board', shortcut: 'Ctrl+S' },
+        ];
+        this.ctxMenu.visible = true;
+      });
   }
 
   ngOnDestroy(): void {
@@ -350,9 +382,69 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  saveBoard() {
-    this.tiles.forEach((tile) => {
-      this.boardSearchService.saveTopic(tile);
+  private createTileAt(worldX: number, worldY: number): void {
+    if (!this.selectedBoard) return;
+
+    const tile = BoardTile.newTile(worldX, worldY, 440, 800);
+
+    this.tiles.push(tile);
+    this.tilesMap.set(tile.id, tile);
+
+    Promise.resolve().then(() => {
+      this.cdr.detectChanges();
+      this.mainBoardService.tileComponents = this.tileComponents
+        ? this.tileComponents.toArray()
+        : [];
     });
+  }
+
+  async saveBoard(): Promise<void> {
+    if (!this.selectedBoard) return;
+
+    const boardId = this.selectedBoard.id;
+    const tilesToCreate = this.tiles.filter((t) => !t.serverId);
+
+    if (tilesToCreate.length > 0) {
+      const createdTopics = await Promise.all(
+        tilesToCreate.map((t) =>
+          this.boardSearchService.createTopic(t, boardId),
+        ),
+      );
+
+      for (let i = 0; i < createdTopics.length; i++) {
+        const created = createdTopics[i];
+        if (!created) continue;
+        tilesToCreate[i].serverId = created.id;
+      }
+    }
+
+    const resolveTopicId = (id: string) =>
+      this.tilesMap.get(id)?.serverId ?? id;
+    const tilesWithServerId = this.tiles.filter((t) => Boolean(t.serverId));
+    await Promise.all(
+      tilesWithServerId.map((t) =>
+        this.boardSearchService.saveTopic(t, resolveTopicId),
+      ),
+    );
+  }
+
+  closeContextMenu() {
+    this.ctxMenu.visible = false;
+  }
+
+  onContextMenuItem(item: ContextMenuItem) {
+    this.closeContextMenu();
+
+    switch (item.id) {
+      case 'save':
+        this.saveBoard();
+        return;
+      case 'create':
+        this.createTileAt(this.lastWorldX, this.lastWorldY);
+        return;
+      default:
+        console.log(item.label);
+        return;
+    }
   }
 }

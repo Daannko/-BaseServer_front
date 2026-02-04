@@ -1,4 +1,4 @@
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { SnackBarService } from '../../service/snackbar.service';
@@ -6,7 +6,7 @@ import { Topic } from './models/topic.model';
 import { Board } from './models/board.model';
 import { BoardTile } from './board-tile/board-tile.data';
 import { UpdateTopic } from './models/updateTopic.model';
-import { error } from 'node:console';
+import { CreateTopic } from './models/create-topic.model';
 
 @Injectable({ providedIn: 'root' })
 export class BoardApiService {
@@ -119,7 +119,21 @@ export class BoardApiService {
       }
       return topic;
     } catch (e) {
-      this.snackBarService.error('Failed to fetch topic');
+      const url = this.apiUrl + getTopicUrl;
+      if (e instanceof HttpErrorResponse) {
+        console.error('Failed to fetch topic', {
+          topicId,
+          url,
+          status: e.status,
+          statusText: e.statusText,
+          message: e.message,
+          error: e.error,
+        });
+        this.snackBarService.error(`Failed to fetch topic (${e.status})`);
+      } else {
+        console.error('Failed to fetch topic', { topicId, url, error: e });
+        this.snackBarService.error('Failed to fetch topic');
+      }
       throw e;
     }
   }
@@ -129,38 +143,120 @@ export class BoardApiService {
     store: boolean = true,
   ): Promise<Topic[]> {
     const uniqueIds = Array.from(new Set(topicIds.filter(Boolean)));
-    const topics = await Promise.all(
+    const results = await Promise.allSettled(
       uniqueIds.map((id) => this.getTopic(id, false)),
     );
+    const topics = results
+      .filter(
+        (r): r is PromiseFulfilledResult<Topic> => r.status === 'fulfilled',
+      )
+      .map((r) => r.value);
+
+    const failedCount = results.length - topics.length;
+    if (failedCount > 0) {
+      this.snackBarService.error(
+        `Failed to load ${failedCount} topic${failedCount === 1 ? '' : 's'}`,
+      );
+    }
     if (store) {
       this.addTopics(topics);
     }
     return topics;
   }
 
-  createTopic(topic: BoardTile, boardId: string) {}
-
-  async saveTopic(topic: BoardTile) {
-    const payload: Partial<UpdateTopic> = {
-      ...(topic.nameUpdated && { title: topic.name }),
-      ...(topic.contentUpdated && { content: topic.content }),
-      ...(topic.positionUpdated && { x: topic.x, y: topic.y }),
-      ...(topic.sizeUpdated && { width: topic.width, height: topic.height }),
-      ...(topic.connectorsAdded.length > 0 && {
-        topicsToBeAdded: topic.connectorsAdded,
-      }),
-      ...(topic.connectorsRemoved.length > 0 && {
-        topicsToBeRemoved: topic.connectorsRemoved,
-      }),
+  async createTopic(topic: BoardTile, boardId: string): Promise<Topic | null> {
+    const payload: CreateTopic = {
+      boardId,
+      title: topic.name,
+      content: topic.content,
+      x: topic.x,
+      y: topic.y,
+      width: topic.width,
+      height: topic.height,
+      relatedTopics: [],
     };
-    if (Object.keys(payload).length == 0) return;
+    const createTopicUrl = `${this.apiUrl}/topic`;
+    try {
+      const created = await firstValueFrom(
+        this.http.post<Topic>(createTopicUrl, payload),
+      );
+      this.addTopic(created);
+      return created;
+    } catch (e: unknown) {
+      if (e instanceof HttpErrorResponse) {
+        console.error('Failed to create topic', {
+          boardId,
+          url: createTopicUrl,
+          status: e.status,
+          statusText: e.statusText,
+          message: e.message,
+          error: e.error,
+        });
+        this.snackBarService.error(`Failed to create topic (${e.status})`);
+        return null;
+      }
+      const message = e instanceof Error ? e.message : String(e);
+      console.error('Failed to create topic', { boardId, error: e });
+      this.snackBarService.error(message || 'Failed to create topic');
+      return null;
+    }
+  }
+
+  async saveTopic(
+    topic: BoardTile,
+    resolveTopicId?: (id: string) => string,
+  ): Promise<void> {
+    const payload: Partial<UpdateTopic> = {};
+
+    if (topic.nameUpdated) {
+      payload.title = topic.name;
+    }
+    if (topic.contentUpdated) {
+      payload.content = topic.content;
+    }
+    if (topic.positionUpdated) {
+      payload.x = topic.x;
+      payload.y = topic.y;
+    }
+    if (topic.sizeUpdated) {
+      payload.width = topic.width;
+      payload.height = topic.height;
+    }
+    if (topic.connectorsAdded.length > 0) {
+      payload.topicsToBeAdded = resolveTopicId
+        ? topic.connectorsAdded.map(resolveTopicId)
+        : topic.connectorsAdded;
+    }
+    if (topic.connectorsRemoved.length > 0) {
+      payload.topicsToBeRemoved = resolveTopicId
+        ? topic.connectorsRemoved.map(resolveTopicId)
+        : topic.connectorsRemoved;
+    }
+
+    if (Object.keys(payload).length === 0) return;
     console.log(payload);
-    const saveTopicUrl = `${this.apiUrl}/topic/${topic.id}`;
+    const apiId = topic.serverId ?? topic.id;
+    const saveTopicUrl = `${this.apiUrl}/topic/${apiId}`;
     try {
       await firstValueFrom(this.http.patch(saveTopicUrl, payload));
       topic.saved();
-    } catch (e) {
-      console.log('sie zjebało:' + e);
+    } catch (e: unknown) {
+      if (e instanceof HttpErrorResponse) {
+        console.error('Failed to save topic', {
+          topicId: topic.id,
+          url: saveTopicUrl,
+          status: e.status,
+          statusText: e.statusText,
+          message: e.message,
+          error: e.error,
+        });
+        this.snackBarService.error(`Failed to save topic (${e.status})`);
+        return;
+      }
+
+      const message = e instanceof Error ? e.message : String(e);
+      console.error('Failed to save topic', { topicId: topic.id, error: e });
+      this.snackBarService.error(message || 'Failed to save topic');
     }
   }
 }

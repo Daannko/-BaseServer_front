@@ -1,6 +1,13 @@
 import { ElementRef, Injectable } from '@angular/core';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { BoardTile } from './board-tile/board-tile.data';
+
+export type BoardContextMenuRequest = {
+  clientX: number;
+  clientY: number;
+  worldX: number;
+  worldY: number;
+};
 
 @Injectable({ providedIn: 'root' })
 export class BoardMainService {
@@ -14,6 +21,9 @@ export class BoardMainService {
   }>({ x: 0, y: 0 });
   readonly zoom$ = this.zoomSubject.asObservable();
   readonly camera$ = this.cameraSubject.asObservable();
+
+  private readonly contextMenuSubject = new Subject<BoardContextMenuRequest>();
+  readonly contextMenu$ = this.contextMenuSubject.asObservable();
 
   get cameraX(): number {
     return this.cameraSubject.value.x;
@@ -163,7 +173,6 @@ export class BoardMainService {
       const mouseY = event.clientY - rect.top;
 
       const newZoom = this.zoom + (event.deltaY < 0 ? 0.05 : -0.05);
-      if (newZoom < 0.1 || newZoom > 5) return;
 
       // Keep mouse position fixed during zoom
       const worldMouseX = mouseX / this.zoom + this.cameraX;
@@ -180,12 +189,10 @@ export class BoardMainService {
     });
 
     board.addEventListener('mousedown', (event: MouseEvent) => {
+      // stop right click
       if (event.button !== 0) return;
       const target = event.target as HTMLElement | null;
       if (!target) return;
-
-      // Only start panning when interacting with the background.
-      // (The viewport is transformed, so clicks often target children; we still want pan.)
       if (
         target.closest('app-board-tile') ||
         target.closest('.board-item') ||
@@ -239,7 +246,36 @@ export class BoardMainService {
   }
 
   showContextMenu(ev: MouseEvent) {
-    // ev.stopPropagation();
+    if (!this.boardRef) return;
     ev.preventDefault();
+
+    const target = ev.target as HTMLElement | null;
+    if (!target) return;
+
+    // Background-only menu (avoid opening when interacting with UI/tile/connector).
+    if (
+      target.closest('app-board-tile') ||
+      target.closest('.board-item') ||
+      target.closest('app-board-connector') ||
+      target.closest('.search-window') ||
+      target.closest('app-navbar')
+    ) {
+      return;
+    }
+
+    const board = this.boardRef.nativeElement as HTMLElement;
+    const rect = board.getBoundingClientRect();
+    const mouseX = ev.clientX - rect.left;
+    const mouseY = ev.clientY - rect.top;
+
+    const worldX = mouseX / this.zoom + this.cameraX;
+    const worldY = mouseY / this.zoom + this.cameraY;
+
+    this.contextMenuSubject.next({
+      clientX: ev.clientX,
+      clientY: ev.clientY,
+      worldX,
+      worldY,
+    });
   }
 }

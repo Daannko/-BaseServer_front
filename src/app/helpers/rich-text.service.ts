@@ -11,6 +11,7 @@ import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
 import DOMPurify from 'dompurify';
+import { getDoc } from './rich-text.util';
 
 @Injectable({ providedIn: 'root' })
 export class RichTextService {
@@ -36,16 +37,8 @@ export class RichTextService {
 
   constructor(private sanitizer: DomSanitizer) {}
 
-  getEmptyDoc(): JSONContent {
-    return { type: 'doc', content: [{ type: 'paragraph' }] };
-  }
-
-  getDocOrEmpty(value: string): JSONContent {
-    const parsed = this.tryParseJson(value);
-    if (parsed && this.isProseMirrorDoc(parsed)) {
-      return parsed;
-    }
-    return this.getEmptyDoc();
+  getDoc(value?: unknown): JSONContent {
+    return getDoc(value);
   }
 
   renderDocToSafeHtml(doc: JSONContent): SafeHtml {
@@ -56,21 +49,6 @@ export class RichTextService {
 
   renderJsonToSafeHtml(value: JSONContent): SafeHtml {
     return this.renderDocToSafeHtml(value);
-  }
-
-  private tryParseJson(value: string): any | null {
-    if (!value) return null;
-    const trimmed = value.trim();
-    if (!trimmed.startsWith('{') && !trimmed.startsWith('[')) return null;
-    try {
-      return JSON.parse(trimmed);
-    } catch {
-      return null;
-    }
-  }
-
-  private isProseMirrorDoc(value: any): value is JSONContent {
-    return !!value && value.type === 'doc' && Array.isArray(value.content);
   }
 
   private sanitizeHtml(html: string): string {
