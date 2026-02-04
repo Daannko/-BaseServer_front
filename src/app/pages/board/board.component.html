@@ -33,6 +33,9 @@
           class="search-window"
           aria-label="Board search"
           (wheel)="$event.stopPropagation()"
+          (mousedown)="$event.stopPropagation()"
+          (pointerdown)="$event.stopPropagation()"
+          (contextmenu)="$event.stopPropagation()"
         >
           <div class="search-header">
             <div class="search-title">

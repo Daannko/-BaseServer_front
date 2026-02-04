@@ -85,18 +85,9 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
 
   @HostListener('document:mousedown', ['$event'])
   onDocumentMouseDown(ev: MouseEvent) {
-    const target = ev.target as HTMLElement | null;
-    if (target?.closest('app-navbar') || target?.closest('.search-window')) {
-      return;
-    }
-
-    if (
-      target?.isContentEditable ||
-      target?.closest?.('.ProseMirror') ||
-      target?.closest?.('[contenteditable="true"]')
-    ) {
-      return;
-    }
+    const path = (ev.composedPath?.() ?? []) as EventTarget[];
+    // Ignore clicks that occur inside this tile (including TipTap internals / text nodes).
+    if (path.includes(this.host.nativeElement)) return;
 
     // Click was outside this tile: clear its selection highlight.
     this.tiptap.clearSelectionHighlight();
@@ -151,12 +142,18 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     });
 
     root.addEventListener('mousemove', (e: MouseEvent) => {
-      const el = (e.target as HTMLElement) || null;
+      const path = (e.composedPath?.() ?? []) as EventTarget[];
+      const anchor = path.find(
+        (p): p is HTMLAnchorElement =>
+          p instanceof HTMLAnchorElement,
+      );
       // If hovering a real <a> element, pointer
-      if (el && el.closest && el.closest('a')) {
+      if (anchor) {
         root.style.cursor = 'pointer';
         return;
       }
+
+      const el = (e.target as HTMLElement) || null;
 
       // If hovering image, show grab
       if (el && el.tagName === 'IMG') {
@@ -164,12 +161,6 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
         return;
       }
 
-      const anchor =
-        el && el.closest ? (el.closest('a') as HTMLAnchorElement | null) : null;
-      if (anchor && anchor.href && anchor.href.startsWith('tile:')) {
-        root.style.cursor = 'pointer';
-        return;
-      }
       root.style.cursor = 'text';
     });
   }

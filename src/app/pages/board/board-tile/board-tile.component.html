@@ -24,7 +24,12 @@
       (moveStart)="onMoveStart()"
       (moveEnd)="onMoveEnd()"
     >
-      <div #titleElement class="title-editor"></div>
+      <div
+        #titleElement
+        class="title-editor"
+        (pointerdown)="$event.stopPropagation()"
+        (mousedown)="$event.stopPropagation()"
+      ></div>
     </div>
     <div class="tile-body">
       <div #contentElement class="content-editor"></div>

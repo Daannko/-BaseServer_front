@@ -30,6 +30,7 @@ import {
   ContextMenuComponent,
   ContextMenuItem,
 } from '../common/context-menu/context-menu.component';
+import { StorageService } from '../../service/storage.service';
 
 @Component({
   selector: 'app-board',
@@ -47,6 +48,7 @@ import {
   styleUrls: ['./board.component.scss'],
 })
 export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
+  SELECTED_BOARD_KEY = 'SELECTED_BOARD' as const;
   @ViewChild('board', { static: true }) boardRef!: ElementRef<HTMLDivElement>;
   @ViewChild('viewport', { static: false })
   viewportRef!: ElementRef<HTMLDivElement>;
@@ -147,6 +149,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private cdr: ChangeDetectorRef,
     private mainBoardService: BoardMainService,
     private boardSearchService: BoardApiService,
+    private storageSerice: StorageService,
   ) {
     this.boards$ = this.boardSearchService.boards$;
     this.topics$ = this.boardSearchService.topics$;
@@ -203,6 +206,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
           ),
       });
       this.isSearchOpen = false;
+
+      this.storageSerice.setVariable(this.SELECTED_BOARD_KEY, id);
 
       // ensure navbar updates even if it was showing the default template
       this.navBarService.setTemplate(
@@ -306,6 +311,12 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         ];
         this.ctxMenu.visible = true;
       });
+    if (this.storageSerice.hasKey(this.SELECTED_BOARD_KEY)) {
+      this.isSearchOpen = false;
+      this.selectBoard(
+        this.storageSerice.getVariable(this.SELECTED_BOARD_KEY)!!,
+      );
+    }
   }
 
   ngOnDestroy(): void {

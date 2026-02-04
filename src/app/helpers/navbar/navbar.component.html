@@ -1,4 +1,9 @@
-<div class="navbar-container">
+<div
+  class="navbar-container"
+  (mousedown)="$event.stopPropagation()"
+  (pointerdown)="$event.stopPropagation()"
+  (contextmenu)="$event.stopPropagation()"
+>
   <div class="top-bar">
     <div class="up-left">
       <button class="navbar-logo" (click)="goHome()">BaseServer</button>

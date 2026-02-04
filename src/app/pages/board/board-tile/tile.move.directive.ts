@@ -48,16 +48,6 @@ export class TileMoveDirective implements OnInit, OnDestroy {
         // Only left mouse button (touch/pen usually report 0)
         if (typeof pev.button === 'number' && pev.button !== 0) return;
 
-        // If starting inside editable content, don't move.
-        const target = pev.target as HTMLElement | null;
-        if (
-          target?.closest(
-            '.title-editor, .content-editor, .ProseMirror, .tiptap, [contenteditable="true"], input, textarea, button, a',
-          )
-        ) {
-          return;
-        }
-
         // Ensure the host stays rendered during drag (prevents ngIf virtualization glitches).
         this.zone.run(() => this.moveStart.emit());
 

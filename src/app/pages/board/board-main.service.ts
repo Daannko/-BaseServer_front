@@ -191,14 +191,19 @@ export class BoardMainService {
     board.addEventListener('mousedown', (event: MouseEvent) => {
       // stop right click
       if (event.button !== 0) return;
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
+
+      const path = (event.composedPath?.() ?? []) as EventTarget[];
+      const hasClass = (cls: string) =>
+        path.some((p) => p instanceof HTMLElement && p.classList.contains(cls));
+      const hasTag = (tag: string) =>
+        path.some((p) => p instanceof HTMLElement && p.tagName === tag);
+
       if (
-        target.closest('app-board-tile') ||
-        target.closest('.board-item') ||
-        target.closest('app-board-connector') ||
-        target.closest('.search-window') ||
-        target.closest('app-navbar')
+        hasTag('APP-BOARD-TILE') ||
+        hasClass('board-item') ||
+        hasTag('APP-BOARD-CONNECTOR') ||
+        hasClass('search-window') ||
+        hasTag('APP-NAVBAR')
       ) {
         return;
       }
@@ -249,16 +254,19 @@ export class BoardMainService {
     if (!this.boardRef) return;
     ev.preventDefault();
 
-    const target = ev.target as HTMLElement | null;
-    if (!target) return;
+    const path = (ev.composedPath?.() ?? []) as EventTarget[];
+    const hasClass = (cls: string) =>
+      path.some((p) => p instanceof HTMLElement && p.classList.contains(cls));
+    const hasTag = (tag: string) =>
+      path.some((p) => p instanceof HTMLElement && p.tagName === tag);
 
     // Background-only menu (avoid opening when interacting with UI/tile/connector).
     if (
-      target.closest('app-board-tile') ||
-      target.closest('.board-item') ||
-      target.closest('app-board-connector') ||
-      target.closest('.search-window') ||
-      target.closest('app-navbar')
+      hasTag('APP-BOARD-TILE') ||
+      hasClass('board-item') ||
+      hasTag('APP-BOARD-CONNECTOR') ||
+      hasClass('search-window') ||
+      hasTag('APP-NAVBAR')
     ) {
       return;
     }
