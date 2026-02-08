@@ -1,5 +1,6 @@
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Injectable } from '@angular/core';
+import { environment } from '../../../environments/environment';
 import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { SnackBarService } from '../../service/snackbar.service';
 import { Topic } from './models/topic.model';
@@ -14,7 +15,7 @@ export class BoardApiService {
     private http: HttpClient,
     private snackBarService: SnackBarService,
   ) {}
-  private apiUrl = 'http://localhost:8080';
+  private apiUrl = environment.apiUrl;
   private _boards = new BehaviorSubject<Board[] | null>(null);
   readonly boards$ = this._boards.asObservable();
   private _topics = new BehaviorSubject<Topic[] | null>(null);

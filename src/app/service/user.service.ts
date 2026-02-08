@@ -3,29 +3,26 @@ import { HttpClient } from '@angular/common/http';
 import { environment } from '../../environments/environment';
 
 @Injectable({
-  providedIn: 'root'
+  providedIn: 'root',
 })
 export class UserService {
+  constructor(private http: HttpClient) {}
 
-  constructor(private http: HttpClient) {
+  private apiUrl = `${environment.apiUrl}/user/`;
+
+  getUserData() {
+    return this.http.get<any>(this.apiUrl + 'me', {
+      withCredentials: true,
+    });
   }
-
-  private apiUrl = 'http://localhost:8080/user/';
-
-  getUserData(){
-      return this.http.get<any>(this.apiUrl + 'me',{
-        withCredentials: true
-      });
-  }
-
 
   getClientIP() {
-    return this.http.get<any>('https://geolocation-db.com/json/',{
-    })
- }
+    return this.http.get<any>('https://geolocation-db.com/json/', {});
+  }
 
- getWeather(lat:string,lon:string) {
-  return this.http.get<any>(`https://api.tomorrow.io/v4/weather/realtime?location=${lat},${lon}&apikey=${environment.tomorrowApiKey}`)
-}
-
+  getWeather(lat: string, lon: string) {
+    return this.http.get<any>(
+      `https://api.tomorrow.io/v4/weather/realtime?location=${lat},${lon}&apikey=${environment.tomorrowApiKey}`,
+    );
+  }
 }

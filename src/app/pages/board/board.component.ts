@@ -60,8 +60,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   connectorComponents!: QueryList<BoardConnectorComponent>;
   @ViewChildren(BoardTileComponent)
   tileComponents!: QueryList<BoardTileComponent>;
-  @ViewChild('newBoardNameInput', { static: true })
-  nameInputRef!: ElementRef<HTMLInputElement>;
+  @ViewChild('newBoardNameInput', { static: false })
+  nameInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('searchInput', { static: false })
+  searchInputRef?: ElementRef<HTMLInputElement>;
 
   boards$!: Observable<Board[] | null>;
   topics$!: Observable<Topic[] | null>;
@@ -162,10 +164,72 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   toggleSearchState() {
     this.isSearchOpen = !this.isSearchOpen;
+    if (this.isSearchOpen) {
+      this.focusSearchInput();
+    }
   }
 
   toggleCreateState() {
-    this.isCreateOpen = !this.isCreateOpen;
+    const willOpen = !this.isCreateOpen;
+    this.isCreateOpen = willOpen;
+    if (willOpen) {
+      this.focusCreateNameInput();
+    } else {
+      this.focusSearchInput();
+    }
+  }
+
+  private focusSearchInput() {
+    setTimeout(() => this.searchInputRef?.nativeElement?.focus());
+  }
+
+  private focusCreateNameInput() {
+    setTimeout(() => this.nameInputRef?.nativeElement?.focus());
+  }
+
+  clearSearchQuery() {
+    this.searchQuery = '';
+    this.focusSearchInput();
+  }
+
+  onSearchWindowClick(event: MouseEvent) {
+    if (this.isCreateOpen) return;
+
+    const path = (event.composedPath?.() ?? []) as EventTarget[];
+    const isInteractive = (target: EventTarget) =>
+      target instanceof HTMLElement &&
+      ['BUTTON', 'INPUT', 'TEXTAREA', 'SELECT', 'A'].includes(target.tagName);
+
+    if (path.some(isInteractive)) return;
+    this.focusSearchInput();
+  }
+
+  openCreateFromSearch(boards: Board[] | null | undefined) {
+    this.isCreateOpen = true;
+    const query = this.searchQuery.trim();
+    if (!query) {
+      this.focusCreateNameInput();
+      return;
+    }
+
+    const matches = this.filteredBoards(boards).some(
+      (b) => String(b?.name ?? '').toLowerCase() === query.toLowerCase(),
+    );
+    if (!matches) {
+      this.newBoardName = query;
+      this.newBoardNameTouched = false;
+    }
+    this.focusCreateNameInput();
+  }
+
+  onSearchEnter(boards: Board[] | null | undefined) {
+    const query = this.searchQuery.trim();
+    if (!query) return;
+
+    const hasResults = this.filteredBoards(boards).length > 0;
+    if (!hasResults) {
+      this.openCreateFromSearch(boards);
+    }
   }
 
   async selectBoard(id: string) {

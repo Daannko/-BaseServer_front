@@ -21,18 +21,19 @@ import { error } from 'node:console';
 import { Router } from '@angular/router';
 import { SnackBarService } from './snackbar.service';
 import { response } from 'express';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root',
 })
 export class AuthService {
-  private apiUrl = 'http://localhost:8080/auth/';
+  private apiUrl = `${environment.apiUrl}/auth/`;
   private firstLogin = true;
 
   constructor(
     private http: HttpClient,
     private router: Router,
-    private snackBar: SnackBarService
+    private snackBar: SnackBarService,
   ) {}
 
   refresh(options?: any): Observable<any> {
@@ -60,8 +61,6 @@ export class AuthService {
     return this.http.post<any>(this.apiUrl + 'login', body, {
       headers,
     });
-    console.log('login called');
-    console.log(this.apiUrl + 'login');
   }
 
   register(email: string, password: string, name: string): Observable<any> {

@@ -31,155 +31,136 @@
       <div class="search" *ngIf="boards$ | async as boards">
         <section
           class="search-window"
+          [class.is-fixed]="
+            isCreateOpen ||
+            (searchQuery.length > 0 && filteredBoards(boards).length === 0)
+          "
           aria-label="Board search"
           (wheel)="$event.stopPropagation()"
-          (mousedown)="$event.stopPropagation()"
-          (pointerdown)="$event.stopPropagation()"
-          (contextmenu)="$event.stopPropagation()"
+          (click)="onSearchWindowClick($event)"
         >
-          <div class="search-header">
-            <div class="search-title">
-              <h3>Boards</h3>
-              <ng-container *ngIf="!isCreateOpen; else create">
-                <ng-container *ngIf="boards.length > 0; else noBoardsFound">
-                  <p class="search-subtitle">Search and select a board</p>
-                </ng-container>
-                <ng-template #noBoardsFound>
-                  <p class="search-subtitle">No boards found</p>
-                </ng-template>
-              </ng-container>
-              <ng-template #create>
-                <p class="search-subtitle">Create new board</p>
-              </ng-template>
-            </div>
+          <!-- Top command bar -->
+          <div class="command-bar">
+            <app-svg-icon class="command-icon" icon="search"></app-svg-icon>
 
-            <ng-container *ngIf="!isCreateOpen; else leftIcon">
-              <button
-                (click)="toggleSearchState()"
-                class="close-button"
-                type="button"
-                aria-label="Close"
-              >
-                <app-svg-icon icon="close-x"></app-svg-icon>
-              </button>
-            </ng-container>
-            <ng-template #leftIcon>
-              <button
-                (click)="toggleCreateState()"
-                class="close-button"
-                type="button"
-                aria-label="Close"
-              >
-                <app-svg-icon icon="chevron-left"></app-svg-icon>
-              </button>
-            </ng-template>
+            <input
+              *ngIf="!isCreateOpen"
+              class="command-input"
+              type="text"
+              #searchInput
+              [(ngModel)]="searchQuery"
+              (keydown.enter)="onSearchEnter(boards)"
+              placeholder="Search boards or create one…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+
+            <button
+              *ngIf="!isCreateOpen && searchQuery.length"
+              class="command-clear"
+              type="button"
+              (click)="clearSearchQuery()"
+            >
+              Clear
+            </button>
+
+            <span *ngIf="isCreateOpen" class="command-title">
+              Create board
+            </span>
+
+            <button
+              class="command-close"
+              type="button"
+              (click)="isCreateOpen ? toggleCreateState() : toggleSearchState()"
+            >
+              <app-svg-icon
+                [icon]="isCreateOpen ? 'chevron-left' : 'close-x'"
+              ></app-svg-icon>
+            </button>
           </div>
 
-          <div #searchOptions>
-            <ng-container *ngIf="!isCreateOpen; else createOption">
-              <div class="search-controls" *ngIf="boards.length > 0">
-                <input
-                  class="search-input"
-                  type="search"
-                  [(ngModel)]="searchQuery"
-                  placeholder="Search boards…"
-                  autocomplete="off"
-                  spellcheck="false"
-                />
-              </div>
-
-              <div class="search-results" role="list">
-                <ng-container
-                  *ngIf="
-                    filteredBoards(boards).length || searchQuery.length == 0;
-                    else noResults
-                  "
-                >
-                  <div
-                    class="search-result"
-                    role="listitem"
-                    *ngFor="let b of filteredBoards(boards)"
-                    (click)="selectBoard(b.id)"
-                  >
-                    <div class="search-result-name">
-                      {{ b.name }}
-                    </div>
-                  </div>
-                </ng-container>
-                <ng-template #noResults>
-                  <div class="search-empty">No boards match your search.</div>
-                </ng-template>
-              </div>
-              <div class="search-footer">
+          <!-- Results -->
+          <ng-container *ngIf="!isCreateOpen; else createMode">
+            <div class="command-results">
+              <ng-container
+                *ngIf="
+                  filteredBoards(boards).length || searchQuery.length === 0;
+                  else noResults
+                "
+              >
                 <button
-                  class="new-board"
+                  class="command-item"
+                  *ngFor="let b of filteredBoards(boards)"
+                  (click)="selectBoard(b.id)"
+                >
+                  <span class="command-item-title">{{ b.name }}</span>
+                  <span class="command-item-subtitle">{{ b.description }}</span>
+                </button>
+
+                <button
+                  class="command-item command-create"
+                  type="button"
+                  (click)="openCreateFromSearch(boards)"
+                >
+                  + Create board
+                </button>
+              </ng-container>
+
+              <ng-template #noResults>
+                <div class="command-empty">
+                  No boards found — press enter to create one
+                </div>
+              </ng-template>
+            </div>
+          </ng-container>
+
+          <!-- Create mode -->
+          <ng-template #createMode>
+            <div class="create-panel">
+              <label class="create-field">
+                <span>Name</span>
+                <input
+                  class="command-input"
+                  type="text"
+                  #newBoardNameInput
+                  [(ngModel)]="newBoardName"
+                  [class.is-invalid]="newBoardNameTouched && !isCreateNameValid"
+                  [attr.placeholder]="
+                    newBoardNameTouched && !isCreateNameValid
+                      ? 'Name is required'
+                      : 'e.g. Cooking'
+                  "
+                />
+              </label>
+
+              <label class="create-field">
+                <span>Description</span>
+                <textarea
+                  class="command-textarea"
+                  rows="3"
+                  placeholder="What is this board about?"
+                  [(ngModel)]="newBoardDescription"
+                ></textarea>
+              </label>
+
+              <div class="create-actions">
+                <button
+                  class="primary"
+                  type="button"
+                  (click)="submitNewBoardRequest()"
+                >
+                  Create
+                </button>
+                <button
+                  class="secondary"
                   type="button"
                   (click)="toggleCreateState()"
                 >
-                  Create new board
+                  Cancel
                 </button>
               </div>
-            </ng-container>
-            <ng-template #createOption>
-              <div class="create-board">
-                <div class="create-fields">
-                  <label class="field">
-                    <span class="field-label">Name</span>
-                    <input
-                      #newBoardNameInput
-                      class="search-input"
-                      type="text"
-                      placeholder=""
-                      autocomplete="off"
-                      spellcheck="false"
-                      [class.is-invalid]="
-                        newBoardNameTouched && !isCreateNameValid
-                      "
-                      [attr.aria-invalid]="
-                        newBoardNameTouched && !isCreateNameValid
-                      "
-                      [(ngModel)]="newBoardName"
-                      [attr.placeholder]="
-                        newBoardNameTouched && !isCreateNameValid
-                          ? 'Name is required…'
-                          : 'e.g. Cooking'
-                      "
-                    />
-                  </label>
-
-                  <label class="field">
-                    <span class="field-label">Description</span>
-                    <textarea
-                      class="search-textarea"
-                      placeholder="What is this board about?"
-                      rows="4"
-                      spellcheck="false"
-                      [(ngModel)]="newBoardDescription"
-                    ></textarea>
-                  </label>
-                </div>
-
-                <div class="search-footer">
-                  <div class="create-actions">
-                    <button
-                      class="new-board"
-                      type="button"
-                      (click)="submitNewBoardRequest()"
-                    >
-                      Create board
-                    </button>
-                    <button
-                      class="new-board new-board-secondary"
-                      type="button"
-                      (click)="toggleCreateState()"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </ng-template>
-          </div>
+            </div>
+          </ng-template>
         </section>
       </div>
     </div>

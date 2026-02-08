@@ -144,8 +144,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     root.addEventListener('mousemove', (e: MouseEvent) => {
       const path = (e.composedPath?.() ?? []) as EventTarget[];
       const anchor = path.find(
-        (p): p is HTMLAnchorElement =>
-          p instanceof HTMLAnchorElement,
+        (p): p is HTMLAnchorElement => p instanceof HTMLAnchorElement,
       );
       // If hovering a real <a> element, pointer
       if (anchor) {
