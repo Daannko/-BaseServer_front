@@ -51,6 +51,14 @@ export class RichTextService {
     return this.renderDocToSafeHtml(value);
   }
 
+  renderJsonToSafeHtmlWithoutFontSize(value: JSONContent): SafeHtml {
+    const html = generateHTML(value, this.renderExtensions);
+    const clean = this.sanitizeHtml(html)
+      .replace(/font-size\s*:\s*[^;"']+;?/gi, '')
+      .replace(/style\s*=\s*"\s*"/gi, '');
+    return this.sanitizer.bypassSecurityTrustHtml(clean);
+  }
+
   private sanitizeHtml(html: string): string {
     return DOMPurify.sanitize(html, {
       ALLOWED_TAGS: [

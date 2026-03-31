@@ -3,18 +3,19 @@
 app-board-tile {
   position: absolute;
   z-index: 1;
+  contain: layout style paint;
 }
 
 .board-item {
   position: absolute;
   /* Theme hooks (future: override per-tile via [style.--tile-bg] etc.) */
-  --tile-bg: rgba(35, 38, 41, 0.98);
-  --tile-bg2: rgba(46, 50, 54, 0.98);
-  --tile-border: rgba(255, 255, 255, 0.1);
-  --tile-border-strong: rgba(255, 255, 255, 0.18);
+  --tile-bg: rgba(16, 16, 16, 0.92);
+  --tile-bg2: rgba(22, 22, 22, 0.92);
+  --tile-border: rgba(255, 255, 255, 0.08);
+  --tile-border-strong: rgba(255, 255, 255, 0.16);
   --tile-text: rgba(255, 255, 255, 0.92);
-  --tile-text-muted: rgba(255, 255, 255, 0.7);
-  --tile-focus: rgba(255, 213, 79, 0.35);
+  --tile-text-muted: rgba(255, 255, 255, 0.6);
+  --tile-focus: rgba(255, 213, 79, 0.28);
 
   background: transparent;
   box-sizing: border-box;
@@ -57,14 +58,19 @@ app-board-tile {
   width: 100%;
   display: flex;
   flex-direction: column;
+  font-size: 1rem;
   border-radius: 12px;
   border: 1px solid var(--tile-border);
-  background: linear-gradient(180deg, var(--tile-bg2), var(--tile-bg));
+  background: linear-gradient(
+    180deg,
+    rgba(22, 22, 22, 0.98),
+    rgba(16, 16, 16, 0.98)
+  );
   box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.55),
-    0 8px 22px rgba(0, 0, 0, 0.35),
-    0 2px 6px rgba(0, 0, 0, 0.25);
+    0 0 0 1px rgba(0, 0, 0, 0.6),
+    0 8px 20px rgba(0, 0, 0, 0.4);
   overflow: hidden;
+  will-change: transform;
   transition:
     transform 120ms ease-out,
     box-shadow 120ms ease-out,
@@ -73,18 +79,17 @@ app-board-tile {
 
 .tile-header {
   flex: 0 0 auto;
-  padding-top: 15px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(0, 0, 0, 0.14);
+  // padding: 0.5em 1rem 0.25em;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(0, 0, 0, 0.18);
   cursor: grab;
-
   display: flex;
   justify-content: center;
 }
 
 .tile-body {
   flex: 1 1 auto;
-  padding: 10px 12px 12px;
+  padding: 0.25em 1rem 1rem;
   overflow: hidden;
   display: flex;
   min-height: 0;
@@ -111,13 +116,20 @@ app-board-tile {
   }
 }
 
-.title-editor {
-  padding-top: 10px;
+::ng-deep .title-editor {
   flex-shrink: 0;
   cursor: text;
   display: inline-block;
   width: fit-content;
   max-width: 90%;
+  min-width: 30%;
+  line-height: 1;
+
+  .tiptap p,
+  .ProseMirror p {
+    margin: 0 !important;
+    line-height: 1;
+  }
 
   :global(.ProseMirror),
   :global(.tiptap) {
@@ -133,15 +145,19 @@ app-board-tile {
       "Segoe UI",
       Helvetica,
       sans-serif;
-    font-size: 24px;
     font-weight: 700;
-    line-height: 1.2;
+    line-height: inherit;
     color: var(--tile-text);
-    letter-spacing: 0.2px;
+    letter-spacing: 0.15px;
 
     p {
       margin: 0;
       padding: 0;
+    }
+
+    // Spans with explicit font-size determine the actual size
+    span[style*="font-size"] {
+      line-height: 1;
     }
 
     &.ProseMirror-focused {
@@ -161,12 +177,20 @@ app-board-tile {
   height: 100%;
   padding-right: 6px;
   cursor: text;
+  padding-top: 6px;
+  line-height: 1;
+
+  /* Override Angular Material typography margin on paragraphs */
+  .tiptap p,
+  .ProseMirror p {
+    margin: 0 0 4px !important;
+  }
 
   /* Make the editor surface fill the whole body so clicks anywhere focus typing. */
   :global(.ProseMirror),
   :global(.tiptap) {
     min-height: 100%;
-    height: 100%;
+    height: auto;
     box-sizing: border-box;
     cursor: text;
   }
@@ -179,10 +203,11 @@ app-board-tile {
     outline: none;
     color: rgba(255, 255, 255, 0.86);
     font-size: 14px;
-    line-height: 1.45;
+    line-height: 1.4;
 
-    p {
-      margin: 0 0 0.55rem;
+    // Prevent large font spans from expanding line-height beyond the paragraph's own
+    span[style*="font-size"] {
+      line-height: 1;
     }
 
     h1,
@@ -191,7 +216,7 @@ app-board-tile {
     h4,
     h5,
     h6 {
-      margin: 0.7rem 0 0.4rem;
+      margin: 0.8em 0 0.45em;
       color: var(--tile-text);
       letter-spacing: 0.15px;
     }
@@ -305,6 +330,10 @@ app-board-tile {
   /* force Tiptap inline color spans to take priority */
   all: unset;
   display: inline;
+}
+
+::ng-deep .navbar-label {
+  font-size: large !important;
 }
 
 ::ng-deep .editor-toolbar {

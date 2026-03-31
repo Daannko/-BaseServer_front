@@ -310,6 +310,16 @@
           (commit)="tiptap.applyFont($event, nameEditor)"
         ></app-query-select>
 
+        <app-query-select
+          [options]="tiptap.fontSizes"
+          labelKey="name"
+          valueKey="value"
+          placeholder="Size"
+          title="Font size"
+          (commit)="tiptap.applyFontSize($event, nameEditor)"
+        ></app-query-select>
+        <div class="navbar-spacer"></div>
+
         <div class="navbar-spacer"></div>
 
         <!-- Color -->

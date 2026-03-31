@@ -151,6 +151,7 @@ p {
   display: flex;
   flex-direction: column;
   overscroll-behavior: contain;
+  cursor: default;
 }
 
 .search-window.is-fixed {

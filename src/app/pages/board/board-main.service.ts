@@ -172,7 +172,7 @@ export class BoardMainService {
       const mouseX = event.clientX - rect.left;
       const mouseY = event.clientY - rect.top;
 
-      const newZoom = this.zoom + (event.deltaY < 0 ? 0.05 : -0.05);
+      const newZoom = this.zoom * (event.deltaY < 0 ? 1.1 : 0.9);
 
       // Keep mouse position fixed during zoom
       const worldMouseX = mouseX / this.zoom + this.cameraX;

@@ -6,6 +6,8 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TextAlign } from '@tiptap/extension-text-align';
+import { splitBlockKeepMarks } from '@tiptap/pm/commands';
+import { CodeBlock } from '@tiptap/extension-code-block';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
@@ -16,6 +18,7 @@ import {
   PersistentSelectionKey,
 } from '../../../helpers/tiptap/PersistentSelector';
 import type { BoardTile } from './board-tile.data';
+import { ParagraphAttrPlugin, ParagraphWithMarks } from './tiptap.extension';
 
 type SelectionRange = { from: number; to: number };
 
@@ -82,8 +85,10 @@ export class TiptapService {
     this.nameEditor = new Editor({
       element: titleElement,
       extensions: [
+        ParagraphWithMarks,
         StarterKit.configure({
           heading: false,
+          paragraph: false,
           bulletList: false,
           orderedList: false,
           blockquote: false,
@@ -95,6 +100,8 @@ export class TiptapService {
         TextStyle,
         Color.configure({ types: ['textStyle'] }),
         FontFamily,
+        FontSize,
+        ParagraphAttrPlugin,
       ],
       content: tile.name,
       onFocus: () => {
@@ -103,7 +110,6 @@ export class TiptapService {
       },
       onUpdate: ({ editor }) => {
         tile.name = editor.getJSON();
-        console.log(tile.name);
       },
       onSelectionUpdate: ({ editor }) => {
         this.captureLastSelection(editor);
@@ -113,35 +119,29 @@ export class TiptapService {
           class: 'title-content',
           placeholder: 'Untitled',
         },
+        handleKeyDown: (view, event) => {
+          if (event.key !== 'Enter') return false;
+          return splitBlockKeepMarks(view.state, view.dispatch);
+        },
       },
     });
 
     this.contentEditor = new Editor({
       element: contentElement,
       extensions: [
-        StarterKit.configure({
-          link: {
-            openOnClick: false,
-            HTMLAttributes: {
-              class: 'tile-link',
-            },
-          },
-        }),
+        ParagraphWithMarks,
+        StarterKit.configure({ paragraph: false }),
         TextStyle,
+        FontSize,
         Color.configure({ types: ['textStyle'] }),
         FontFamily,
-        Table.configure({
-          resizable: true,
-          allowTableNodeSelection: true,
-        }),
+        Table.configure({ resizable: true }),
         TableRow,
-        PersistentSelection,
         TableHeader,
         TableCell,
-        FontSize,
-        TextAlign.configure({
-          types: ['heading', 'paragraph'],
-        }),
+        TextAlign.configure({ types: ['heading', 'paragraph'] }),
+
+        ParagraphAttrPlugin,
       ],
       content: tile.content,
       onFocus: () => {
@@ -150,6 +150,7 @@ export class TiptapService {
       },
       onUpdate: ({ editor }) => {
         tile.content = editor.getJSON();
+        console.log(tile.content);
       },
       onSelectionUpdate: ({ editor }) => {
         this.detectTableContext(editor);
@@ -306,43 +307,11 @@ export class TiptapService {
   }
 
   setTextColor(color: string, editor: Editor) {
-    const { from, to } = editor.state.selection;
-    const last = this.getLastSelection(editor);
-    const canRestore =
-      from === to &&
-      last &&
-      typeof last.from === 'number' &&
-      last.from < last.to;
-
-    const chain = editor.chain().focus();
-
-    if (canRestore) {
-      chain.setTextSelection({ from: last.from, to: last.to });
-    } else if (from === to) {
-      chain.selectAll();
-    }
-
-    chain.setMark('textStyle', { color }).run();
+    editor.chain().setMark('textStyle', { color }).run();
   }
 
   setFont(fontFamily: string, editor: Editor) {
-    const { from, to } = editor.state.selection;
-    const last = this.getLastSelection(editor);
-    const canRestore =
-      from === to &&
-      last &&
-      typeof last.from === 'number' &&
-      last.from < last.to;
-
-    const chain = editor.chain().focus();
-
-    if (canRestore) {
-      chain.setTextSelection({ from: last.from, to: last.to });
-    } else if (from === to) {
-      chain.selectAll();
-    }
-
-    chain.setFontFamily(fontFamily).run();
+    editor.chain().setFontFamily(fontFamily).run();
   }
 
   applyFont(input: string, editor: Editor) {
@@ -357,59 +326,12 @@ export class TiptapService {
     this.setFont(fontFamily, editor);
   }
 
-  setFontSize(fontSize: string, editor: Editor) {
-    const { from, to } = editor.state.selection;
-    const last = this.getLastSelection(editor);
-    const canRestore =
-      from === to &&
-      last &&
-      typeof last.from === 'number' &&
-      last.from < last.to;
-
-    const chain = editor.chain().focus();
-
-    if (canRestore) {
-      chain.setTextSelection({ from: last.from, to: last.to });
-    } else if (from === to) {
-      chain.selectAll();
-    }
-
-    chain.setMark('textStyle', { fontSize }).run();
-  }
-
-  applyFontSize(input: string, editor: Editor) {
-    const fontSize = this.normalizeFontSize(input);
-    if (!fontSize) return;
-
-    this.setFontSize(fontSize, editor);
-  }
-
-  private normalizeFontSize(input: string): string | null {
-    const raw = (input || '').trim();
-    if (!raw) return null;
-
-    if (/^\d+(?:\.\d+)?$/.test(raw)) {
-      return `${raw}px`;
-    }
-
-    if (
-      /^\d+(?:\.\d+)?(px|em|rem|%|pt|pc|cm|mm|in|vh|vw|vmin|vmax|ch|ex)$/.test(
-        raw,
-      )
-    ) {
-      return raw;
-    }
-
-    const compact = raw.replace(/\s+/g, '').toLowerCase();
-    if (
-      /^\d+(?:\.\d+)?(px|em|rem|%|pt|pc|cm|mm|in|vh|vw|vmin|vmax|ch|ex)$/.test(
-        compact,
-      )
-    ) {
-      return compact;
-    }
-
-    return null;
+  applyFontSize(size: string, editor: Editor) {
+    const chain = editor
+      .chain()
+      .focus()
+      .setMark('textStyle', { fontSize: size });
+    chain.run();
   }
 
   getDisplayText(html: string): string {

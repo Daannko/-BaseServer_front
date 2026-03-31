@@ -1,0 +1,34 @@
+[     523ms] [WARNING] NG0505: Angular hydration was requested on the client, but there was no serialized information present in the server response, thus hydration was not enabled. Make sure the `provideClientHydration()` is included into the list of providers in the server part of the application configuration. Find more at https://angular.dev/errors/NG0505 @ http://localhost:49191/@fs/D:/BaseServer_front/.angular/cache/18.2.7/BaseServer-app/vite/deps/chunk-V3CJMW24.js?v=e1c7234e:19327
+[     549ms] [LOG] Angular is running in development mode. @ http://localhost:49191/@fs/D:/BaseServer_front/.angular/cache/18.2.7/BaseServer-app/vite/deps/chunk-V3CJMW24.js?v=e1c7234e:19323
+[     609ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/board/all:0
+[     623ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/board/all:0
+[     682ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:49191/assets/search.svg:0
+[   19414ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/board:0
+[   19450ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/board:0
+[   83223ms] [WARNING] NG0505: Angular hydration was requested on the client, but there was no serialized information present in the server response, thus hydration was not enabled. Make sure the `provideClientHydration()` is included into the list of providers in the server part of the application configuration. Find more at https://angular.dev/errors/NG0505 @ http://localhost:49191/@fs/D:/BaseServer_front/.angular/cache/18.2.7/BaseServer-app/vite/deps/chunk-V3CJMW24.js?v=e1c7234e:19327
+[   83227ms] [LOG] Angular is running in development mode. @ http://localhost:49191/@fs/D:/BaseServer_front/.angular/cache/18.2.7/BaseServer-app/vite/deps/chunk-V3CJMW24.js?v=e1c7234e:19323
+[   83292ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/board/all:0
+[   83376ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/board/all:0
+[   83443ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:49191/assets/search.svg:0
+[  109119ms] [WARNING] NG0505: Angular hydration was requested on the client, but there was no serialized information present in the server response, thus hydration was not enabled. Make sure the `provideClientHydration()` is included into the list of providers in the server part of the application configuration. Find more at https://angular.dev/errors/NG0505 @ http://localhost:49191/@fs/D:/BaseServer_front/.angular/cache/18.2.7/BaseServer-app/vite/deps/chunk-V3CJMW24.js?v=e1c7234e:19327
+[  109124ms] [LOG] Angular is running in development mode. @ http://localhost:49191/@fs/D:/BaseServer_front/.angular/cache/18.2.7/BaseServer-app/vite/deps/chunk-V3CJMW24.js?v=e1c7234e:19323
+[  109143ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/board/all:0
+[  109203ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/board/all:0
+[  109230ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:49191/assets/search.svg:0
+[  109841ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/user/me:0
+[  109865ms] [ERROR] Failed to load resource: the server responded with a status of 401 () @ http://localhost:49192/user/me:0
+[  109866ms] [ERROR] Error fetching user data HttpErrorResponse @ http://localhost:49191/main.js:566
+[  109879ms] [WARNING] 
+  It looks like you're using ngModel on the same form field as formControlName.
+  Support for using the ngModel input property and ngModelChange event with
+  reactive form directives has been deprecated in Angular v6 and will be removed
+  in a future version of Angular.
+
+  For more information on this, see our API docs here:
+  https://angular.io/api/forms/FormControlName#use-with-ngmodel
+   @ http://localhost:49191/@fs/D:/BaseServer_front/.angular/cache/18.2.7/BaseServer-app/vite/deps/@angular_forms.js?v=e1c7234e:2732
+[  109906ms] [ERROR] Failed to load resource: the server responded with a status of 462 () @ http://localhost:49192/auth/refresh:0
+[  109916ms] [ERROR] Failed to load resource: the server responded with a status of 462 () @ http://localhost:49192/auth/refresh:0
+[  109920ms] [ERROR] ERROR HttpErrorResponse @ http://localhost:49191/@fs/D:/BaseServer_front/.angular/cache/18.2.7/BaseServer-app/vite/deps/chunk-V3CJMW24.js?v=e1c7234e:5935
+[  109987ms] [VERBOSE] [DOM] Input elements should have autocomplete attributes (suggested: "current-password"): (More info: https://goo.gl/9p2vKq) %o @ http://localhost:49191/auth:0
+[  117011ms] [ERROR] Failed to load resource: the server responded with a status of 404 (Not Found) @ http://localhost:49191/assets/search.svg:0
