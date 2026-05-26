@@ -84,6 +84,27 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedBoard: Board | null = null;
   private activeNavbarTile: BoardTile | null = null;
 
+  deleteBoardPending: { id: string; name: string } | null = null;
+  deleteConfirmInput = '';
+
+  get deleteConfirmChars(): Array<{ char: string; status: 'ghost' | 'correct' | 'wrong' }> {
+    if (!this.deleteBoardPending) return [];
+    const name = this.deleteBoardPending.name;
+    const typed = this.deleteConfirmInput;
+    const len = Math.max(name.length, typed.length);
+    return Array.from({ length: len }, (_, i) => {
+      const nameChar = name[i] ?? '';
+      const typedChar = typed[i];
+      if (typedChar === undefined) return { char: nameChar, status: 'ghost' as const };
+      if (typedChar === nameChar) return { char: typedChar, status: 'correct' as const };
+      return { char: typedChar, status: 'wrong' as const };
+    });
+  }
+
+  get deleteConfirmValid(): boolean {
+    return !!this.deleteBoardPending && this.deleteConfirmInput === this.deleteBoardPending.name;
+  }
+
   ctxMenu = {
     visible: false,
     x: 0,
@@ -313,6 +334,40 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   centerOnItem(item: BoardTile) {
     if (!this.mainBoardService) return;
     this.mainBoardService.centerOnItem(item);
+  }
+
+  openDeleteBoardConfirm(board: Board, event: MouseEvent) {
+    event.stopPropagation();
+    this.deleteBoardPending = { id: board.id, name: board.name };
+    this.deleteConfirmInput = '';
+  }
+
+  cancelDeleteBoard() {
+    this.deleteBoardPending = null;
+    this.deleteConfirmInput = '';
+  }
+
+  async confirmDeleteBoard() {
+    if (!this.deleteConfirmValid || !this.deleteBoardPending) return;
+    const { id } = this.deleteBoardPending;
+    this.deleteBoardPending = null;
+    this.deleteConfirmInput = '';
+    await this.boardSearchService.deleteBoard(id);
+    if (this.selectedBoard?.id === id) {
+      this.selectedBoard = null;
+      this.resetTileState();
+    }
+  }
+
+  setRowHoverX(event: MouseEvent) {
+    const el = event.currentTarget as HTMLElement;
+    const rect = el.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    el.style.setProperty('--hover-x', String(x));
+  }
+
+  clearRowHoverX(event: MouseEvent) {
+    (event.currentTarget as HTMLElement).style.removeProperty('--hover-x');
   }
 
   async submitNewBoardRequest() {

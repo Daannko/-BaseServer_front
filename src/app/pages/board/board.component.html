@@ -88,14 +88,28 @@
                   else noResults
                 "
               >
-                <button
-                  class="command-item"
+                <div
+                  class="command-item-row"
                   *ngFor="let b of filteredBoards(boards)"
-                  (click)="selectBoard(b.id)"
+                  (mousemove)="setRowHoverX($event)"
+                  (mouseleave)="clearRowHoverX($event)"
                 >
-                  <span class="command-item-title">{{ b.name }}</span>
-                  <span class="command-item-subtitle">{{ b.description }}</span>
-                </button>
+                  <button
+                    class="command-item"
+                    (click)="selectBoard(b.id)"
+                  >
+                    <span class="command-item-title">{{ b.name }}</span>
+                    <span class="command-item-subtitle">{{ b.description }}</span>
+                  </button>
+                  <button
+                    class="command-item-delete"
+                    type="button"
+                    title="Delete board"
+                    (click)="openDeleteBoardConfirm(b, $event)"
+                  >
+                    <app-svg-icon icon="close-x"></app-svg-icon>
+                  </button>
+                </div>
 
                 <button
                   class="command-item command-create"
@@ -189,6 +203,37 @@
           >
           </app-board-connector>
         </ng-container>
+      </div>
+    </div>
+  </div>
+
+  <!-- Delete board confirmation modal -->
+  <div class="delete-modal-backdrop" *ngIf="deleteBoardPending" (click)="cancelDeleteBoard()">
+    <div class="delete-modal" (click)="$event.stopPropagation()">
+      <h3 class="delete-modal-title">Delete board</h3>
+      <p class="delete-modal-hint">Type <span class="delete-modal-board-name">{{ deleteBoardPending.name }}</span> to confirm:</p>
+      <div class="delete-modal-input-wrap">
+        <div class="delete-modal-chars" aria-hidden="true">
+          <span
+            *ngFor="let c of deleteConfirmChars"
+            [class.char-ghost]="c.status === 'ghost'"
+            [class.char-correct]="c.status === 'correct'"
+            [class.char-wrong]="c.status === 'wrong'"
+          >{{ c.char }}</span>
+        </div>
+        <input
+          class="delete-modal-input"
+          [(ngModel)]="deleteConfirmInput"
+          (keydown.enter)="confirmDeleteBoard()"
+          (keydown.escape)="cancelDeleteBoard()"
+          autocomplete="off"
+          spellcheck="false"
+          autofocus
+        />
+      </div>
+      <div class="delete-modal-actions">
+        <button class="delete-modal-confirm" [disabled]="!deleteConfirmValid" (click)="confirmDeleteBoard()">Delete</button>
+        <button class="delete-modal-cancel" (click)="cancelDeleteBoard()">Cancel</button>
       </div>
     </div>
   </div>

@@ -89,6 +89,21 @@ export class BoardApiService {
     }
   }
 
+  async deleteBoard(boardId: string): Promise<void> {
+    try {
+      await firstValueFrom(this.http.delete(`${this.apiUrl}/board/${boardId}`));
+      const current = this._boards.value ?? [];
+      this._boards.next(current.filter((b) => b.id !== boardId));
+    } catch (e: unknown) {
+      if (e instanceof HttpErrorResponse) {
+        this.snackBarService.error(`Failed to delete board (${e.status})`);
+      } else {
+        this.snackBarService.error('Failed to delete board');
+      }
+      throw e;
+    }
+  }
+
   refreshBoards(): void {
     var retrieveBoardsUrl = '/board/all';
     this.http.get<Board[]>(this.apiUrl + retrieveBoardsUrl).subscribe({

@@ -271,6 +271,66 @@ p {
   border-color: transparent;
 }
 
+.command-item-row {
+  position: relative;
+  border-radius: 10px;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 10px;
+    background: linear-gradient(
+      to left,
+      rgba(200, 50, 40, calc(var(--hover-x, 0) * var(--hover-x, 0) * 0.55)) 0%,
+      transparent 30%
+    );
+    pointer-events: none;
+  }
+
+  &:hover .command-item {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.command-item-delete {
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 10%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  border-radius: 0 10px 10px 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0);
+  transition: color 150ms ease;
+
+  app-svg-icon {
+    width: 22px;
+    height: 22px;
+    display: block;
+    background: currentColor;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+  }
+
+  .command-item-row:hover & {
+    color: rgba(255, 255, 255, 0.6);
+  }
+
+  &:hover {
+    color: rgba(240, 80, 65, 0.95) !important;
+  }
+}
+
 .command-item {
   width: 100%;
   padding: 0.75rem 1rem;
@@ -282,14 +342,7 @@ p {
   gap: 0.25rem;
   text-align: left;
   cursor: pointer;
-  transition:
-    background 120ms ease,
-    transform 120ms ease;
-}
-
-.command-item:hover {
-  background: rgba(255, 255, 255, 0.06);
-  transform: translateX(4px);
+  transition: background 120ms ease;
 }
 
 .command-item-title {
@@ -397,4 +450,132 @@ p {
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #fff;
+}
+
+// ── Delete board confirmation modal ─────────────────────────────
+
+.delete-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.delete-modal {
+  background: linear-gradient(180deg, rgba(28, 28, 30, 0.98) 0%, rgba(18, 18, 20, 0.98) 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 2rem;
+  width: 380px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.delete-modal-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #fff;
+}
+
+.delete-modal-hint {
+  margin: 0;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.delete-modal-board-name {
+  color: rgba(220, 75, 65, 0.95);
+  font-weight: 600;
+}
+
+.delete-modal-input-wrap {
+  position: relative;
+}
+
+.delete-modal-chars {
+  position: absolute;
+  inset: 0;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  font-family: monospace;
+  letter-spacing: 0.02em;
+  display: flex;
+  align-items: center;
+  pointer-events: none;
+  white-space: pre;
+
+  .char-ghost   { color: rgba(255, 255, 255, 0.2); }
+  .char-correct { color: rgba(255, 255, 255, 0.9); }
+  .char-wrong   { color: rgba(220, 70, 60, 0.9); }
+}
+
+.delete-modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 0.5rem 0.75rem;
+  font-size: 0.95rem;
+  font-family: monospace;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 7px;
+  color: transparent;
+  caret-color: rgba(255, 255, 255, 0.8);
+  outline: none;
+  transition: border-color 150ms ease;
+
+  &:focus {
+    border-color: rgba(255, 213, 79, 0.45);
+  }
+}
+
+.delete-modal-actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+  margin-top: 0.25rem;
+}
+
+.delete-modal-confirm {
+  padding: 0.45rem 1.1rem;
+  border-radius: 7px;
+  border: none;
+  background: rgba(200, 50, 40, 0.85);
+  color: #fff;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 150ms ease, opacity 150ms ease;
+
+  &:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+  }
+
+  &:not(:disabled):hover {
+    background: rgba(220, 60, 48, 1);
+  }
+}
+
+.delete-modal-cancel {
+  padding: 0.45rem 1.1rem;
+  border-radius: 7px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 150ms ease, color 150ms ease;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.07);
+    color: #fff;
+  }
 }
