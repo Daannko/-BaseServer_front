@@ -13,6 +13,7 @@ import {
   NgZone,
 } from '@angular/core';
 import { BoardTile } from './board-tile.data';
+import { extractPlainText, docFromText } from '../../../helpers/rich-text.util';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import type { Editor } from '@tiptap/core';
@@ -41,6 +42,7 @@ import { TiptapService } from './tiptap.service';
 export class BoardTileComponent implements OnDestroy, AfterViewInit {
   @Input() tile!: BoardTile;
   @Input() zoom = 1;
+  @Input() nameLabelScale = 18;
   @Output() navbarChange = new EventEmitter<{
     template: TemplateRef<any>;
     context: any;
@@ -48,6 +50,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
   @Output() deleteTile = new EventEmitter<void>();
   @Output() connectorDragStart = new EventEmitter<{ fromX: number; fromY: number }>();
   @ViewChild('contentElement', { static: false }) contentElement!: ElementRef;
+  @ViewChild('nameLabel', { static: false }) nameLabelRef?: ElementRef<HTMLElement>;
   @ViewChild('navbarContentTemplate', { static: false })
   navbarContentTemplate!: TemplateRef<any>;
 
@@ -67,6 +70,39 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
   get hostTileMin() {
     const min = Math.min(this.tile?.width ?? 0, this.tile?.height ?? 0);
     return min + 'px';
+  }
+
+  @HostBinding('style.--name-label-scale')
+  get hostNameLabelScale() {
+    return String(this.nameLabelScale);
+  }
+
+  getTileName(): string {
+    return extractPlainText(this.tile?.name).trim();
+  }
+
+  onNameKeydown(event: KeyboardEvent): void {
+    event.stopPropagation();
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      (event.target as HTMLElement).blur();
+    } else if (event.key === 'Escape') {
+      const el = event.target as HTMLElement;
+      el.textContent = this.getTileName();
+      el.blur();
+    }
+  }
+
+  onNameBlur(event: FocusEvent): void {
+    const el = event.target as HTMLElement;
+    const text = el.textContent?.trim() ?? '';
+    if (!text) {
+      el.textContent = this.getTileName();
+      return;
+    }
+    if (text !== this.getTileName()) {
+      this.tile.name = docFromText(text);
+    }
   }
 
   isColorPaletteVisible: boolean = false;
@@ -110,6 +146,10 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit() {
+    if (this.nameLabelRef) {
+      this.nameLabelRef.nativeElement.textContent = this.getTileName();
+    }
+
     this.tiptap.initEditors({
       tile: this.tile,
       contentElement: this.contentElement.nativeElement,
@@ -171,8 +211,11 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     this.tile.width = r.width;
     this.tile.height = r.height;
 
-    // This might not be the best ... will see
     for (const connector of this.tile.connectors) {
+      connector.updateAngles();
+      connector.updatePosition();
+    }
+    for (const connector of this.tile.inboundConnectors) {
       connector.updateAngles();
       connector.updatePosition();
     }
@@ -183,6 +226,10 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     this.tile.y = p.y;
 
     for (const connector of this.tile.connectors) {
+      connector.updateAngles();
+      connector.updatePosition();
+    }
+    for (const connector of this.tile.inboundConnectors) {
       connector.updateAngles();
       connector.updatePosition();
     }

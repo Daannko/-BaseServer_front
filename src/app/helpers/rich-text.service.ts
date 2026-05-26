@@ -51,6 +51,11 @@ export class RichTextService {
     return this.renderDocToSafeHtml(value);
   }
 
+  renderJsonToHtml(value: JSONContent): string {
+    const html = generateHTML(value, this.renderExtensions);
+    return this.sanitizeHtml(html);
+  }
+
   renderJsonToSafeHtmlWithoutFontSize(value: JSONContent): SafeHtml {
     const html = generateHTML(value, this.renderExtensions);
     const clean = this.sanitizeHtml(html)

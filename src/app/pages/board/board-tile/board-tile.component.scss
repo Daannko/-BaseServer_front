@@ -6,6 +6,39 @@
   pointer-events: none;
 }
 
+:host:focus-within .tile-name-label {
+  opacity: 0.62;
+}
+
+.tile-name-label {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  margin-bottom: 6px;
+  color: var(--bp-text-muted);
+  opacity: 0.38;
+  font-size: calc(var(--tile-min) / var(--name-label-scale, 18));
+  line-height: 1.4;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: auto;
+  user-select: text;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: text;
+  border-radius: 4px;
+  outline: none;
+  transition: color 120ms ease-out, opacity 120ms ease-out;
+
+  &:focus {
+    color: var(--bp-text);
+    opacity: 1;
+    overflow: visible;
+    text-overflow: clip;
+  }
+}
+
 .connector-btn {
   position: absolute;
   width: calc(var(--tile-min) * 0.09);

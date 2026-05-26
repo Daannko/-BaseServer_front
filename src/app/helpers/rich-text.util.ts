@@ -59,6 +59,13 @@ function tryParseJson(value: string): unknown | null {
  * - If `value` is a JSON string containing a doc, parses and returns it.
  * - Otherwise returns an empty doc.
  */
+export function extractPlainText(doc: JSONContent | undefined): string {
+  if (!doc) return '';
+  if (doc.text) return doc.text as string;
+  if (doc.content) return doc.content.map(extractPlainText).join('');
+  return '';
+}
+
 export function getDoc(value?: unknown): JSONContent {
   if (!value) return emptyDoc();
 

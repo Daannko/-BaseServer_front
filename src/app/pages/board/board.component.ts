@@ -580,8 +580,24 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
       }
     }
-    this.tiles = this.tiles.filter((t) => t.id !== tile.id);
-    this.tilesMap.delete(tile.id);
+
+    for (const conn of tile.connectors) {
+      conn.itemB.inboundConnectors.delete(conn);
+      for (const c of conn.itemB.connectors) {
+        if (c.id === conn.id) { conn.itemB.connectors.delete(c); break; }
+      }
+    }
+    for (const conn of tile.inboundConnectors) {
+      conn.itemA.connectors.delete(conn);
+      for (const c of conn.itemA.inboundConnectors) {
+        if (c.id === conn.id) { conn.itemA.inboundConnectors.delete(c); break; }
+      }
+    }
+
+    const tileId = tile.id;
+    this.connectors = this.connectors.filter(c => c.itemA.id !== tileId && c.itemB.id !== tileId);
+    this.tiles = this.tiles.filter(t => t.id !== tile.id);
+    this.tilesMap.delete(tileId);
     this.cdr.detectChanges();
   }
 
@@ -632,8 +648,42 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       }
       this.trailPoints = [];
 
-      const w = this.screenToWorld(e.clientX, e.clientY);
       if (!this.selectedBoard) return;
+
+      const w = this.screenToWorld(e.clientX, e.clientY);
+
+      // Drop on an existing tile → connect instead of creating
+      const targetTile = this.tiles.find(t =>
+        t !== tile &&
+        w.x >= t.x && w.x <= t.x + t.width &&
+        w.y >= t.y && w.y <= t.y + t.height,
+      );
+
+      if (targetTile) {
+        const alreadyConnected = Array.from(tile.connectors).some(
+          conn => conn.itemA === targetTile || conn.itemB === targetTile,
+        );
+        if (!alreadyConnected) {
+          tile.addConnectors(targetTile);
+          for (const conn of targetTile.connectors) {
+            if (conn.itemB === tile) { this.connectors.push(conn); break; }
+          }
+          for (const conn of tile.connectors) {
+            if (conn.itemB === targetTile) { this.connectors.push(conn); break; }
+          }
+          Promise.resolve().then(() => this.cdr.detectChanges());
+        }
+        return;
+      }
+
+      // Require minimum drag distance from the source tile edge before creating
+      const outsideDx = Math.max(tile.x - w.x, 0, w.x - (tile.x + tile.width));
+      const outsideDy = Math.max(tile.y - w.y, 0, w.y - (tile.y + tile.height));
+      const distToEdge = Math.hypot(outsideDx, outsideDy);
+      const minDist = Math.min(tile.width, tile.height) * 0.25;
+      if (distToEdge < minDist) return;
+
+      // Create new tile at drop position
       const zoom = this.mainBoardService.zoom;
       const width = 440 / zoom;
       const height = 600 / zoom;
@@ -645,6 +695,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       );
       this.tiles.push(newTile);
       this.tilesMap.set(newTile.id, newTile);
+
+      tile.addConnectors(newTile);
+      for (const conn of newTile.connectors) {
+        this.connectors.push(conn);
+      }
+      for (const conn of tile.connectors) {
+        if (conn.itemB === newTile) { this.connectors.push(conn); break; }
+      }
+
       Promise.resolve().then(() => {
         this.cdr.detectChanges();
         this.mainBoardService.tileComponents = this.tileComponents

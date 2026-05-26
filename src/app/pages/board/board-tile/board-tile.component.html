@@ -1,4 +1,16 @@
 <div
+  #nameLabel
+  class="tile-name-label"
+  contenteditable="true"
+  spellcheck="false"
+  (mousedown)="$event.stopPropagation()"
+  (pointerdown)="$event.stopPropagation()"
+  (dblclick)="$event.stopPropagation()"
+  (keydown)="onNameKeydown($event)"
+  (blur)="onNameBlur($event)"
+></div>
+
+<div
   boardTileResize
   [rect]="{
     x: tile.x,

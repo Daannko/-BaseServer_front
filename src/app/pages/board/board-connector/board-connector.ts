@@ -16,6 +16,10 @@ export class BoardConnector {
   shiftX: number = 0;
   shiftY: number = 0;
 
+  // Set by BoardConnectorComponent to receive direct DOM updates without Angular CD.
+  domElement: HTMLElement | null = null;
+  updateLabel: (() => void) | null = null;
+
   constructor(id: string, itemA: BoardTile, itemB: BoardTile) {
     this.id = id;
     this.itemA = itemA;
@@ -33,7 +37,7 @@ export class BoardConnector {
   }
 
   updatePosition() {
-    const connectorShift = 20;
+    const connectorShift = Math.max(15, Math.min(this.itemA.width, this.itemA.height) * 0.05);
 
     const tx =
       (this.itemA.width / 2 + connectorShift + this.width / 2) /
@@ -43,20 +47,29 @@ export class BoardConnector {
       Math.max(0.0001, Math.abs(this.sin));
     const r = Math.min(tx, ty);
 
-    var x = this.itemA.x + this.itemA.width / 2 + r * this.cos;
-    var y = this.itemA.y + this.itemA.height / 2 + r * this.sin;
+    this.x = this.itemA.x + this.itemA.width / 2 + r * this.cos;
+    this.y = this.itemA.y + this.itemA.height / 2 + r * this.sin;
 
-    this.x = x;
-    this.y = y;
+    if (this.domElement) {
+      this.domElement.style.left = this.x + 'px';
+      this.domElement.style.top = this.y + 'px';
+      this.domElement.style.setProperty('--tile-min', Math.min(this.itemB.width, this.itemB.height) + 'px');
+      this.domElement.style.setProperty('--source-tile-min', Math.min(this.itemA.width, this.itemA.height) + 'px');
+
+      this.domElement.style.transform = 'translate(-50%, -50%)';
+    }
   }
 
   updateSize(zoom: number) {
     this.opacity = 2 * zoom - 1;
+    if (this.domElement) {
+      this.domElement.style.opacity = String(this.opacity);
+    }
   }
 
   updateAngles() {
-    var dx = this.itemA.getCenterX() - this.itemB.getCenterX();
-    var dy = this.itemA.getCenterY() - this.itemB.getCenterY();
+    const dx = this.itemA.getCenterX() - this.itemB.getCenterX();
+    const dy = this.itemA.getCenterY() - this.itemB.getCenterY();
     this.angle = Math.atan2(-dy, -dx);
     this.cos = Math.cos(this.angle);
     this.sin = Math.sin(this.angle);

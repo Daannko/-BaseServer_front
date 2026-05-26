@@ -24,6 +24,7 @@ export class BoardTile {
   forceToRender: boolean = false;
   inView = false;
   connectors: Set<BoardConnector> = new Set();
+  inboundConnectors: Set<BoardConnector> = new Set();
   positionUpdated = false;
   sizeUpdated = false;
   contentUpdated = false;
@@ -117,10 +118,12 @@ export class BoardTile {
 
     const connectorA = new BoardConnector(id, this, t);
     this.connectors.add(connectorA);
+    t.inboundConnectors.add(connectorA);
     this.handleAddRelatedTopicHistory(t.id);
 
     const connectorB = new BoardConnector(id, t, this);
     t.connectors.add(connectorB);
+    this.inboundConnectors.add(connectorB);
     t.handleAddRelatedTopicHistory(this.id);
   }
 
@@ -154,15 +157,18 @@ export class BoardTile {
   removeConnector(c: BoardConnector) {
     if (!c?.id) return;
 
-    const otherIdForThis = c.itemB?.id;
-    const otherIdForOther = c.itemA?.id;
+    const otherTile = c.itemB;
 
     this.removeConnectorById(c.id);
-    if (otherIdForThis) this.handleRemoveRelatedTopicHistory(otherIdForThis);
-    c.itemB?.removeConnectorById(c.id);
-    if (otherIdForOther) {
-      c.itemB?.handleRemoveRelatedTopicHistory(otherIdForOther);
-    }
+    otherTile?.inboundConnectors.delete(c);
+    if (otherTile?.id) this.handleRemoveRelatedTopicHistory(otherTile.id);
+
+    const counterpart = otherTile
+      ? [...otherTile.connectors].find(x => x.id === c.id)
+      : undefined;
+    otherTile?.removeConnectorById(c.id);
+    if (counterpart) this.inboundConnectors.delete(counterpart);
+    if (c.itemA?.id) otherTile?.handleRemoveRelatedTopicHistory(c.itemA.id);
   }
 
   private removeConnectorById(connectorId: string) {
@@ -200,6 +206,9 @@ export class BoardTile {
     if (value === this._name) return;
     this.nameUpdated = true;
     this._name = value;
+    for (const conn of this.inboundConnectors) {
+      conn.updateLabel?.();
+    }
   }
 
   get content() {

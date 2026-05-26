@@ -1,4 +1,4 @@
-import { ElementRef, Injectable } from '@angular/core';
+import { ElementRef, Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
 import { BoardTile } from './board-tile/board-tile.data';
 
@@ -11,6 +11,7 @@ export type BoardContextMenuRequest = {
 
 @Injectable({ providedIn: 'root' })
 export class BoardMainService {
+  constructor(private ngZone: NgZone) {}
   // internal state - set by caller via `initialize`
   boardRef: ElementRef | null = null;
   viewportRef: ElementRef | null = null;
@@ -164,6 +165,10 @@ export class BoardMainService {
   setupListeners() {
     if (!this.boardRef) return;
     const board = this.boardRef.nativeElement as HTMLElement;
+    this.ngZone.runOutsideAngular(() => this.registerListeners(board));
+  }
+
+  private registerListeners(board: HTMLElement) {
 
     board.addEventListener('wheel', (event: WheelEvent) => {
       event.preventDefault();
@@ -223,7 +228,9 @@ export class BoardMainService {
       event.preventDefault();
       document.body.style.userSelect = 'none';
 
-      this.onBackgroundMouseDown?.();
+      if (this.onBackgroundMouseDown) {
+        this.ngZone.run(() => this.onBackgroundMouseDown!());
+      }
       this.isDragging = true;
       this.startX = event.clientX;
       this.startY = event.clientY;
@@ -259,7 +266,7 @@ export class BoardMainService {
     board.addEventListener('mouseup', stopDragging);
 
     board.addEventListener('contextmenu', (ev: MouseEvent) =>
-      this.showContextMenu(ev),
+      this.ngZone.run(() => this.showContextMenu(ev)),
     );
   }
 

@@ -10,7 +10,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: clamp(calc(var(--source-tile-min, 200px) / 22), calc(var(--tile-min, 200px) / 18), calc(var(--source-tile-min, 200px) / 7));
     font-weight: 500;
     padding: 5px 10px 5px 10px;
     box-shadow: none;
