@@ -94,7 +94,7 @@ export class BoardMainService {
     board.style.backgroundPosition = `${-this.cameraX * this.zoom}px ${-this.cameraY * this.zoom}px`;
   }
 
-  isItemVisible(item: any): boolean {
+  isItemVisible(item: BoardTile): boolean {
     if (!this.boardRef) return true;
     const board = this.boardRef.nativeElement as HTMLElement;
     const viewW = board.offsetWidth / this.zoom;
@@ -110,13 +110,13 @@ export class BoardMainService {
     const viewRight = this.cameraX + viewW;
     const viewBottom = this.cameraY + viewH;
 
-    return (
-      item.forceToRender ||
-      (right > viewLeft &&
-        left < viewRight &&
-        bottom > viewTop &&
-        top < viewBottom)
-    );
+    item.inView =
+      right > viewLeft &&
+      left < viewRight &&
+      bottom > viewTop &&
+      top < viewBottom;
+
+    return item.forceToRender || item.inView;
   }
 
   centerOnItem(item: BoardTile) {
@@ -126,10 +126,10 @@ export class BoardMainService {
     const viewportHeight = board.offsetHeight;
 
     // subtracting here to make place for the connectors
-    const zoomHeightRatio = viewportHeight / item.height - 0.3;
-    const zoomWidthRatio = viewportWidth / item.width - 0.4;
+    // const zoomHeightRatio = viewportHeight / item.height - 0.3;
+    // const zoomWidthRatio = viewportWidth / item.width - 0.4;
 
-    this.setZoom(Math.min(zoomHeightRatio, zoomWidthRatio));
+    // this.setZoom(Math.min(zoomHeightRatio, zoomWidthRatio));
 
     this.setCamera(
       item.getCenterX() - viewportWidth / (2 * this.zoom),
@@ -240,6 +240,7 @@ export class BoardMainService {
     const stopDragging = () => {
       this.isDragging = false;
       board.style.cursor = 'grab';
+      document.body.style.userSelect = '';
     };
 
     window.addEventListener('mouseup', stopDragging);

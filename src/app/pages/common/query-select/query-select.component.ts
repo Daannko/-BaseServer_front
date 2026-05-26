@@ -30,6 +30,25 @@ export class QuerySelectComponent {
   @Input() allowCustom = true;
   @Input() clearOnClick = true;
 
+  /** Restrict input to numeric characters only. */
+  @Input() numbersOnly = false;
+
+  /** When true, the "rest" (non-matching) section is hidden while the user is typing. */
+  @Input() hideRestOnQuery = false;
+
+  /** When true, always show the full options list. If query is set, prepend it as the first option. */
+  @Input() alwaysShowAll = false;
+
+  /** Visual variant — drives CSS class on the host wrapper. */
+  @Input() variant: 'text' | 'number' = 'text';
+
+  /** Sets the displayed value from outside (e.g. current editor state). Ignored while the dropdown is open. */
+  @Input() set displayValue(v: string) {
+    if (!this.isOpen) {
+      this.query = v ?? '';
+    }
+  }
+
   /** Emits when user commits a value (selects option / presses Enter / blurs). */
   @Output() commit = new EventEmitter<string>();
 
@@ -38,14 +57,19 @@ export class QuerySelectComponent {
 
   isOpen = false;
   query = '';
-  filtered: QuerySelectOption[] = [];
+  filteredMatches: QuerySelectOption[] = [];
+  filteredRest: QuerySelectOption[] = [];
+
+  get showDivider() {
+    return this.filteredMatches.length > 0 && this.filteredRest.length > 0;
+  }
 
   private suppressBlurCommit = false;
 
   constructor(private host: ElementRef<HTMLElement>) {}
 
   ngOnInit() {
-    this.filtered = this.options ?? [];
+    this.filteredRest = this.options ?? [];
   }
 
   ngOnChanges() {
@@ -54,7 +78,7 @@ export class QuerySelectComponent {
 
   open() {
     this.isOpen = true;
-    this.filter();
+    this.showAllSorted();
   }
 
   close() {
@@ -62,8 +86,9 @@ export class QuerySelectComponent {
   }
 
   onInput(value: string) {
-    this.query = value;
-    this.queryChange.emit(value);
+    const clean = this.numbersOnly ? value.replace(/\D/g, '') : value;
+    this.query = clean;
+    this.queryChange.emit(clean);
     this.isOpen = true;
     this.filter();
   }
@@ -77,7 +102,6 @@ export class QuerySelectComponent {
   }
 
   onBlur() {
-    // If an option click is in progress (mousedown), let that win.
     if (this.suppressBlurCommit) {
       this.suppressBlurCommit = false;
       return;
@@ -102,6 +126,13 @@ export class QuerySelectComponent {
     this.close();
   }
 
+  onKeydown(event: KeyboardEvent) {
+    if (!this.numbersOnly) return;
+    const allowed = ['Backspace', 'Delete', 'ArrowLeft', 'ArrowRight', 'Tab', 'Enter'];
+    if (allowed.includes(event.key)) return;
+    if (!/^\d$/.test(event.key)) event.preventDefault();
+  }
+
   trackByIndex(index: number) {
     return index;
   }
@@ -118,21 +149,74 @@ export class QuerySelectComponent {
     return { label, value };
   }
 
+  isSelected(option: QuerySelectOption): boolean {
+    if (!this.query) return false;
+    const { label } = this.readOption(option);
+    return label.toLowerCase() === this.query.toLowerCase();
+  }
+
+  private showAllSorted() {
+    if (this.alwaysShowAll) {
+      this.filter();
+      return;
+    }
+    const options = this.options ?? [];
+    const sorted = [...options];
+    const q = (this.query || '').trim().toLowerCase();
+    if (q) {
+      const idx = sorted.findIndex((opt) => {
+        const { label } = this.readOption(opt);
+        return label.toLowerCase() === q;
+      });
+      if (idx > 0) {
+        const [selected] = sorted.splice(idx, 1);
+        sorted.unshift(selected);
+      }
+    }
+    this.filteredMatches = [];
+    this.filteredRest = sorted;
+  }
+
   private filter() {
     const options = this.options ?? [];
     const q = (this.query || '').trim().toLowerCase();
-    if (!q) {
-      this.filtered = options;
+
+    if (this.alwaysShowAll) {
+      if (!q) {
+        this.filteredMatches = [];
+        this.filteredRest = [...options];
+      } else {
+        // Prepend typed value as first option; exclude exact preset match to avoid duplicate
+        const rest = options.filter((opt) => {
+          const { label } = this.readOption(opt);
+          return label.toLowerCase() !== q;
+        });
+        this.filteredMatches = [this.query];
+        this.filteredRest = rest;
+      }
       return;
     }
 
-    this.filtered = options.filter((opt) => {
+    if (!q) {
+      this.filteredMatches = [];
+      this.filteredRest = [...options];
+      return;
+    }
+
+    const matches = options.filter((opt) => {
       const { label, value } = this.readOption(opt);
       return label.toLowerCase().includes(q) || value.toLowerCase().includes(q);
     });
-    if (this.filtered.length == 0) {
+
+    const matchSet = new Set(matches);
+    const rest = options.filter((opt) => !matchSet.has(opt));
+
+    this.filteredMatches = matches.slice(0, 6);
+    this.filteredRest = this.hideRestOnQuery ? [] : rest;
+
+    if (matches.length === 0 && !this.allowCustom) {
       this.isOpen = false;
-    } else this.isOpen = true;
+    }
   }
 
   @HostListener('document:mousedown', ['$event'])

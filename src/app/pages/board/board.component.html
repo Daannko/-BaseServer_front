@@ -173,6 +173,7 @@
             [zoom]="zoom"
             (dblclick)="centerOnItem(item)"
             (navbarChange)="onTileNavbarChange($event)"
+            (deleteTile)="onDeleteTile(item)"
             *ngIf="isItemVisible(item)"
           >
           </app-board-tile>

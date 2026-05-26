@@ -460,10 +460,19 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   private createTileAt(worldX: number, worldY: number): void {
     if (!this.selectedBoard) return;
 
-    const tile = BoardTile.newTile(worldX, worldY, 440, 800);
+    const zoom = this.mainBoardService.zoom;
+    const width = 440 / zoom;
+    const height = 600 / zoom;
+    const tile = BoardTile.newTile(
+      worldX - width / 2,
+      worldY - height / 2,
+      width,
+      height,
+    );
 
     this.tiles.push(tile);
     this.tilesMap.set(tile.id, tile);
+    this.centerOnItem(tile);
 
     Promise.resolve().then(() => {
       this.cdr.detectChanges();
@@ -471,6 +480,19 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         ? this.tileComponents.toArray()
         : [];
     });
+  }
+
+  async onDeleteTile(tile: BoardTile): Promise<void> {
+    if (tile.serverId) {
+      try {
+        await this.boardSearchService.deleteTopic(tile.serverId);
+      } catch {
+        return;
+      }
+    }
+    this.tiles = this.tiles.filter((t) => t.id !== tile.id);
+    this.tilesMap.delete(tile.id);
+    this.cdr.detectChanges();
   }
 
   async saveBoard(): Promise<void> {

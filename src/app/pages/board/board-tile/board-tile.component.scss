@@ -1,13 +1,63 @@
 /* Tile styles: polished note card with topic badge and editor */
 
-app-board-tile {
+:host {
   position: absolute;
   z-index: 1;
-  contain: layout style paint;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: calc(var(--tile-min) * -0.15);
+    background: rgba(255, 0, 0, 0.3); /* debug */
+    pointer-events: auto;
+  }
+}
+
+.connector-btn {
+  position: absolute;
+  width: calc(var(--tile-min) * 0.09);
+  height: calc(var(--tile-min) * 0.09);
+  background: linear-gradient(
+    180deg,
+    rgba(38, 38, 40, 0.98) 0%,
+    rgba(24, 24, 26, 0.98) 100%
+  );
+  border: none;
+  border-radius: 18%;
+  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+  cursor: pointer;
+  z-index: 10;
+  padding: 0;
+  animation: connector-fade-in 150ms ease-out;
+  transition: background 150ms ease-out;
+
+  &:hover {
+    background: linear-gradient(
+      180deg,
+      rgba(55, 55, 58, 0.98) 0%,
+      rgba(38, 38, 40, 0.98) 100%
+    );
+  }
+
+  &--top    { top: calc(var(--tile-min) * -0.1);    left: 50%; transform: translate(-50%, -50%) rotate(0deg);   }
+  &--right  { right: calc(var(--tile-min) * -0.1);  top: 50%;  transform: translate(50%, -50%)  rotate(90deg);  }
+  &--bottom { bottom: calc(var(--tile-min) * -0.1); left: 50%; transform: translate(-50%, 50%)  rotate(180deg); }
+  &--left   { left: calc(var(--tile-min) * -0.1);   top: 50%;  transform: translate(-50%, -50%) rotate(-90deg); }
+}
+
+@keyframes connector-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .board-item {
   position: absolute;
+  left: 0;
+  top: 0;
   /* Theme hooks (future: override per-tile via [style.--tile-bg] etc.) */
   --tile-bg: rgba(16, 16, 16, 0.92);
   --tile-bg2: rgba(22, 22, 22, 0.92);
@@ -36,39 +86,34 @@ app-board-tile {
   overflow: visible;
 
   &:hover .tile-surface {
-    transform: translateY(-1px);
-    border-color: var(--tile-border-strong);
+    border-color: rgba(255, 255, 255, 0.22);
     box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.55),
-      0 10px 28px rgba(0, 0, 0, 0.45),
-      0 2px 10px rgba(0, 0, 0, 0.35);
+      0 6px 10px rgba(0, 0, 0, 0.3),
+      0 18px 36px rgba(0, 0, 0, 0.5);
   }
 
   &:focus-within .tile-surface {
-    border-color: rgba(255, 213, 79, 0.32);
+    border-color: rgba(255, 213, 79, 0.4);
     box-shadow:
-      0 0 0 1px rgba(0, 0, 0, 0.6),
-      0 0 0 4px var(--tile-focus),
-      0 12px 30px rgba(0, 0, 0, 0.5);
+      0 0 0 3px rgba(255, 213, 79, 0.18),
+      0 14px 32px rgba(0, 0, 0, 0.5);
   }
 }
 
 .tile-surface {
+  position: relative;
   height: 100%;
   width: 100%;
   display: flex;
   flex-direction: column;
   font-size: 1rem;
   border-radius: 12px;
-  border: 1px solid var(--tile-border);
+  border: 1px solid rgba(255, 255, 255, 0.13);
   background: linear-gradient(
     180deg,
-    rgba(22, 22, 22, 0.98),
-    rgba(16, 16, 16, 0.98)
+    rgba(32, 32, 34, 0.98) 0%,
+    rgba(20, 20, 22, 0.98) 100%
   );
-  box-shadow:
-    0 0 0 1px rgba(0, 0, 0, 0.6),
-    0 8px 20px rgba(0, 0, 0, 0.4);
   overflow: hidden;
   will-change: transform;
   transition:
@@ -78,21 +123,49 @@ app-board-tile {
 }
 
 .tile-header {
-  flex: 0 0 auto;
-  // padding: 0.5em 1rem 0.25em;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-  background: rgba(0, 0, 0, 0.18);
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: calc(var(--tile-min) / 13);
+  background: transparent;
   cursor: grab;
   display: flex;
+  align-items: center;
   justify-content: center;
+  z-index: 2;
+  transition: background 150ms ease-out;
+
+  &:active {
+    cursor: grabbing;
+  }
+
+  &::after {
+    content: "";
+    display: block;
+    width: calc(var(--tile-min) / 13);
+    height: calc(var(--tile-min) / 150);
+    border-radius: 3px;
+    background: transparent;
+    transition: background 120ms ease-out;
+  }
+}
+
+.board-item:hover .tile-header {
+  background: linear-gradient(to bottom, rgba(0, 0, 0, 0.35), transparent);
+
+  &::after {
+    background: rgba(255, 255, 255, 0.25);
+  }
 }
 
 .tile-body {
   flex: 1 1 auto;
-  padding: 0.25em 1rem 1rem;
+  padding: 0.6em 1rem 1rem;
   overflow: hidden;
   display: flex;
   min-height: 0;
+  height: 100%;
 }
 
 .tile-top {
@@ -113,56 +186,6 @@ app-board-tile {
     background: rgba(46, 170, 220, 0.25);
     color: rgb(100, 200, 240);
     border-radius: 3px;
-  }
-}
-
-::ng-deep .title-editor {
-  flex-shrink: 0;
-  cursor: text;
-  display: inline-block;
-  width: fit-content;
-  max-width: 90%;
-  min-width: 30%;
-  line-height: 1;
-
-  .tiptap p,
-  .ProseMirror p {
-    margin: 0 !important;
-    line-height: 1;
-  }
-
-  :global(.ProseMirror),
-  :global(.tiptap) {
-    cursor: text;
-    display: inline-block;
-    width: fit-content;
-    max-width: 100%;
-    outline: none;
-    font-family:
-      ui-sans-serif,
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Helvetica,
-      sans-serif;
-    font-weight: 700;
-    line-height: inherit;
-    color: var(--tile-text);
-    letter-spacing: 0.15px;
-
-    p {
-      margin: 0;
-      padding: 0;
-    }
-
-    // Spans with explicit font-size determine the actual size
-    span[style*="font-size"] {
-      line-height: 1;
-    }
-
-    &.ProseMirror-focused {
-      outline: none;
-    }
   }
 }
 
@@ -326,16 +349,6 @@ app-board-tile {
   }
 }
 
-::ng-deep .navbar-label *[style*="color"] {
-  /* force Tiptap inline color spans to take priority */
-  all: unset;
-  display: inline;
-}
-
-::ng-deep .navbar-label {
-  font-size: large !important;
-}
-
 ::ng-deep .editor-toolbar {
   color: rgba(255, 255, 255, 0.85); // Current: light gray (85% white)
   display: flex;
@@ -406,6 +419,12 @@ app-board-tile {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
+::ng-deep .selector-group {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
 ::ng-deep .navbar-spacer {
   width: 1px;
   height: 22px;
@@ -413,10 +432,6 @@ app-board-tile {
   flex: 0 0 1px;
   align-self: center;
   background: rgba(255, 255, 255, 0.14);
-}
-
-::ng-deep .navbar-title {
-  white-space: nowrap;
 }
 
 ::ng-deep .navbar-tile-controls strong {
@@ -453,13 +468,6 @@ app-board-tile {
 ::ng-deep .navbar-tile-controls button:active {
   color: #ffb300 !important;
   transform: translateY(0);
-}
-
-::ng-deep .navbar-title-text {
-  margin: 0 !important;
-  padding: 0 !important;
-  display: inline !important;
-  line-height: 1 !important;
 }
 
 // Color picker styles - sent to navbar via board-tile
@@ -567,6 +575,82 @@ app-board-tile {
       transform: translateY(0);
     }
   }
+}
+
+.tile-delete-btn {
+  position: absolute;
+  top: calc(var(--tile-min) / 120);
+  right: calc(var(--tile-min) / 120);
+  z-index: 3;
+  height: calc(var(--tile-min) / 13);
+  width: calc(var(--tile-min) / 13);
+  border-radius: 4px;
+  border: none;
+  background: none;
+  color: rgba(255, 255, 255, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  gap: 0;
+  opacity: 0;
+  pointer-events: none;
+  overflow: hidden;
+  white-space: nowrap;
+  transition:
+    opacity 150ms ease-out,
+    color 150ms ease-out,
+    width 200ms ease-out;
+
+  app-svg-icon.tile-delete-icon {
+    flex-shrink: 0;
+    width: calc(var(--tile-min) / 20);
+    height: calc(var(--tile-min) / 20);
+    display: block;
+    background: currentColor;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+    mask-size: contain;
+    mask-repeat: no-repeat;
+    mask-position: center;
+  }
+
+  .tile-delete-label {
+    font-size: calc(var(--tile-min) / 30);
+    font-weight: 400;
+    color: currentColor;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 0;
+    opacity: 0;
+    flex-shrink: 0;
+    transition:
+      max-width 200ms ease-out,
+      opacity 150ms ease-out 50ms,
+      padding 200ms ease-out;
+  }
+
+  &:hover {
+    color: rgba(255, 255, 255, 0.7);
+  }
+
+  &.confirm {
+    width: calc(var(--tile-min) / 4.2);
+    color: rgba(210, 75, 65, 0.95);
+
+    .tile-delete-label {
+      max-width: calc(var(--tile-min) / 4);
+      opacity: 1;
+      padding-right: calc(var(--tile-min) / 55);
+    }
+  }
+}
+
+.board-item:hover .tile-delete-btn {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .resize-handle {

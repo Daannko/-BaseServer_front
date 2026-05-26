@@ -9,10 +9,11 @@
   [zoom]="zoom"
   (rectChange)="onTileWorldRectChange($event)"
   class="board-item"
-  [style.width.px]="tile.width"
-  [style.height.px]="tile.height"
-  [style.left.px]="tile.x"
-  [style.top.px]="tile.y"
+  [style.--tile-w]="tile.width + 'px'"
+  [style.--tile-h]="tile.height + 'px'"
+  [style.--tile-min]="
+    (tile.width < tile.height ? tile.width : tile.height) + 'px'
+  "
 >
   <div class="tile-surface">
     <div
@@ -23,43 +24,74 @@
       (posChange)="onTileWorldPosChange($event)"
       (moveStart)="onMoveStart()"
       (moveEnd)="onMoveEnd()"
+    ></div>
+    <button
+      class="tile-delete-btn"
+      [class.confirm]="deleteConfirmPending"
+      (mousedown)="$event.stopPropagation()"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="onDeleteClick($event)"
+      title="Delete tile"
     >
-      <div
-        #titleElement
-        class="title-editor"
-        (pointerdown)="$event.stopPropagation()"
-        (mousedown)="$event.stopPropagation()"
-      ></div>
-    </div>
+      <span class="tile-delete-label">Delete?</span>
+      <app-svg-icon icon="close-x" class="tile-delete-icon"></app-svg-icon>
+    </button>
+
     <div class="tile-body">
       <div #contentElement class="content-editor"></div>
     </div>
   </div>
 
+  <button *ngIf="activeEdge === 'top'"    class="connector-btn connector-btn--top"    (mousedown)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (click)="connectorClick.emit('top')">+</button>
+  <button *ngIf="activeEdge === 'right'"  class="connector-btn connector-btn--right"  (mousedown)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (click)="connectorClick.emit('right')">+</button>
+  <button *ngIf="activeEdge === 'bottom'" class="connector-btn connector-btn--bottom" (mousedown)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (click)="connectorClick.emit('bottom')">+</button>
+  <button *ngIf="activeEdge === 'left'"   class="connector-btn connector-btn--left"   (mousedown)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (click)="connectorClick.emit('left')">+</button>
+
   <ng-template #navbarContentTemplate let-tile="tile">
     <div class="bar">
       <div #normalControls class="navbar-tile-controls">
-        <div class="navbar-title" [innerHTML]="getTitleHtml(tile)"></div>
-        <div class="navbar-spacer"></div>
         <!-- Font Selection -->
-        <app-query-select
-          [options]="tiptap.fonts"
-          labelKey="name"
-          valueKey="name"
-          placeholder="Font"
-          title="Font family"
-          [allowCustom]="false"
-          (commit)="tiptap.applyFont($event, contentEditor)"
-        ></app-query-select>
-
-        <app-query-select
-          [options]="tiptap.fontSizes"
-          labelKey="name"
-          valueKey="value"
-          placeholder="Size"
-          title="Font size"
-          (commit)="tiptap.applyFontSize($event, contentEditor)"
-        ></app-query-select>
+        <div class="selector-group">
+          <app-query-select
+            [options]="tiptap.fonts"
+            labelKey="name"
+            valueKey="name"
+            placeholder="Font"
+            title="Font family"
+            variant="text"
+            [allowCustom]="false"
+            [displayValue]="tiptap.currentFont"
+            (commit)="tiptap.applyFont($event, contentEditor)"
+            style="--qs-width: 120px"
+          ></app-query-select>
+          <app-query-select
+            [options]="tiptap.fontSizes"
+            labelKey="name"
+            valueKey="value"
+            placeholder="Size"
+            title="Font size"
+            variant="number"
+            [numbersOnly]="true"
+            [alwaysShowAll]="true"
+            [displayValue]="tiptap.currentSize"
+            (commit)="tiptap.applyFontSize($event, contentEditor)"
+            style="--qs-width: 52px"
+          ></app-query-select>
+          <button
+            (mousedown)="$event.preventDefault()"
+            (click)="tiptap.adjustFontSize(-1, contentEditor)"
+            title="Decrease font size"
+          >
+            <app-svg-icon icon="font-size-down"></app-svg-icon>
+          </button>
+          <button
+            (mousedown)="$event.preventDefault()"
+            (click)="tiptap.adjustFontSize(1, contentEditor)"
+            title="Increase font size"
+          >
+            <app-svg-icon icon="font-size-up"></app-svg-icon>
+          </button>
+        </div>
         <div class="navbar-spacer"></div>
         <!-- Text Formatting -->
         <div
@@ -287,89 +319,6 @@
           title="Delete table"
         >
           <app-svg-icon icon="table-delete"></app-svg-icon>
-        </button>
-      </div>
-    </div>
-  </ng-template>
-
-  <ng-template #navbarTitleTemplate let-tile="tile">
-    <div class="bar">
-      <div class="navbar-tile-controls">
-        <div class="navbar-label">
-          <div [innerHTML]="getTitleHtml(tile)"></div>
-        </div>
-        <div class="navbar-spacer"></div>
-        <!-- Font Selection -->
-        <app-query-select
-          [options]="tiptap.fonts"
-          labelKey="name"
-          valueKey="name"
-          placeholder="Font"
-          title="Font family"
-          [allowCustom]="false"
-          (commit)="tiptap.applyFont($event, nameEditor)"
-        ></app-query-select>
-
-        <app-query-select
-          [options]="tiptap.fontSizes"
-          labelKey="name"
-          valueKey="value"
-          placeholder="Size"
-          title="Font size"
-          (commit)="tiptap.applyFontSize($event, nameEditor)"
-        ></app-query-select>
-        <div class="navbar-spacer"></div>
-
-        <div class="navbar-spacer"></div>
-
-        <!-- Color -->
-        <div
-          class="color-picker-container"
-          (mouseenter)="isColorPaletteVisible = true"
-          (mouseleave)="isColorPaletteVisible = false"
-        >
-          <button class="color-picker-btn" title="Text color">
-            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
-          </button>
-          <div class="color-palette" [class.open]="isColorPaletteVisible">
-            <div class="temp"></div>
-            <button
-              *ngFor="let color of tiptap.colors"
-              [style.background-color]="color"
-              (click)="tiptap.setTextColor(color, nameEditor)"
-              [title]="color"
-              class="color-option"
-            ></button>
-          </div>
-        </div>
-
-        <button
-          (click)="tiptap.toggleBold(nameEditor)"
-          aria-label="Bold"
-          title="Bold"
-        >
-          <app-svg-icon icon="editor-bold"></app-svg-icon>
-        </button>
-        <button
-          (click)="tiptap.toggleItalic(nameEditor)"
-          aria-label="Italic"
-          title="Italic"
-        >
-          <app-svg-icon icon="editor-italic"></app-svg-icon>
-        </button>
-        <button
-          (click)="tiptap.toggleUnderline(nameEditor)"
-          aria-label="Underline"
-          title="Underline"
-        >
-          <app-svg-icon icon="editor-underline"></app-svg-icon>
-        </button>
-        <button
-          (click)="tiptap.toggleStrikethrough(nameEditor)"
-          aria-label="Strikethrough"
-          title="Strikethrough"
-        >
-          <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
         </button>
       </div>
     </div>

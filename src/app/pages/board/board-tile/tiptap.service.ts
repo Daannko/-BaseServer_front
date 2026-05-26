@@ -1,4 +1,4 @@
-import { Injectable } from '@angular/core';
+import { Injectable, NgZone } from '@angular/core';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
@@ -6,7 +6,6 @@ import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TextAlign } from '@tiptap/extension-text-align';
-import { splitBlockKeepMarks } from '@tiptap/pm/commands';
 import { CodeBlock } from '@tiptap/extension-code-block';
 import { FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
@@ -24,13 +23,13 @@ type SelectionRange = { from: number; to: number };
 
 @Injectable()
 export class TiptapService {
-  nameEditor?: Editor;
   contentEditor?: Editor;
 
   disableTextDrag = true;
   isTableActive = false;
+  currentFont = '';
+  currentSize = '';
 
-  private lastTitleSelection: SelectionRange | null = null;
   private lastContentSelection: SelectionRange | null = null;
 
   readonly colors = [
@@ -60,71 +59,29 @@ export class TiptapService {
   ];
 
   readonly fontSizes = [
-    { name: '12px', value: '12px' },
-    { name: '14px', value: '14px' },
-    { name: '16px', value: '16px' },
-    { name: '18px', value: '18px' },
-    { name: '20px', value: '20px' },
-    { name: '24px', value: '24px' },
-    { name: '28px', value: '28px' },
-    { name: '32px', value: '32px' },
+    { name: '12', value: '12px' },
+    { name: '14', value: '14px' },
+    { name: '16', value: '16px' },
+    { name: '18', value: '18px' },
+    { name: '20', value: '20px' },
+    { name: '24', value: '24px' },
+    { name: '28', value: '28px' },
+    { name: '32', value: '32px' },
   ];
 
-  constructor(private richText: RichTextService) {}
+  constructor(
+    private richText: RichTextService,
+    private ngZone: NgZone,
+  ) {}
 
   initEditors(options: {
     tile: BoardTile;
-    titleElement: HTMLElement;
     contentElement: HTMLElement;
   }) {
-    const { tile, titleElement, contentElement } = options;
+    const { tile, contentElement } = options;
 
     // Destroy any existing editors (can happen if tile is re-rendered)
     this.destroyEditors();
-
-    this.nameEditor = new Editor({
-      element: titleElement,
-      extensions: [
-        ParagraphWithMarks,
-        StarterKit.configure({
-          heading: false,
-          paragraph: false,
-          bulletList: false,
-          orderedList: false,
-          blockquote: false,
-          codeBlock: false,
-          horizontalRule: false,
-          link: false,
-        }),
-        PersistentSelection,
-        TextStyle,
-        Color.configure({ types: ['textStyle'] }),
-        FontFamily,
-        FontSize,
-        ParagraphAttrPlugin,
-      ],
-      content: tile.name,
-      onFocus: () => {
-        this.clearPersistentSelectionDecoration(this.contentEditor);
-        this.lastContentSelection = null;
-      },
-      onUpdate: ({ editor }) => {
-        tile.name = editor.getJSON();
-      },
-      onSelectionUpdate: ({ editor }) => {
-        this.captureLastSelection(editor);
-      },
-      editorProps: {
-        attributes: {
-          class: 'title-content',
-          placeholder: 'Untitled',
-        },
-        handleKeyDown: (view, event) => {
-          if (event.key !== 'Enter') return false;
-          return splitBlockKeepMarks(view.state, view.dispatch);
-        },
-      },
-    });
 
     this.contentEditor = new Editor({
       element: contentElement,
@@ -142,19 +99,22 @@ export class TiptapService {
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
 
         ParagraphAttrPlugin,
+        PersistentSelection,
       ],
       content: tile.content,
-      onFocus: () => {
-        this.clearPersistentSelectionDecoration(this.nameEditor);
-        this.lastTitleSelection = null;
+      onFocus: ({ editor }) => {
+        this.lastContentSelection = null;
+        this.updateCurrentStyles(editor);
+        this.onFocusCallback?.();
       },
       onUpdate: ({ editor }) => {
         tile.content = editor.getJSON();
-        console.log(tile.content);
+        this.updateCurrentStyles(editor);
       },
       onSelectionUpdate: ({ editor }) => {
         this.detectTableContext(editor);
         this.captureLastSelection(editor);
+        this.updateCurrentStyles(editor);
       },
       editorProps: {
         attributes: {
@@ -168,30 +128,28 @@ export class TiptapService {
 
   destroyEditors() {
     try {
-      this.nameEditor?.destroy();
-    } catch {}
-    try {
       this.contentEditor?.destroy();
     } catch {}
-    this.nameEditor = undefined;
     this.contentEditor = undefined;
   }
 
+  onFocusCallback: (() => void) | null = null;
+
+  get hasActiveSelection(): boolean {
+    if (!this.contentEditor) return false;
+    const { from, to } = this.contentEditor.state.selection;
+    return from !== to;
+  }
+
   clearSelectionHighlight() {
-    this.lastTitleSelection = null;
     this.lastContentSelection = null;
 
-    try {
-      this.nameEditor?.commands?.blur();
-    } catch {}
     try {
       this.contentEditor?.commands?.blur();
     } catch {}
 
-    this.clearPersistentSelectionDecoration(this.nameEditor);
     this.clearPersistentSelectionDecoration(this.contentEditor);
     queueMicrotask(() => {
-      this.clearPersistentSelectionDecoration(this.nameEditor);
       this.clearPersistentSelectionDecoration(this.contentEditor);
     });
   }
@@ -235,7 +193,6 @@ export class TiptapService {
       });
     };
 
-    patchEditor(this.nameEditor);
     patchEditor(this.contentEditor);
   }
 
@@ -249,15 +206,12 @@ export class TiptapService {
     if (from === to) return;
 
     const selection = { from: Math.min(from, to), to: Math.max(from, to) };
-    if (editor === this.nameEditor) {
-      this.lastTitleSelection = selection;
-    } else if (editor === this.contentEditor) {
+    if (editor === this.contentEditor) {
       this.lastContentSelection = selection;
     }
   }
 
   private getLastSelection(editor: Editor): SelectionRange | null {
-    if (editor === this.nameEditor) return this.lastTitleSelection;
     if (editor === this.contentEditor) return this.lastContentSelection;
     return null;
   }
@@ -327,11 +281,79 @@ export class TiptapService {
   }
 
   applyFontSize(size: string, editor: Editor) {
+    const normalized = /^\d+$/.test(size.trim()) ? size.trim() + 'px' : size;
     const chain = editor
       .chain()
       .focus()
-      .setMark('textStyle', { fontSize: size });
+      .setMark('textStyle', { fontSize: normalized });
     chain.run();
+  }
+
+  private updateCurrentStyles(editor: Editor) {
+    this.ngZone.run(() => {
+      const { from, to } = editor.state.selection;
+      const hasRange = from !== to;
+
+      if (hasRange) {
+        // Selection: collect every unique fontFamily and fontSize across text nodes
+        const fonts = new Set<string>();
+        const sizes = new Set<string>();
+
+        editor.state.doc.nodesBetween(from, to, (node) => {
+          if (!node.isText) return;
+          const mark = node.marks.find((m) => m.type.name === 'textStyle');
+          fonts.add((mark?.attrs['fontFamily'] as string) ?? '');
+          sizes.add((mark?.attrs['fontSize'] as string) ?? '');
+        });
+
+        // Mixed font → empty; single value → resolve name or 'Default'
+        if (fonts.size > 1) {
+          this.currentFont = '';
+        } else {
+          const fontValue = [...fonts][0] ?? '';
+          const fontMatch = this.fonts.find((f) => f.value === fontValue);
+          this.currentFont = fontMatch ? fontMatch.name : 'Default';
+        }
+
+        // Mixed size → empty; single value → resolve or compute
+        if (sizes.size > 1) {
+          this.currentSize = '';
+        } else {
+          const sizeValue = ([...sizes][0] ?? '').replace('px', '');
+          this.currentSize = sizeValue || this.computedSizeAt(editor, from);
+        }
+      } else {
+        // Cursor (no selection): read marks at caret position
+        const attrs = editor.getAttributes('textStyle');
+
+        const fontValue = (attrs['fontFamily'] as string) ?? '';
+        const fontMatch = this.fonts.find((f) => f.value === fontValue);
+        this.currentFont = fontMatch ? fontMatch.name : 'Default';
+
+        const sizeValue = (attrs['fontSize'] as string) ?? '';
+        this.currentSize = sizeValue
+          ? sizeValue.replace('px', '')
+          : this.computedSizeAt(editor, from);
+      }
+    });
+  }
+
+  private computedSizeAt(editor: Editor, pos: number): string {
+    try {
+      const { node } = editor.view.domAtPos(pos);
+      const el = node instanceof Element ? node : node.parentElement;
+      const computed = el ? window.getComputedStyle(el).fontSize : '';
+      return computed ? String(Math.round(parseFloat(computed))) : '';
+    } catch {
+      return '';
+    }
+  }
+
+  adjustFontSize(delta: number, editor: Editor) {
+    const current = editor.getAttributes('textStyle')['fontSize'] as string | undefined;
+    const num = parseInt(current ?? '14', 10);
+    const next = Math.max(1, num + delta);
+    this.applyFontSize(String(next), editor);
   }
 
   getDisplayText(html: string): string {

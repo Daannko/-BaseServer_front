@@ -23,6 +23,25 @@ export function docFromText(text: string): JSONContent {
   };
 }
 
+export function docFromTextWithFontSize(text: string, fontSize: number): JSONContent {
+  const safeText = String(text ?? '').trim();
+  const sizeStr = `${Math.round(fontSize)}px`;
+  const textStyleMark = { type: 'textStyle', attrs: { fontSize: sizeStr } };
+  const content = safeText
+    ? [{ type: 'text', text: safeText, marks: [textStyleMark] }]
+    : [];
+  return {
+    type: 'doc',
+    content: [
+      {
+        type: 'paragraph',
+        attrs: { storedMarks: [textStyleMark] },
+        content,
+      },
+    ],
+  };
+}
+
 function tryParseJson(value: string): unknown | null {
   if (!value) return null;
   const trimmed = value.trim();

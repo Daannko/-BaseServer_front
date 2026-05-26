@@ -1,7 +1,12 @@
 import type { JSONContent } from '@tiptap/core';
 import { BoardConnector } from '../board-connector/board-connector';
 import { Topic } from '../models/topic.model';
-import { docFromText, emptyDoc, getDoc } from '../../../helpers/rich-text.util';
+import {
+  docFromText,
+  docFromTextWithFontSize,
+  emptyDoc,
+  getDoc,
+} from '../../../helpers/rich-text.util';
 
 export class BoardTile {
   readonly id: string;
@@ -17,6 +22,7 @@ export class BoardTile {
   private relatedTopicsToBeRemoved: Set<string> = new Set();
   tier!: number;
   forceToRender: boolean = false;
+  inView = false;
   connectors: Set<BoardConnector> = new Set();
   positionUpdated = false;
   sizeUpdated = false;
@@ -46,6 +52,8 @@ export class BoardTile {
   }
 
   static newTile(x: number, y: number, width: number, height: number) {
+    const nameFont = width / 18;
+    const contentFont = width / 15;
     return new BoardTile(
       globalThis.crypto.randomUUID(),
       x,
@@ -54,8 +62,8 @@ export class BoardTile {
       height,
       new Set(),
       0,
-      docFromText('Name'),
-      docFromText('Content'),
+      docFromTextWithFontSize('Name', nameFont),
+      docFromTextWithFontSize('Content', contentFont),
     );
   }
 

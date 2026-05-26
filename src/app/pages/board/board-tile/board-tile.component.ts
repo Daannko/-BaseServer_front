@@ -9,6 +9,8 @@ import {
   AfterViewInit,
   TemplateRef,
   HostListener,
+  HostBinding,
+  NgZone,
 } from '@angular/core';
 import { BoardTile } from './board-tile.data';
 import { CommonModule } from '@angular/common';
@@ -20,7 +22,6 @@ import { TileRect, TileResizeDirective } from './tile.resize.directive';
 import { TileMoveDirective, Position } from './tile.move.directive';
 import { BoardMainService } from '../board-main.service';
 import { TiptapService } from './tiptap.service';
-import { RichTextService } from '../../../helpers/rich-text.service';
 
 @Component({
   selector: 'app-board-tile',
@@ -44,32 +45,43 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     template: TemplateRef<any>;
     context: any;
   }>();
-  @ViewChild('titleElement', { static: false }) titleElement!: ElementRef;
+  @Output() deleteTile = new EventEmitter<void>();
+  @Output() connectorClick = new EventEmitter<'top' | 'right' | 'bottom' | 'left'>();
   @ViewChild('contentElement', { static: false }) contentElement!: ElementRef;
   @ViewChild('navbarContentTemplate', { static: false })
   navbarContentTemplate!: TemplateRef<any>;
-  @ViewChild('navbarTitleTemplate', { static: false })
-  navbarTitleTemplate!: TemplateRef<any>;
+
+  @HostBinding('style.left.px') get hostLeft() {
+    return this.tile?.x ?? 0;
+  }
+  @HostBinding('style.top.px') get hostTop() {
+    return this.tile?.y ?? 0;
+  }
+  @HostBinding('style.width.px') get hostWidth() {
+    return this.tile?.width ?? 0;
+  }
+  @HostBinding('style.height.px') get hostHeight() {
+    return this.tile?.height ?? 0;
+  }
+  @HostBinding('style.--tile-min')
+  get hostTileMin() {
+    const min = Math.min(this.tile?.width ?? 0, this.tile?.height ?? 0);
+    return min + 'px';
+  }
 
   isColorPaletteVisible: boolean = false;
+  deleteConfirmPending = false;
+  activeEdge: 'top' | 'right' | 'bottom' | 'left' | null = null;
 
   private navbarPinned = false;
   private isDraggingTile = false;
+  private deleteConfirmTimeout?: ReturnType<typeof setTimeout>;
 
   constructor(
     private host: ElementRef<HTMLElement>,
-    private mainBoardService: BoardMainService,
+    private ngZone: NgZone,
     public tiptap: TiptapService,
-    private richText: RichTextService,
   ) {}
-
-  getTitleHtml(tile: BoardTile) {
-    return this.richText.renderJsonToSafeHtml(tile.name);
-  }
-
-  get nameEditor(): Editor {
-    return this.tiptap.nameEditor!;
-  }
 
   get contentEditor(): Editor {
     return this.tiptap.contentEditor!;
@@ -89,12 +101,10 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     // Ignore clicks that occur inside this tile (including TipTap internals / text nodes).
     if (path.includes(this.host.nativeElement)) return;
 
-    // Click was outside this tile: clear its selection highlight.
-    this.tiptap.clearSelectionHighlight();
-
-    // If this tile was providing the navbar, allow it to be virtualized again.
+    // If this tile was providing the navbar, allow it to be virtualized again —
+    // but only if there is no active text selection that should stay visible.
     this.navbarPinned = false;
-    if (!this.isDraggingTile) {
+    if (!this.isDraggingTile && !this.tiptap.hasActiveSelection) {
       this.tile.forceToRender = false;
     }
   }
@@ -102,40 +112,27 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
   ngAfterViewInit() {
     this.tiptap.initEditors({
       tile: this.tile,
-      titleElement: this.titleElement.nativeElement,
       contentElement: this.contentElement.nativeElement,
     });
 
     const root = this.contentElement.nativeElement as HTMLElement;
+    const contentRoot = root;
 
-    // When user clicks inside this tile, publish its navbar template so the top navbar can render
-    const titleRoot =
-      this.titleElement && (this.titleElement.nativeElement as HTMLElement);
-    const contentRoot =
-      this.contentElement && (this.contentElement.nativeElement as HTMLElement);
+    contentRoot.addEventListener('click', () => {
+      this.requestNavbar(this.navbarContentTemplate);
+    });
 
-    if (titleRoot) {
-      titleRoot.addEventListener('click', () => {
-        this.requestNavbar(this.navbarTitleTemplate);
-      });
-    }
-    if (contentRoot) {
-      contentRoot.addEventListener('click', () => {
-        this.requestNavbar(this.navbarContentTemplate);
-      });
-    }
+    this.tiptap.onFocusCallback = () => {
+      if (!this.navbarPinned && !this.isDraggingTile) {
+        this.tile.forceToRender = false;
+      }
+    };
 
     // Listen for mouseup anywhere to detect text selection that ends outside the editor
     document.addEventListener('mouseup', () => {
       const selection = window.getSelection();
       if (selection && selection.toString().length > 0) {
-        const isInTitle = titleRoot && titleRoot.contains(selection.anchorNode);
-        const isInContent =
-          contentRoot && contentRoot.contains(selection.anchorNode);
-
-        if (isInTitle) {
-          this.requestNavbar(this.navbarTitleTemplate);
-        } else if (isInContent) {
+        if (contentRoot.contains(selection.anchorNode)) {
           this.requestNavbar(this.navbarContentTemplate);
         }
       }
@@ -162,6 +159,17 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
 
       root.style.cursor = 'text';
     });
+
+    this.ngZone.runOutsideAngular(() => {
+      this.host.nativeElement.addEventListener(
+        'mousemove',
+        this.onHostMouseMove,
+      );
+      this.host.nativeElement.addEventListener(
+        'mouseleave',
+        this.onHostMouseLeave,
+      );
+    });
   }
 
   onTileWorldRectChange(r: TileRect) {
@@ -187,8 +195,31 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     }
   }
 
+  onDeleteClick(event: MouseEvent) {
+    event.stopPropagation();
+    if (this.deleteConfirmPending) {
+      clearTimeout(this.deleteConfirmTimeout);
+      this.deleteConfirmPending = false;
+      this.deleteTile.emit();
+    } else {
+      this.deleteConfirmPending = true;
+      this.deleteConfirmTimeout = setTimeout(() => {
+        this.deleteConfirmPending = false;
+      }, 2500);
+    }
+  }
+
   ngOnDestroy() {
+    clearTimeout(this.deleteConfirmTimeout);
     this.tiptap.destroyEditors();
+    this.host.nativeElement.removeEventListener(
+      'mousemove',
+      this.onHostMouseMove,
+    );
+    this.host.nativeElement.removeEventListener(
+      'mouseleave',
+      this.onHostMouseLeave,
+    );
   }
 
   private getNavbarContext() {
@@ -219,4 +250,34 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
       this.tile.forceToRender = false;
     }
   }
+
+  private readonly onHostMouseMove = (e: MouseEvent) => {
+    const rect = this.host.nativeElement.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const nx = (mx - rect.width / 2) / (rect.width / 2);
+    const ny = (my - rect.height / 2) / (rect.height / 2);
+    const edge =
+      Math.abs(nx) > Math.abs(ny)
+        ? nx > 0
+          ? 'right'
+          : 'left'
+        : ny > 0
+          ? 'bottom'
+          : 'top';
+
+    if (edge !== this.activeEdge) {
+      this.ngZone.run(() => {
+        this.activeEdge = edge;
+      });
+    }
+  };
+
+  private readonly onHostMouseLeave = () => {
+    if (this.activeEdge !== null) {
+      this.ngZone.run(() => {
+        this.activeEdge = null;
+      });
+    }
+  };
 }

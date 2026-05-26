@@ -1,4 +1,4 @@
-<div class="query-select">
+<div class="query-select" [class.open]="isOpen" [class.query-select--text]="variant === 'text'" [class.query-select--number]="variant === 'number'">
   <input
     class="query-input"
     [placeholder]="placeholder"
@@ -7,19 +7,36 @@
     spellcheck="false"
     [value]="query"
     (focus)="open()"
+    (click)="$any($event.target).select()"
     (input)="onInput($any($event.target).value)"
+    (keydown)="onKeydown($event)"
     (keydown.enter)="onEnter()"
     (blur)="onBlur()"
   />
+  <span class="query-chevron" aria-hidden="true">
+    <svg width="9" height="5" viewBox="0 0 9 5" fill="none">
+      <path d="M1 1L4.5 4.5L8 1" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </span>
 
   <div class="query-dropdown" *ngIf="isOpen">
     <button
       type="button"
       class="query-option"
-      *ngFor="let opt of filtered; trackBy: trackByIndex"
+      [class.selected]="isSelected(opt)"
+      *ngFor="let opt of filteredMatches; trackBy: trackByIndex"
       (mousedown)="onOptionMouseDown(opt)"
-    >
-      {{ readOption(opt).label }}
-    </button>
+    >{{ readOption(opt).label }}</button>
+
+    <div class="query-divider" *ngIf="showDivider"></div>
+
+    <button
+      type="button"
+      class="query-option"
+      [class.selected]="isSelected(opt)"
+      [class.dimmed]="query.length > 0"
+      *ngFor="let opt of filteredRest; trackBy: trackByIndex"
+      (mousedown)="onOptionMouseDown(opt)"
+    >{{ readOption(opt).label }}</button>
   </div>
 </div>

@@ -165,6 +165,20 @@ export class BoardApiService {
     return topics;
   }
 
+  async deleteTopic(topicId: string): Promise<void> {
+    const url = `${this.apiUrl}/topic/${topicId}`;
+    try {
+      await firstValueFrom(this.http.delete(url));
+    } catch (e: unknown) {
+      if (e instanceof HttpErrorResponse) {
+        this.snackBarService.error(`Failed to delete topic (${e.status})`);
+      } else {
+        this.snackBarService.error('Failed to delete topic');
+      }
+      throw e;
+    }
+  }
+
   async createTopic(topic: BoardTile, boardId: string): Promise<Topic | null> {
     const payload: CreateTopic = {
       boardId,
