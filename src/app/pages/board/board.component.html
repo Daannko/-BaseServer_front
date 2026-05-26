@@ -179,15 +179,17 @@
       </div>
     </div>
 
+    <canvas #dragCanvas class="drag-trail-canvas"></canvas>
     <div class="board-viewport" #viewport>
       <div #itemsContainer>
         <ng-container *ngFor="let item of tiles">
           <app-board-tile
             [tile]="item"
             [zoom]="zoom"
-            (dblclick)="centerOnItem(item)"
+            (dblclick)="onTileDblClick($event, item)"
             (navbarChange)="onTileNavbarChange($event)"
             (deleteTile)="onDeleteTile(item)"
+            (connectorDragStart)="onConnectorDragStart(item)"
             *ngIf="isItemVisible(item)"
           >
           </app-board-tile>
@@ -204,6 +206,7 @@
           </app-board-connector>
         </ng-container>
       </div>
+
     </div>
   </div>
 

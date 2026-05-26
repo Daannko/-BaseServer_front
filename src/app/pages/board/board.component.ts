@@ -31,6 +31,7 @@ import {
   ContextMenuItem,
 } from '../common/context-menu/context-menu.component';
 import { StorageService } from '../../service/storage.service';
+import { Theme } from '../../theme';
 
 @Component({
   selector: 'app-board',
@@ -84,10 +85,17 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedBoard: Board | null = null;
   private activeNavbarTile: BoardTile | null = null;
 
+  @ViewChild('dragCanvas', { static: false })
+  private dragCanvasRef?: ElementRef<HTMLCanvasElement>;
+  private trailPoints: Array<{ x: number; y: number }> = [];
+
   deleteBoardPending: { id: string; name: string } | null = null;
   deleteConfirmInput = '';
 
-  get deleteConfirmChars(): Array<{ char: string; status: 'ghost' | 'correct' | 'wrong' }> {
+  get deleteConfirmChars(): Array<{
+    char: string;
+    status: 'ghost' | 'correct' | 'wrong';
+  }> {
     if (!this.deleteBoardPending) return [];
     const name = this.deleteBoardPending.name;
     const typed = this.deleteConfirmInput;
@@ -95,14 +103,19 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     return Array.from({ length: len }, (_, i) => {
       const nameChar = name[i] ?? '';
       const typedChar = typed[i];
-      if (typedChar === undefined) return { char: nameChar, status: 'ghost' as const };
-      if (typedChar === nameChar) return { char: typedChar, status: 'correct' as const };
+      if (typedChar === undefined)
+        return { char: nameChar, status: 'ghost' as const };
+      if (typedChar === nameChar)
+        return { char: typedChar, status: 'correct' as const };
       return { char: typedChar, status: 'wrong' as const };
     });
   }
 
   get deleteConfirmValid(): boolean {
-    return !!this.deleteBoardPending && this.deleteConfirmInput === this.deleteBoardPending.name;
+    return (
+      !!this.deleteBoardPending &&
+      this.deleteConfirmInput === this.deleteBoardPending.name
+    );
   }
 
   ctxMenu = {
@@ -336,6 +349,25 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mainBoardService.centerOnItem(item);
   }
 
+  onTileDblClick(event: MouseEvent, item: BoardTile): void {
+    const path = (event.composedPath?.() ?? []) as EventTarget[];
+    const tileEl = path.find(
+      (p): p is HTMLElement =>
+        p instanceof HTMLElement && p.tagName === 'APP-BOARD-TILE',
+    ) as HTMLElement | undefined;
+    if (!tileEl) return;
+    const r = tileEl.getBoundingClientRect();
+    if (
+      event.clientX < r.left ||
+      event.clientX > r.right ||
+      event.clientY < r.top ||
+      event.clientY > r.bottom
+    ) {
+      return;
+    }
+    this.centerOnItem(item);
+  }
+
   openDeleteBoardConfirm(board: Board, event: MouseEvent) {
     event.stopPropagation();
     this.deleteBoardPending = { id: board.id, name: board.name };
@@ -362,7 +394,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   setRowHoverX(event: MouseEvent) {
     const el = event.currentTarget as HTMLElement;
     const rect = el.getBoundingClientRect();
-    const x = Math.min(1, Math.max(0, (event.clientX - rect.left) / rect.width));
+    const x = Math.min(
+      1,
+      Math.max(0, (event.clientX - rect.left) / rect.width),
+    );
     el.style.setProperty('--hover-x', String(x));
   }
 
@@ -548,6 +583,114 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.tiles = this.tiles.filter((t) => t.id !== tile.id);
     this.tilesMap.delete(tile.id);
     this.cdr.detectChanges();
+  }
+
+  private screenToWorld(
+    clientX: number,
+    clientY: number,
+  ): { x: number; y: number } {
+    const board = this.boardRef.nativeElement as HTMLElement;
+    const rect = board.getBoundingClientRect();
+    const zoom = this.mainBoardService.zoom;
+    return {
+      x: (clientX - rect.left) / zoom + this.mainBoardService.cameraX,
+      y: (clientY - rect.top) / zoom + this.mainBoardService.cameraY,
+    };
+  }
+
+  onConnectorDragStart(tile: BoardTile): void {
+    if (!this.selectedBoard) return;
+
+    this.trailPoints = [];
+    const canvas = this.dragCanvasRef?.nativeElement;
+    if (canvas) {
+      const board = this.boardRef.nativeElement as HTMLElement;
+      canvas.width = board.offsetWidth;
+      canvas.height = board.offsetHeight;
+      canvas.style.display = 'block';
+    }
+
+    const onMove = (e: MouseEvent) => {
+      const board = this.boardRef.nativeElement as HTMLElement;
+      const rect = board.getBoundingClientRect();
+      const pt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const last = this.trailPoints[this.trailPoints.length - 1];
+      if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > 4) {
+        this.trailPoints.push(pt);
+      }
+      this.drawTrail();
+    };
+
+    const onUp = (e: MouseEvent) => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+
+      const c = this.dragCanvasRef?.nativeElement;
+      if (c) {
+        c.getContext('2d')!.clearRect(0, 0, c.width, c.height);
+        c.style.display = 'none';
+      }
+      this.trailPoints = [];
+
+      const w = this.screenToWorld(e.clientX, e.clientY);
+      if (!this.selectedBoard) return;
+      const zoom = this.mainBoardService.zoom;
+      const width = 440 / zoom;
+      const height = 600 / zoom;
+      const newTile = BoardTile.newTile(
+        w.x - width / 2,
+        w.y - height / 2,
+        width,
+        height,
+      );
+      this.tiles.push(newTile);
+      this.tilesMap.set(newTile.id, newTile);
+      Promise.resolve().then(() => {
+        this.cdr.detectChanges();
+        this.mainBoardService.tileComponents = this.tileComponents
+          ? this.tileComponents.toArray()
+          : [];
+      });
+    };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+  }
+
+  private drawTrail(): void {
+    const canvas = this.dragCanvasRef?.nativeElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d')!;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    const pts = this.trailPoints;
+    const n = pts.length;
+    if (n < 2) return;
+
+    for (let i = 1; i < n; i++) {
+      const t = i / (n - 1); // 0 = oldest/tail, 1 = newest/head
+      const alpha = 0.7 + 0.3 * t;
+      const lineWidth = 1.5 + 2.5 * t;
+
+      ctx.beginPath();
+      ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
+      ctx.lineTo(pts[i].x, pts[i].y);
+      ctx.strokeStyle = `rgba(255, 213, 79, ${alpha.toFixed(3)})`; // Theme.amber
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'butt';
+      ctx.shadowColor = Theme.amberGlow;
+      ctx.shadowBlur = 12 * t;
+      ctx.stroke();
+    }
+
+    // Bright dot at cursor
+    const head = pts[n - 1];
+    ctx.beginPath();
+    ctx.arc(head.x, head.y, 5, 0, Math.PI * 2);
+    ctx.fillStyle = Theme.amberLight;
+    ctx.shadowColor = Theme.amberStrong;
+    ctx.shadowBlur = 20;
+    ctx.fill();
   }
 
   async saveBoard(): Promise<void> {

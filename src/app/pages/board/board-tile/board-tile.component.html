@@ -42,10 +42,10 @@
     </div>
   </div>
 
-  <button *ngIf="activeEdge === 'top'"    class="connector-btn connector-btn--top"    (mousedown)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (click)="connectorClick.emit('top')">+</button>
-  <button *ngIf="activeEdge === 'right'"  class="connector-btn connector-btn--right"  (mousedown)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (click)="connectorClick.emit('right')">+</button>
-  <button *ngIf="activeEdge === 'bottom'" class="connector-btn connector-btn--bottom" (mousedown)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (click)="connectorClick.emit('bottom')">+</button>
-  <button *ngIf="activeEdge === 'left'"   class="connector-btn connector-btn--left"   (mousedown)="$event.stopPropagation()" (pointerdown)="$event.stopPropagation()" (click)="connectorClick.emit('left')">+</button>
+  <button *ngIf="activeEdge === 'top'"    class="connector-btn connector-btn--top"    (mousedown)="onConnectorMouseDown($event)" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()"></button>
+  <button *ngIf="activeEdge === 'right'"  class="connector-btn connector-btn--right"  (mousedown)="onConnectorMouseDown($event)" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()"></button>
+  <button *ngIf="activeEdge === 'bottom'" class="connector-btn connector-btn--bottom" (mousedown)="onConnectorMouseDown($event)" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()"></button>
+  <button *ngIf="activeEdge === 'left'"   class="connector-btn connector-btn--left"   (mousedown)="onConnectorMouseDown($event)" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()"></button>
 
   <ng-template #navbarContentTemplate let-tile="tile">
     <div class="bar">

@@ -198,9 +198,21 @@ export class BoardMainService {
       const hasTag = (tag: string) =>
         path.some((p) => p instanceof HTMLElement && p.tagName === tag);
 
+      const tileEl = path.find(
+        (p): p is HTMLElement => p instanceof HTMLElement && p.tagName === 'APP-BOARD-TILE',
+      ) as HTMLElement | undefined;
+      const isInsideTileBounds = tileEl
+        ? (() => {
+            const r = tileEl.getBoundingClientRect();
+            return (
+              event.clientX >= r.left && event.clientX <= r.right &&
+              event.clientY >= r.top && event.clientY <= r.bottom
+            );
+          })()
+        : false;
+
       if (
-        hasTag('APP-BOARD-TILE') ||
-        hasClass('board-item') ||
+        isInsideTileBounds ||
         hasTag('APP-BOARD-CONNECTOR') ||
         hasClass('search-window') ||
         hasTag('APP-NAVBAR')
@@ -262,9 +274,21 @@ export class BoardMainService {
       path.some((p) => p instanceof HTMLElement && p.tagName === tag);
 
     // Background-only menu (avoid opening when interacting with UI/tile/connector).
+    const tileEl = path.find(
+      (p): p is HTMLElement => p instanceof HTMLElement && p.tagName === 'APP-BOARD-TILE',
+    ) as HTMLElement | undefined;
+    const isInsideTileBounds = tileEl
+      ? (() => {
+          const r = tileEl.getBoundingClientRect();
+          return (
+            ev.clientX >= r.left && ev.clientX <= r.right &&
+            ev.clientY >= r.top && ev.clientY <= r.bottom
+          );
+        })()
+      : false;
+
     if (
-      hasTag('APP-BOARD-TILE') ||
-      hasClass('board-item') ||
+      isInsideTileBounds ||
       hasTag('APP-BOARD-CONNECTOR') ||
       hasClass('search-window') ||
       hasTag('APP-NAVBAR')

@@ -3,14 +3,7 @@
 :host {
   position: absolute;
   z-index: 1;
-
-  &::before {
-    content: "";
-    position: absolute;
-    inset: calc(var(--tile-min) * -0.15);
-    background: rgba(255, 0, 0, 0.3); /* debug */
-    pointer-events: auto;
-  }
+  pointer-events: none;
 }
 
 .connector-btn {
@@ -19,8 +12,8 @@
   height: calc(var(--tile-min) * 0.09);
   background: linear-gradient(
     180deg,
-    rgba(38, 38, 40, 0.98) 0%,
-    rgba(24, 24, 26, 0.98) 100%
+    var(--bp-surface-hi) 0%,
+    var(--bp-surface) 100%
   );
   border: none;
   border-radius: 18%;
@@ -28,29 +21,38 @@
   cursor: pointer;
   z-index: 10;
   padding: 0;
-  animation: connector-fade-in 150ms ease-out;
-  transition: background 150ms ease-out;
+  opacity: var(--connector-opacity, 0);
+  transition:
+    background 150ms ease-out,
+    opacity 80ms ease-out;
 
   &:hover {
     background: linear-gradient(
       180deg,
-      rgba(55, 55, 58, 0.98) 0%,
-      rgba(38, 38, 40, 0.98) 100%
+      var(--bp-surface-ctrl) 0%,
+      var(--bp-surface-hi) 100%
     );
   }
 
-  &--top    { top: calc(var(--tile-min) * -0.1);    left: 50%; transform: translate(-50%, -50%) rotate(0deg);   }
-  &--right  { right: calc(var(--tile-min) * -0.1);  top: 50%;  transform: translate(50%, -50%)  rotate(90deg);  }
-  &--bottom { bottom: calc(var(--tile-min) * -0.1); left: 50%; transform: translate(-50%, 50%)  rotate(180deg); }
-  &--left   { left: calc(var(--tile-min) * -0.1);   top: 50%;  transform: translate(-50%, -50%) rotate(-90deg); }
-}
-
-@keyframes connector-fade-in {
-  from {
-    opacity: 0;
+  &--top {
+    top: calc(var(--tile-min) * -0.08);
+    left: 50%;
+    transform: translate(-50%, -50%) rotate(0deg);
   }
-  to {
-    opacity: 1;
+  &--right {
+    right: calc(var(--tile-min) * -0.08);
+    top: 50%;
+    transform: translate(50%, -50%) rotate(90deg);
+  }
+  &--bottom {
+    bottom: calc(var(--tile-min) * -0.08);
+    left: 50%;
+    transform: translate(-50%, 50%) rotate(180deg);
+  }
+  &--left {
+    left: calc(var(--tile-min) * -0.08);
+    top: 50%;
+    transform: translate(-50%, -50%) rotate(-90deg);
   }
 }
 
@@ -86,16 +88,16 @@
   overflow: visible;
 
   &:hover .tile-surface {
-    border-color: rgba(255, 255, 255, 0.22);
+    border-color: var(--bp-border-hi);
     box-shadow:
       0 6px 10px rgba(0, 0, 0, 0.3),
       0 18px 36px rgba(0, 0, 0, 0.5);
   }
 
   &:focus-within .tile-surface {
-    border-color: rgba(255, 213, 79, 0.4);
+    border-color: var(--bp-amber-border);
     box-shadow:
-      0 0 0 3px rgba(255, 213, 79, 0.18),
+      0 0 0 3px var(--bp-amber-dim),
       0 14px 32px rgba(0, 0, 0, 0.5);
   }
 }
@@ -108,11 +110,11 @@
   flex-direction: column;
   font-size: 1rem;
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid var(--bp-border);
   background: linear-gradient(
     180deg,
-    rgba(32, 32, 34, 0.98) 0%,
-    rgba(20, 20, 22, 0.98) 100%
+    var(--bp-surface-hi) 0%,
+    var(--bp-surface) 100%
   );
   overflow: hidden;
   will-change: transform;
@@ -270,7 +272,7 @@
 
   code {
     background-color: rgba(0, 0, 0, 0.3);
-    color: #ffd54f;
+    color: var(--bp-amber);
     padding: 2px 6px;
     border-radius: 4px;
     font-family: "Courier New", monospace;
@@ -334,7 +336,7 @@
 
   th {
     background-color: rgba(255, 213, 79, 0.15);
-    color: #ffd54f;
+    color: var(--bp-amber);
     font-weight: 600;
   }
 
@@ -377,12 +379,12 @@
     height: 28px;
 
     &:hover {
-      color: #ffd54f;
+      color: var(--bp-amber);
       transform: translateY(-1px);
     }
 
     &:active {
-      color: #ffb300;
+      color: var(--bp-amber);
       transform: translateY(0);
     }
 
@@ -461,12 +463,12 @@
 }
 
 ::ng-deep .navbar-tile-controls button:hover {
-  color: #ffd54f !important;
+  color: var(--bp-amber) !important;
   transform: translateY(-1px);
 }
 
 ::ng-deep .navbar-tile-controls button:active {
-  color: #ffb300 !important;
+  color: var(--bp-amber) !important;
   transform: translateY(0);
 }
 
@@ -566,12 +568,12 @@
     }
 
     &:hover {
-      color: #ffd54f !important;
+      color: var(--bp-amber) !important;
       transform: translateY(-1px);
     }
 
     &:active {
-      color: #ffb300 !important;
+      color: var(--bp-amber) !important;
       transform: translateY(0);
     }
   }
@@ -638,7 +640,7 @@
 
   &.confirm {
     width: calc(var(--tile-min) / 4.2);
-    color: rgba(210, 75, 65, 0.95);
+    color: var(--bp-danger);
 
     .tile-delete-label {
       max-width: calc(var(--tile-min) / 4);

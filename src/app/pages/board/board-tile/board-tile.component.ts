@@ -46,7 +46,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     context: any;
   }>();
   @Output() deleteTile = new EventEmitter<void>();
-  @Output() connectorClick = new EventEmitter<'top' | 'right' | 'bottom' | 'left'>();
+  @Output() connectorDragStart = new EventEmitter<{ fromX: number; fromY: number }>();
   @ViewChild('contentElement', { static: false }) contentElement!: ElementRef;
   @ViewChild('navbarContentTemplate', { static: false })
   navbarContentTemplate!: TemplateRef<any>;
@@ -161,14 +161,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     });
 
     this.ngZone.runOutsideAngular(() => {
-      this.host.nativeElement.addEventListener(
-        'mousemove',
-        this.onHostMouseMove,
-      );
-      this.host.nativeElement.addEventListener(
-        'mouseleave',
-        this.onHostMouseLeave,
-      );
+      document.addEventListener('mousemove', this.onDocumentMouseMove);
     });
   }
 
@@ -212,14 +205,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
   ngOnDestroy() {
     clearTimeout(this.deleteConfirmTimeout);
     this.tiptap.destroyEditors();
-    this.host.nativeElement.removeEventListener(
-      'mousemove',
-      this.onHostMouseMove,
-    );
-    this.host.nativeElement.removeEventListener(
-      'mouseleave',
-      this.onHostMouseLeave,
-    );
+    document.removeEventListener('mousemove', this.onDocumentMouseMove);
   }
 
   private getNavbarContext() {
@@ -251,32 +237,50 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     }
   }
 
-  private readonly onHostMouseMove = (e: MouseEvent) => {
+  onConnectorMouseDown(event: MouseEvent): void {
+    event.stopPropagation();
+    this.connectorDragStart.emit({
+      fromX: this.tile.x + this.tile.width / 2,
+      fromY: this.tile.y + this.tile.height / 2,
+    });
+  }
+
+  private readonly onDocumentMouseMove = (e: MouseEvent) => {
     const rect = this.host.nativeElement.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
+    const tileMinScreen = Math.min(rect.width, rect.height);
+    const maxDist = tileMinScreen * 0.4;
+
+    const outsideDx = Math.max(0, -mx, mx - rect.width);
+    const outsideDy = Math.max(0, -my, my - rect.height);
+    const outsideDist = Math.hypot(outsideDx, outsideDy);
+
+    if (outsideDist === 0 || outsideDist > maxDist) {
+      this.host.nativeElement.style.setProperty('--connector-opacity', '0');
+      if (this.activeEdge !== null) {
+        this.ngZone.run(() => { this.activeEdge = null; });
+      }
+      return;
+    }
+
+    const innerDist = tileMinScreen * 0.2;
+    const gradientDist = Math.max(0, outsideDist - innerDist);
+    const gradientRange = maxDist - innerDist;
+    const t = gradientRange > 0 ? Math.min(1, gradientDist / gradientRange) : 0;
+    const opacity = 1 - t * 0.85;
+    this.host.nativeElement.style.setProperty('--connector-opacity', opacity.toFixed(3));
+
     const nx = (mx - rect.width / 2) / (rect.width / 2);
     const ny = (my - rect.height / 2) / (rect.height / 2);
     const edge =
       Math.abs(nx) > Math.abs(ny)
-        ? nx > 0
-          ? 'right'
-          : 'left'
-        : ny > 0
-          ? 'bottom'
-          : 'top';
+        ? nx > 0 ? 'right' : 'left'
+        : ny > 0 ? 'bottom' : 'top';
 
     if (edge !== this.activeEdge) {
       this.ngZone.run(() => {
-        this.activeEdge = edge;
-      });
-    }
-  };
-
-  private readonly onHostMouseLeave = () => {
-    if (this.activeEdge !== null) {
-      this.ngZone.run(() => {
-        this.activeEdge = null;
+        this.activeEdge = edge as 'top' | 'right' | 'bottom' | 'left';
       });
     }
   };

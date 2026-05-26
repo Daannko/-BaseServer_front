@@ -1,0 +1,30 @@
+// Central theme — all design tokens for the app.
+// CSS custom properties are set on :root so they cascade everywhere.
+// To support user theming in future, swap these values at runtime on :root.
+
+:root {
+  // ── Accent ──────────────────────────────────────────────────────────────
+  --bp-amber:         #ffd54f;
+  --bp-amber-dim:     rgba(255, 213, 79, 0.18);
+  --bp-amber-border:  rgba(255, 213, 79, 0.40);
+
+  // ── Secondary accent ────────────────────────────────────────────────────
+  --bp-cyan:          rgb(120, 210, 255);
+  --bp-cyan-dim:      rgba(120, 210, 255, 0.25);
+
+  // ── Destructive ─────────────────────────────────────────────────────────
+  --bp-danger:        rgb(210, 75, 65);
+
+  // ── Surfaces ────────────────────────────────────────────────────────────
+  --bp-surface:       rgb(20, 20, 22);
+  --bp-surface-hi:    rgb(32, 32, 34);
+  --bp-surface-ctrl:  rgb(30, 30, 30);
+
+  // ── Borders ─────────────────────────────────────────────────────────────
+  --bp-border:        rgba(255, 255, 255, 0.13);
+  --bp-border-hi:     rgba(255, 255, 255, 0.22);
+
+  // ── Text ────────────────────────────────────────────────────────────────
+  --bp-text:          rgba(255, 255, 255, 0.92);
+  --bp-text-muted:    rgba(255, 255, 255, 0.60);
+}

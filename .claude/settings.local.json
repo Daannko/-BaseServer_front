@@ -12,7 +12,8 @@
       "mcp__playwright__browser_console_messages",
       "Bash(npm start *)",
       "mcp__playwright__browser_wait_for",
-      "Bash(grep -n \"selectBoard\\\\|deleteBoard\\\\|boards\\\\$\\\\|BoardApiService\\\\|filteredBoards\\\\|searchQuery\" D:/BaseServer_front/src/app/pages/board/board.component.ts)"
+      "Bash(grep -n \"selectBoard\\\\|deleteBoard\\\\|boards\\\\$\\\\|BoardApiService\\\\|filteredBoards\\\\|searchQuery\" D:/BaseServer_front/src/app/pages/board/board.component.ts)",
+      "Bash(xargs grep *)"
     ]
   }
 }

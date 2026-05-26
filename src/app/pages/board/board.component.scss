@@ -12,6 +12,14 @@
   pointer-events: none;
 }
 
+.drag-trail-canvas {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 200;
+  display: none;
+}
+
 #background {
   background-color: black;
   height: 100vh;
