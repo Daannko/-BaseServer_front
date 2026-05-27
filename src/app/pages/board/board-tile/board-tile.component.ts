@@ -54,6 +54,8 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
   @ViewChild('navbarContentTemplate', { static: false })
   navbarContentTemplate!: TemplateRef<any>;
 
+  @HostBinding('style.zIndex') get hostZIndex() { return this.tile?.zIndex ?? 1; }
+
   @HostBinding('style.left.px') get hostLeft() {
     return this.tile?.x ?? 0;
   }
@@ -107,7 +109,13 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
 
   isColorPaletteVisible: boolean = false;
   deleteConfirmPending = false;
-  activeEdge: 'top' | 'right' | 'bottom' | 'left' | null = null;
+
+  @ViewChild('connectorWavePath', { static: false })
+  private connectorWavePathRef?: ElementRef<SVGPathElement>;
+
+  private waveAnim   = { t: 0, amplitude: 0, spread: 200, opacity: 0, angle: 0 };
+  private waveTarget = { t: 0, amplitude: 0, spread: 200, opacity: 0, angle: 0 };
+  private rafId: number | null = null;
 
   private navbarPinned = false;
   private isDraggingTile = false;
@@ -212,10 +220,12 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     this.tile.height = r.height;
 
     for (const connector of this.tile.connectors) {
+      if (!connector.active) continue;
       connector.updateAngles();
       connector.updatePosition();
     }
     for (const connector of this.tile.inboundConnectors) {
+      if (!connector.active) continue;
       connector.updateAngles();
       connector.updatePosition();
     }
@@ -226,10 +236,12 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     this.tile.y = p.y;
 
     for (const connector of this.tile.connectors) {
+      if (!connector.active) continue;
       connector.updateAngles();
       connector.updatePosition();
     }
     for (const connector of this.tile.inboundConnectors) {
+      if (!connector.active) continue;
       connector.updateAngles();
       connector.updatePosition();
     }
@@ -253,6 +265,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     clearTimeout(this.deleteConfirmTimeout);
     this.tiptap.destroyEditors();
     document.removeEventListener('mousemove', this.onDocumentMouseMove);
+    if (this.rafId !== null) cancelAnimationFrame(this.rafId);
   }
 
   private getNavbarContext() {
@@ -297,38 +310,160 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
     const tileMinScreen = Math.min(rect.width, rect.height);
-    const maxDist = tileMinScreen * 0.4;
+    const maxDist = tileMinScreen * 0.45;
 
     const outsideDx = Math.max(0, -mx, mx - rect.width);
     const outsideDy = Math.max(0, -my, my - rect.height);
     const outsideDist = Math.hypot(outsideDx, outsideDy);
 
     if (outsideDist === 0 || outsideDist > maxDist) {
-      this.host.nativeElement.style.setProperty('--connector-opacity', '0');
-      if (this.activeEdge !== null) {
-        this.ngZone.run(() => { this.activeEdge = null; });
-      }
+      this.waveTarget.amplitude = 0;
+      this.waveTarget.opacity = 0;
+      this.startWaveAnim();
       return;
     }
 
-    const innerDist = tileMinScreen * 0.2;
-    const gradientDist = Math.max(0, outsideDist - innerDist);
-    const gradientRange = maxDist - innerDist;
-    const t = gradientRange > 0 ? Math.min(1, gradientDist / gradientRange) : 0;
-    const opacity = 1 - t * 0.85;
-    this.host.nativeElement.style.setProperty('--connector-opacity', opacity.toFixed(3));
+    const proximity = 1 - outsideDist / maxDist;
 
-    const nx = (mx - rect.width / 2) / (rect.width / 2);
-    const ny = (my - rect.height / 2) / (rect.height / 2);
-    const edge =
-      Math.abs(nx) > Math.abs(ny)
-        ? nx > 0 ? 'right' : 'left'
-        : ny > 0 ? 'bottom' : 'top';
+    const scaleX = this.tile.width / rect.width;
+    const scaleY = this.tile.height / rect.height;
+    const W = this.tile.width, H = this.tile.height;
 
-    if (edge !== this.activeEdge) {
-      this.ngZone.run(() => {
-        this.activeEdge = edge as 'top' | 'right' | 'bottom' | 'left';
-      });
+    // Nearest point on tile perimeter = clamp mouse to tile bounds
+    const nearestX = Math.max(0, Math.min(W, mx * scaleX));
+    const nearestY = Math.max(0, Math.min(H, my * scaleY));
+
+    // Convert to clockwise perimeter t: top(0..W) → right(W..W+H) → bottom(W+H..2W+H) → left(2W+H..2W+2H)
+    let targetT: number;
+    if (nearestY === 0)  targetT = nearestX;
+    else if (nearestX === W) targetT = W + nearestY;
+    else if (nearestY === H) targetT = W + H + (W - nearestX);
+    else                     targetT = 2*W + H + (H - nearestY);
+
+    const tileMin = Math.min(W, H);
+    const A_max = tileMin * 0.043;
+    // Amplitude maxes out when mouse reaches wave tip (outsideDist <= A_max); closer = no taller
+    const amplitude = outsideDist <= A_max
+      ? A_max
+      : A_max * (maxDist - outsideDist) / (maxDist - A_max);
+
+    this.waveTarget.t         = targetT;
+    this.waveTarget.amplitude = amplitude;
+    this.waveTarget.spread    = tileMin * 0.05 + (1 - proximity) * tileMin * 0.13;
+    this.waveTarget.opacity   = Math.min(1, proximity * 1.6);
+    this.waveTarget.angle     = Math.atan2(my * scaleY - nearestY, mx * scaleX - nearestX);
+
+    this.startWaveAnim();
+  };
+
+  private startWaveAnim(): void {
+    if (this.rafId !== null) return;
+    const tick = () => {
+      const a = this.waveAnim;
+      const tgt = this.waveTarget;
+      const lp = (f: number, to: number, k: number) => f + (to - f) * k;
+      const W = this.tile.width, H = this.tile.height;
+      const perim = 2 * (W + H);
+
+      // Shortest-path lerp around the perimeter
+      let dt = tgt.t - a.t;
+      if (dt >  perim / 2) dt -= perim;
+      if (dt < -perim / 2) dt += perim;
+      a.t = ((a.t + dt * 0.18) + perim) % perim;
+
+      a.amplitude = lp(a.amplitude, tgt.amplitude, 0.10);
+      a.spread    = lp(a.spread,    tgt.spread,    0.10);
+      a.opacity   = lp(a.opacity,   tgt.opacity,   0.15);
+
+      let da = tgt.angle - a.angle;
+      if (da >  Math.PI) da -= 2 * Math.PI;
+      if (da < -Math.PI) da += 2 * Math.PI;
+      a.angle = a.angle + da * 0.15;
+
+      this.updateWavePath();
+
+      const moving = Math.abs(dt) > 0.3
+        || Math.abs(a.amplitude - tgt.amplitude) > 0.05
+        || Math.abs(a.opacity   - tgt.opacity)   > 0.004
+        || Math.abs(da) > 0.01;
+
+      this.rafId = moving ? requestAnimationFrame(tick) : null;
+      if (!moving) {
+        a.t = tgt.t; a.amplitude = tgt.amplitude;
+        a.spread = tgt.spread; a.opacity = tgt.opacity; a.angle = tgt.angle;
+        this.updateWavePath();
+      }
+    };
+    this.rafId = requestAnimationFrame(tick);
+  }
+
+  private updateWavePath(): void {
+    const p = this.connectorWavePathRef?.nativeElement;
+    if (!p) return;
+
+    const { amplitude: A, spread: s, opacity, angle } = this.waveAnim;
+    const W = this.tile.width, H = this.tile.height;
+    const perim = 2 * (W + H);
+    const t = ((this.waveAnim.t % perim) + perim) % perim;
+
+    if (A < 0.3) {
+      p.style.opacity = '0';
+      p.style.pointerEvents = 'none';
+      return;
     }
+
+    let cx: number, cy: number;
+    if (t <= W)           { cx = t;           cy = 0; }
+    else if (t <= W+H)   { cx = W;           cy = t - W; }
+    else if (t <= 2*W+H) { cx = W-(t-W-H);   cy = H; }
+    else                  { cx = 0;           cy = H-(t-2*W-H); }
+
+    const odx = Math.cos(angle); // outward toward mouse
+    const ody = Math.sin(angle);
+    const tnx = -ody;
+    const tny =  odx;
+
+    // Left and right base points: walk ±s along tile perimeter from center point
+    // They always stay on the tile boundary
+    const perimPt = (tp: number): [number, number] => {
+      const tn = ((tp % perim) + perim) % perim;
+      if (tn <= W)           return [tn, 0];
+      else if (tn <= W+H)    return [W, tn - W];
+      else if (tn <= 2*W+H)  return [W-(tn-W-H), H];
+      else                   return [0, H-(tn-2*W-H)];
+    };
+
+    const tLeft = t - s, tRight = t + s;
+    const [lx, ly] = perimPt(tLeft);
+    const [rx, ry] = perimPt(tRight);
+    const tipx = cx + A * odx;
+    const tipy = cy + A * ody;
+
+    const flat  = s * 0.50;
+    const crest = s * 0.40;
+
+    // Direction from each base toward the wave center — continuous everywhere, no corner jumps.
+    // On a straight edge this equals the edge tangent (flat wave start).
+    // Through a corner it blends diagonally — no snap, no mode switch.
+    const dcLx = cx - lx, dcLy = cy - ly, dcL = Math.hypot(dcLx, dcLy) || 1;
+    const dcRx = cx - rx, dcRy = cy - ry, dcR = Math.hypot(dcRx, dcRy) || 1;
+    const c1lx = lx + (dcLx/dcL)*flat,  c1ly = ly + (dcLy/dcL)*flat;
+    const c2rx = rx + (dcRx/dcR)*flat,  c2ry = ry + (dcRy/dcR)*flat;
+
+    const f = (n: number) => n.toFixed(2);
+    const d = `M${f(lx)},${f(ly)} `
+      + `C${f(c1lx)},${f(c1ly)} `
+      + `${f(tipx - tnx*crest)},${f(tipy - tny*crest)} `
+      + `${f(tipx)},${f(tipy)} `
+      + `C${f(tipx + tnx*crest)},${f(tipy + tny*crest)} `
+      + `${f(c2rx)},${f(c2ry)} `
+      + `${f(rx)},${f(ry)} `
+      + `C${f(rx - 20*odx)},${f(ry - 20*ody)} `
+      + `${f(lx - 20*odx)},${f(ly - 20*ody)} `
+      + `${f(lx)},${f(ly)} Z`;
+
+    p.setAttribute('d', d);
+    p.style.opacity = String(Math.min(1, opacity));
+    p.style.pointerEvents = 'painted';
   };
 }

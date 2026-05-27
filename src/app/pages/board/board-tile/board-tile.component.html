@@ -27,6 +27,14 @@
     (tile.width < tile.height ? tile.width : tile.height) + 'px'
   "
 >
+  <svg class="connector-wave" aria-hidden="true">
+    <path #connectorWavePath class="connector-wave-path"
+      (mousedown)="onConnectorMouseDown($event)"
+      (pointerdown)="$event.stopPropagation()"
+      (dblclick)="$event.stopPropagation()"
+    />
+  </svg>
+
   <div class="tile-surface">
     <div
       class="tile-header"
@@ -53,11 +61,6 @@
       <div #contentElement class="content-editor"></div>
     </div>
   </div>
-
-  <button *ngIf="activeEdge === 'top'"    class="connector-btn connector-btn--top"    (mousedown)="onConnectorMouseDown($event)" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()"></button>
-  <button *ngIf="activeEdge === 'right'"  class="connector-btn connector-btn--right"  (mousedown)="onConnectorMouseDown($event)" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()"></button>
-  <button *ngIf="activeEdge === 'bottom'" class="connector-btn connector-btn--bottom" (mousedown)="onConnectorMouseDown($event)" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()"></button>
-  <button *ngIf="activeEdge === 'left'"   class="connector-btn connector-btn--left"   (mousedown)="onConnectorMouseDown($event)" (pointerdown)="$event.stopPropagation()" (dblclick)="$event.stopPropagation()"></button>
 
   <ng-template #navbarContentTemplate let-tile="tile">
     <div class="bar">

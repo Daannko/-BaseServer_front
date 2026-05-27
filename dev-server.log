@@ -1,0 +1,8 @@
+
+> base-server-app@0.0.0 start
+> ng serve --port 49191
+
+ [1mPort 49191 is already in use.
+Would you like to use a different port?[22m [2m(Y/n)[22m[47G
+[?25h[1m[31mAn unhandled exception occurred: Port 49191 is already in use. Use '--port' to specify a different port.
+See "C:\Users\Daniel\AppData\Local\Temp\ng-CQutdJ\angular-errors.log" for further details.[39m[22m

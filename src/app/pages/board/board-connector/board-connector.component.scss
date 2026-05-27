@@ -4,7 +4,7 @@
     background: transparent;
     border: none;
     border-radius: 4px;
-    z-index: 2;
+    z-index: 0;
     pointer-events: auto;
     cursor: pointer;
     display: flex;
@@ -21,7 +21,7 @@
     &:hover {
         color: white;
         background: rgba(80, 80, 100, 0.3);
-        z-index: 3;
+        z-index: 0;
     }
 }
 

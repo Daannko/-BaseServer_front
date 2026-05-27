@@ -181,21 +181,6 @@
 
     <canvas #dragCanvas class="drag-trail-canvas"></canvas>
     <div class="board-viewport" #viewport>
-      <div #itemsContainer>
-        <ng-container *ngFor="let item of tiles">
-          <app-board-tile
-            [tile]="item"
-            [zoom]="zoom"
-            (dblclick)="onTileDblClick($event, item)"
-            (navbarChange)="onTileNavbarChange($event)"
-            (deleteTile)="onDeleteTile(item)"
-            (connectorDragStart)="onConnectorDragStart(item)"
-            *ngIf="isItemVisible(item)"
-          >
-          </app-board-tile>
-        </ng-container>
-      </div>
-
       <div style="display: block">
         <ng-container *ngFor="let connector of connectors">
           <app-board-connector
@@ -204,6 +189,22 @@
             (click)="moveToItem(connector.itemB)"
           >
           </app-board-connector>
+        </ng-container>
+      </div>
+
+      <div #itemsContainer>
+        <ng-container *ngFor="let item of tiles">
+          <app-board-tile
+            [tile]="item"
+            [zoom]="zoom"
+            (mousedown)="bringToFront(item)"
+            (dblclick)="onTileDblClick($event, item)"
+            (navbarChange)="onTileNavbarChange($event)"
+            (deleteTile)="onDeleteTile(item)"
+            (connectorDragStart)="onConnectorDragStart(item)"
+            *ngIf="isItemVisible(item)"
+          >
+          </app-board-tile>
         </ng-container>
       </div>
 

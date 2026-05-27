@@ -21,6 +21,7 @@ export class BoardTile {
   private relatedTopicsToBeAdded: Set<string> = new Set();
   private relatedTopicsToBeRemoved: Set<string> = new Set();
   tier!: number;
+  zIndex: number = 1;
   forceToRender: boolean = false;
   inView = false;
   connectors: Set<BoardConnector> = new Set();
@@ -113,18 +114,37 @@ export class BoardTile {
     return this.y + this.height / 2;
   }
 
-  addConnectors(t: BoardTile) {
+  addConnectors(t: BoardTile, markDirty = true) {
     const id = globalThis.crypto.randomUUID();
 
     const connectorA = new BoardConnector(id, this, t);
     this.connectors.add(connectorA);
     t.inboundConnectors.add(connectorA);
-    this.handleAddRelatedTopicHistory(t.id);
+    // Only the source side persists the relationship — reverse is dormant and saved only if explicitly drawn.
+    if (markDirty) this.handleAddRelatedTopicHistory(t.id);
 
     const connectorB = new BoardConnector(id, t, this);
+    connectorB.active = false;
     t.connectors.add(connectorB);
     this.inboundConnectors.add(connectorB);
-    t.handleAddRelatedTopicHistory(this.id);
+    // Do NOT call t.handleAddRelatedTopicHistory — that would make the backend store both directions
+    // and re-activate both on reload, defeating single-directional connectors.
+  }
+
+  /** Activates a dormant connector from this tile toward t. Returns true if one was found. */
+  activateConnectorTo(t: BoardTile): boolean {
+    for (const conn of this.connectors) {
+      if (!conn.active && conn.itemB === t) {
+        conn.active = true;
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /** Marks the this→t direction as needing a save (call after activateConnectorTo on user action). */
+  markConnectorAdded(t: BoardTile) {
+    this.handleAddRelatedTopicHistory(t.id);
   }
 
   get connectorsAdded(): string[] {
@@ -168,7 +188,7 @@ export class BoardTile {
       : undefined;
     otherTile?.removeConnectorById(c.id);
     if (counterpart) this.inboundConnectors.delete(counterpart);
-    if (c.itemA?.id) otherTile?.handleRemoveRelatedTopicHistory(c.itemA.id);
+    if (counterpart?.active && c.itemA?.id) otherTile?.handleRemoveRelatedTopicHistory(c.itemA.id);
   }
 
   private removeConnectorById(connectorId: string) {

@@ -252,17 +252,6 @@ export class BoardApiService {
       payload.width = topic.width;
       payload.height = topic.height;
     }
-    if (topic.connectorsAdded.length > 0) {
-      payload.topicsToBeAdded = resolveTopicId
-        ? topic.connectorsAdded.map(resolveTopicId)
-        : topic.connectorsAdded;
-    }
-    if (topic.connectorsRemoved.length > 0) {
-      payload.topicsToBeRemoved = resolveTopicId
-        ? topic.connectorsRemoved.map(resolveTopicId)
-        : topic.connectorsRemoved;
-    }
-
     if (Object.keys(payload).length === 0) return;
     console.log(payload);
     const apiId = topic.serverId ?? topic.id;
@@ -287,6 +276,26 @@ export class BoardApiService {
       const message = e instanceof Error ? e.message : String(e);
       console.error('Failed to save topic', { topicId: topic.id, error: e });
       this.snackBarService.error(message || 'Failed to save topic');
+    }
+  }
+
+  async linkTopics(topicIdA: string, topicIdB: string): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.post(`${this.apiUrl}/topic/${topicIdA}/link/${topicIdB}`, {}),
+      );
+    } catch (e) {
+      this.snackBarService.error('Failed to link topics');
+    }
+  }
+
+  async unlinkTopics(topicIdA: string, topicIdB: string): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.delete(`${this.apiUrl}/topic/${topicIdA}/unlink/${topicIdB}`),
+      );
+    } catch (e) {
+      this.snackBarService.error('Failed to unlink topics');
     }
   }
 }

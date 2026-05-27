@@ -13,7 +13,11 @@
       "Bash(npm start *)",
       "mcp__playwright__browser_wait_for",
       "Bash(grep -n \"selectBoard\\\\|deleteBoard\\\\|boards\\\\$\\\\|BoardApiService\\\\|filteredBoards\\\\|searchQuery\" D:/BaseServer_front/src/app/pages/board/board.component.ts)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(cd /d \"D:\\\\BaseServer_front\\\\src\\\\app\\\\pages\\\\board\")",
+      "Bash(findstr /s /n \"isItemVisible\" *.ts board-main.service.ts board.component.ts board.component.html)",
+      "Bash(echo \"Server starting with PID $!\")",
+      "mcp__playwright__browser_hover"
     ]
   }
 }

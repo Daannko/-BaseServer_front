@@ -127,6 +127,11 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private lastWorldX = 0;
   private lastWorldY = 0;
+  private tileZCounter = 1;
+
+  bringToFront(tile: BoardTile) {
+    tile.zIndex = ++this.tileZCounter;
+  }
 
   private buildDefaultNavbarContext() {
     return {
@@ -172,7 +177,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   private rebuildConnectors(): void {
     this.connectors.length = 0;
     for (const tile of this.tiles) {
-      this.connectors.push(...Array.from(tile.connectors));
+      for (const conn of tile.connectors) {
+        if (conn.active) this.connectors.push(conn);
+      }
     }
   }
 
@@ -447,7 +454,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((z) => {
         this.zoom = z;
-        // Keep template bindings in sync (especially important during wheel zoom)
+        this.connectors.forEach((c) => c.updateSize(z));
+        this.cdr.detectChanges();
+      });
+
+    // Pan runs outside Angular zone, so camera changes never trigger CD on their own.
+    // Without this, tiles that scroll into view stay hidden until the next zoom event.
+    this.mainBoardService.camera$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
         this.cdr.detectChanges();
       });
 
@@ -524,8 +539,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const waitingIds = this.requiredConnectors.get(tile.id) ?? [];
     for (const waitingId of waitingIds) {
       const waitingTile = this.tilesMap.get(waitingId);
-      if (waitingTile) {
-        waitingTile.addConnectors(tile);
+      if (waitingTile && !waitingTile.activateConnectorTo(tile)) {
+        waitingTile.addConnectors(tile, false);
       }
     }
     if (waitingIds.length) {
@@ -537,7 +552,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const relatedTile = this.tilesMap.get(relatedTopicId);
       if (relatedTile) {
-        tile.addConnectors(relatedTile);
+        if (!tile.activateConnectorTo(relatedTile)) {
+          tile.addConnectors(relatedTile, false);
+        }
         continue;
       }
 
@@ -660,16 +677,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       );
 
       if (targetTile) {
-        const alreadyConnected = Array.from(tile.connectors).some(
-          conn => conn.itemA === targetTile || conn.itemB === targetTile,
-        );
-        if (!alreadyConnected) {
-          tile.addConnectors(targetTile);
-          for (const conn of targetTile.connectors) {
-            if (conn.itemB === tile) { this.connectors.push(conn); break; }
+        const alreadyActive = Array.from(tile.connectors).some(c => c.active && c.itemB === targetTile);
+        if (!alreadyActive) {
+          if (tile.activateConnectorTo(targetTile)) {
+            tile.markConnectorAdded(targetTile);
+          } else {
+            tile.addConnectors(targetTile);
           }
           for (const conn of tile.connectors) {
-            if (conn.itemB === targetTile) { this.connectors.push(conn); break; }
+            if (conn.active && conn.itemB === targetTile) { this.connectors.push(conn); break; }
           }
           Promise.resolve().then(() => this.cdr.detectChanges());
         }
@@ -697,11 +713,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.tilesMap.set(newTile.id, newTile);
 
       tile.addConnectors(newTile);
-      for (const conn of newTile.connectors) {
-        this.connectors.push(conn);
-      }
       for (const conn of tile.connectors) {
-        if (conn.itemB === newTile) { this.connectors.push(conn); break; }
+        if (conn.active && conn.itemB === newTile) { this.connectors.push(conn); break; }
       }
 
       Promise.resolve().then(() => {
@@ -760,11 +773,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (tilesToCreate.length > 0) {
       const createdTopics = await Promise.all(
-        tilesToCreate.map((t) =>
-          this.boardSearchService.createTopic(t, boardId),
-        ),
+        tilesToCreate.map((t) => this.boardSearchService.createTopic(t, boardId)),
       );
-
       for (let i = 0; i < createdTopics.length; i++) {
         const created = createdTopics[i];
         if (!created) continue;
@@ -772,14 +782,21 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    const resolveTopicId = (id: string) =>
-      this.tilesMap.get(id)?.serverId ?? id;
+    const resolveTopicId = (id: string) => this.tilesMap.get(id)?.serverId ?? id;
     const tilesWithServerId = this.tiles.filter((t) => Boolean(t.serverId));
-    await Promise.all(
-      tilesWithServerId.map((t) =>
-        this.boardSearchService.saveTopic(t, resolveTopicId),
-      ),
-    );
+
+    // Read connector changes synchronously before saveTopic clears them via saved()
+    const ops: Promise<void>[] = [];
+    for (const t of tilesWithServerId) {
+      for (const id of t.connectorsAdded) {
+        ops.push(this.boardSearchService.linkTopics(t.serverId!, resolveTopicId(id)));
+      }
+      for (const id of t.connectorsRemoved) {
+        ops.push(this.boardSearchService.unlinkTopics(t.serverId!, resolveTopicId(id)));
+      }
+      ops.push(this.boardSearchService.saveTopic(t, resolveTopicId));
+    }
+    await Promise.all(ops);
   }
 
   closeContextMenu() {

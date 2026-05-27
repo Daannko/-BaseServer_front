@@ -12,6 +12,8 @@ export class BoardConnector {
   sin!: number;
   cos!: number;
   opacity: number = 0;
+  /** Dormant connectors are not rendered and not calculated — activated when the user draws the reverse direction. */
+  active: boolean = true;
 
   shiftX: number = 0;
   shiftY: number = 0;
@@ -61,9 +63,20 @@ export class BoardConnector {
   }
 
   updateSize(zoom: number) {
-    this.opacity = 2 * zoom - 1;
+    // Fade when the label's on-screen font becomes unreadable (~10px minimum).
+    // The label box is ~labelH world px, but ~half of that is padding, so the font
+    // itself is roughly labelH/2. Threshold of 20px on the full box ≈ 10px screen font.
+    // Cap fadeStart at 0.85 so connectors aren't already faded at normal zoom.
+    const labelH = this.height > 0
+      ? this.height
+      : Math.min(this.itemA.width, this.itemA.height, this.itemB.width, this.itemB.height) / 16;
+    const safeH    = Math.max(labelH, 4);
+    const fadeStart = Math.min(0.85, 20 / safeH); // fully visible above this zoom
+    const fadeEnd   = 10 / safeH;                  // fully gone below this zoom
+    this.opacity = Math.max(0, Math.min(1, (zoom - fadeEnd) / (fadeStart - fadeEnd)));
     if (this.domElement) {
       this.domElement.style.opacity = String(this.opacity);
+      this.domElement.style.pointerEvents = this.opacity < 0.75 ? 'none' : 'auto';
     }
   }
 
