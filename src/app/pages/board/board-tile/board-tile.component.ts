@@ -219,33 +219,13 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     this.tile.y = r.y;
     this.tile.width = r.width;
     this.tile.height = r.height;
-
-    for (const connector of this.tile.connectors) {
-      if (!connector.active) continue;
-      connector.updateAngles();
-      connector.updatePosition();
-    }
-    for (const connector of this.tile.inboundConnectors) {
-      if (!connector.active) continue;
-      connector.updateAngles();
-      connector.updatePosition();
-    }
+    this.updateConnectors();
   }
 
   onTileWorldPosChange(p: Position) {
     this.tile.x = p.x;
     this.tile.y = p.y;
-
-    for (const connector of this.tile.connectors) {
-      if (!connector.active) continue;
-      connector.updateAngles();
-      connector.updatePosition();
-    }
-    for (const connector of this.tile.inboundConnectors) {
-      if (!connector.active) continue;
-      connector.updateAngles();
-      connector.updatePosition();
-    }
+    this.updateConnectors();
   }
 
   onDeleteClick(event: MouseEvent) {
@@ -319,6 +299,28 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     this.waveTarget.opacity = 0;
     this.startWaveAnim();
   };
+
+  private perimToXY(t: number, W: number, H: number): [number, number] {
+    const perim = 2 * (W + H);
+    const tn = ((t % perim) + perim) % perim;
+    if (tn <= W)          return [tn, 0];
+    if (tn <= W + H)      return [W, tn - W];
+    if (tn <= 2 * W + H)  return [W - (tn - W - H), H];
+    return [0, H - (tn - 2 * W - H)];
+  }
+
+  private updateConnectors(): void {
+    for (const connector of this.tile.connectors) {
+      if (!connector.active) continue;
+      connector.updateAngles();
+      connector.updatePosition();
+    }
+    for (const connector of this.tile.inboundConnectors) {
+      if (!connector.active) continue;
+      connector.updateAngles();
+      connector.updatePosition();
+    }
+  }
 
   private readonly onDocumentMouseMove = (e: MouseEvent) => {
     if (this.isDrawingConnector) return;
@@ -415,6 +417,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
 
       const moving = Math.abs(dt) > 0.3
         || Math.abs(a.amplitude - tgt.amplitude) > 0.05
+        || Math.abs(a.spread    - tgt.spread)    > 0.05
         || Math.abs(a.opacity   - tgt.opacity)   > 0.004
         || Math.abs(da) > 0.01;
 
@@ -443,39 +446,22 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
       return;
     }
 
-    let cx: number, cy: number;
-    if (t <= W)           { cx = t;           cy = 0; }
-    else if (t <= W+H)   { cx = W;           cy = t - W; }
-    else if (t <= 2*W+H) { cx = W-(t-W-H);   cy = H; }
-    else                  { cx = 0;           cy = H-(t-2*W-H); }
+    let cx: number, cy: number, edgeStart: number, edgeEnd: number;
+    if (t <= W)          { cx = t;           cy = 0;   edgeStart = 0;       edgeEnd = W; }
+    else if (t <= W + H) { cx = W;           cy = t-W; edgeStart = W;       edgeEnd = W+H; }
+    else if (t <= 2*W+H) { cx = W-(t-W-H);  cy = H;   edgeStart = W+H;     edgeEnd = 2*W+H; }
+    else                 { cx = 0;           cy = H-(t-2*W-H); edgeStart = 2*W+H; edgeEnd = perim; }
 
     const odx = Math.cos(angle); // outward toward mouse
     const ody = Math.sin(angle);
     const tnx = -ody;
     const tny =  odx;
 
-    // Left and right base points: walk ±s along tile perimeter from center point
-    // They always stay on the tile boundary
-    const perimPt = (tp: number): [number, number] => {
-      const tn = ((tp % perim) + perim) % perim;
-      if (tn <= W)           return [tn, 0];
-      else if (tn <= W+H)    return [W, tn - W];
-      else if (tn <= 2*W+H)  return [W-(tn-W-H), H];
-      else                   return [0, H-(tn-2*W-H)];
-    };
-
-    // Corner coordinates for center's edge (used to measure foot proximity to corners)
-    let edgeStart: number, edgeEnd: number;
-    if (t <= W)           { edgeStart = 0;      edgeEnd = W; }
-    else if (t <= W+H)    { edgeStart = W;       edgeEnd = W+H; }
-    else if (t <= 2*W+H)  { edgeStart = W+H;     edgeEnd = 2*W+H; }
-    else                  { edgeStart = 2*W+H;   edgeEnd = perim; }
-
     // Unclamped — feet wrap to adjacent edges smoothly
     const tLeft  = t - s;
     const tRight = t + s;
-    const [lx, ly] = perimPt(tLeft);
-    const [rx, ry] = perimPt(tRight);
+    const [lx, ly] = this.perimToXY(tLeft, W, H);
+    const [rx, ry] = this.perimToXY(tRight, W, H);
     const tipx = cx + A * odx;
     const tipy = cy + A * ody;
 

@@ -31,7 +31,6 @@ import {
   ContextMenuItem,
 } from '../common/context-menu/context-menu.component';
 import { StorageService } from '../../service/storage.service';
-import { Theme } from '../../theme';
 
 @Component({
   selector: 'app-board',
@@ -85,8 +84,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedBoard: Board | null = null;
   private activeNavbarTile: BoardTile | null = null;
 
-  @ViewChild('dragCanvas', { static: false })
-  private dragCanvasRef?: ElementRef<HTMLCanvasElement>;
+  @ViewChild('trailGlowPath', { static: false }) private trailGlowRef?: ElementRef<SVGPathElement>;
+  @ViewChild('trailLinePath', { static: false }) private trailLineRef?: ElementRef<SVGPathElement>;
+  @ViewChild('trailDot',      { static: false }) private trailDotRef?:  ElementRef<SVGCircleElement>;
   private trailPoints: Array<{ x: number; y: number }> = [];
 
   deleteBoardPending: { id: string; name: string } | null = null;
@@ -635,21 +635,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.selectedBoard) return;
 
     this.trailPoints = [];
-    const canvas = this.dragCanvasRef?.nativeElement;
-    if (canvas) {
-      const board = this.boardRef.nativeElement as HTMLElement;
-      canvas.width = board.offsetWidth;
-      canvas.height = board.offsetHeight;
-      canvas.style.display = 'block';
-    }
 
     const onMove = (e: MouseEvent) => {
       const board = this.boardRef.nativeElement as HTMLElement;
       const rect = board.getBoundingClientRect();
-      const pt = { x: e.clientX - rect.left, y: e.clientY - rect.top };
+      const sx = e.clientX - rect.left;
+      const sy = e.clientY - rect.top;
       const last = this.trailPoints[this.trailPoints.length - 1];
-      if (!last || Math.hypot(pt.x - last.x, pt.y - last.y) > 4) {
-        this.trailPoints.push(pt);
+      if (!last || Math.hypot(sx - last.x, sy - last.y) > 4) {
+        this.trailPoints.push({ x: sx, y: sy });
       }
       this.drawTrail();
     };
@@ -657,13 +651,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const onUp = (e: MouseEvent) => {
       window.removeEventListener('mousemove', onMove);
       window.removeEventListener('mouseup', onUp);
-
-      const c = this.dragCanvasRef?.nativeElement;
-      if (c) {
-        c.getContext('2d')!.clearRect(0, 0, c.width, c.height);
-        c.style.display = 'none';
-      }
       this.trailPoints = [];
+      this.clearTrail();
 
       if (!this.selectedBoard) return;
 
@@ -729,40 +718,41 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     window.addEventListener('mouseup', onUp);
   }
 
+  private clearTrail(): void {
+    this.trailGlowRef?.nativeElement?.setAttribute('d', '');
+    this.trailLineRef?.nativeElement?.setAttribute('d', '');
+    const dot = this.trailDotRef?.nativeElement;
+    if (dot) { dot.setAttribute('cx', '-9999'); dot.setAttribute('cy', '-9999'); }
+  }
+
   private drawTrail(): void {
-    const canvas = this.dragCanvasRef?.nativeElement;
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d')!;
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const lineEl = this.trailLineRef?.nativeElement;
+    const glowEl = this.trailGlowRef?.nativeElement;
+    const dotEl  = this.trailDotRef?.nativeElement;
+    if (!lineEl || !dotEl) return;
 
     const pts = this.trailPoints;
     const n = pts.length;
     if (n < 2) return;
 
-    for (let i = 1; i < n; i++) {
-      const t = i / (n - 1); // 0 = oldest/tail, 1 = newest/head
-      const alpha = 0.7 + 0.3 * t;
-      const lineWidth = 1.5 + 2.5 * t;
+    const f = (v: number) => v.toFixed(1);
+    let d = `M${f(pts[0].x)},${f(pts[0].y)}`;
+    for (let i = 1; i < n; i++) d += ` L${f(pts[i].x)},${f(pts[i].y)}`;
 
-      ctx.beginPath();
-      ctx.moveTo(pts[i - 1].x, pts[i - 1].y);
-      ctx.lineTo(pts[i].x, pts[i].y);
-      ctx.strokeStyle = `rgba(255, 213, 79, ${alpha.toFixed(3)})`; // Theme.amber
-      ctx.lineWidth = lineWidth;
-      ctx.lineCap = 'butt';
-      ctx.shadowColor = Theme.amberGlow;
-      ctx.shadowBlur = 12 * t;
-      ctx.stroke();
+    lineEl.setAttribute('d', d);
+    lineEl.setAttribute('stroke', 'rgba(255,213,79,0.9)');
+    lineEl.setAttribute('stroke-width', '2.5');
+
+    if (glowEl) {
+      glowEl.setAttribute('d', d);
+      glowEl.setAttribute('stroke', 'rgba(255,213,79,0.15)');
+      glowEl.setAttribute('stroke-width', '16');
     }
 
-    // Bright dot at cursor
-    const head = pts[n - 1];
-    ctx.beginPath();
-    ctx.arc(head.x, head.y, 5, 0, Math.PI * 2);
-    ctx.fillStyle = Theme.amberLight;
-    ctx.shadowColor = Theme.amberStrong;
-    ctx.shadowBlur = 20;
-    ctx.fill();
+    dotEl.setAttribute('cx', f(pts[n - 1].x));
+    dotEl.setAttribute('cy', f(pts[n - 1].y));
+    dotEl.setAttribute('r', '4');
+    dotEl.setAttribute('fill', 'rgba(255,235,130,1)');
   }
 
   async saveBoard(): Promise<void> {

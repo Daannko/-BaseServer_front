@@ -179,7 +179,6 @@
       </div>
     </div>
 
-    <canvas #dragCanvas class="drag-trail-canvas"></canvas>
     <div class="board-viewport" #viewport>
       <div style="display: block">
         <ng-container *ngFor="let connector of connectors">
@@ -209,6 +208,12 @@
       </div>
 
     </div>
+
+    <svg class="trail-svg">
+      <path #trailGlowPath class="trail-glow"/>
+      <path #trailLinePath class="trail-line"/>
+      <circle #trailDot class="trail-dot" r="4" cx="-9999" cy="-9999"/>
+    </svg>
   </div>
 
   <!-- Delete board confirmation modal -->
