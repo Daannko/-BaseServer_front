@@ -120,6 +120,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
   private navbarPinned = false;
   private isDraggingTile = false;
   private deleteConfirmTimeout?: ReturnType<typeof setTimeout>;
+  private isDrawingConnector = false;
 
   constructor(
     private host: ElementRef<HTMLElement>,
@@ -265,6 +266,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     clearTimeout(this.deleteConfirmTimeout);
     this.tiptap.destroyEditors();
     document.removeEventListener('mousemove', this.onDocumentMouseMove);
+    document.removeEventListener('mouseup', this.onConnectorDragEnd);
     if (this.rafId !== null) cancelAnimationFrame(this.rafId);
   }
 
@@ -299,13 +301,27 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
 
   onConnectorMouseDown(event: MouseEvent): void {
     event.stopPropagation();
+    this.isDrawingConnector = true;
+    this.waveTarget.opacity = Math.max(this.waveAnim.opacity, 0.7);
+    this.waveTarget.amplitude = Math.max(this.waveAnim.amplitude, Math.min(this.tile.width, this.tile.height) * 0.043);
+    this.startWaveAnim();
+    document.addEventListener('mouseup', this.onConnectorDragEnd, { once: true });
+
     this.connectorDragStart.emit({
       fromX: this.tile.x + this.tile.width / 2,
       fromY: this.tile.y + this.tile.height / 2,
     });
   }
 
+  private readonly onConnectorDragEnd = () => {
+    this.isDrawingConnector = false;
+    this.waveTarget.amplitude = 0;
+    this.waveTarget.opacity = 0;
+    this.startWaveAnim();
+  };
+
   private readonly onDocumentMouseMove = (e: MouseEvent) => {
+    if (this.isDrawingConnector) return;
     const rect = this.host.nativeElement.getBoundingClientRect();
     const mx = e.clientX - rect.left;
     const my = e.clientY - rect.top;
@@ -341,16 +357,31 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     else                     targetT = 2*W + H + (H - nearestY);
 
     const tileMin = Math.min(W, H);
-    const A_max = tileMin * 0.043;
+    const A_max = tileMin * 0.057;
     // Amplitude maxes out when mouse reaches wave tip (outsideDist <= A_max); closer = no taller
     const amplitude = outsideDist <= A_max
       ? A_max
       : A_max * (maxDist - outsideDist) / (maxDist - A_max);
 
+    // Suppress wave under name label (top edge, left-anchored, dynamic width)
+    let suppress = 0;
+    const labelEl = this.nameLabelRef?.nativeElement;
+    if (labelEl && targetT <= W) {
+      const zoom = rect.width / W;
+      const labelTileW = labelEl.getBoundingClientRect().width / zoom;
+      const exclusionEnd = labelTileW + tileMin * 0.04;
+      const fadeZone    = tileMin * 0.07;
+      if (targetT < exclusionEnd) {
+        suppress = 1;
+      } else if (targetT < exclusionEnd + fadeZone) {
+        suppress = 1 - (targetT - exclusionEnd) / fadeZone;
+      }
+    }
+
     this.waveTarget.t         = targetT;
-    this.waveTarget.amplitude = amplitude;
-    this.waveTarget.spread    = tileMin * 0.05 + (1 - proximity) * tileMin * 0.13;
-    this.waveTarget.opacity   = Math.min(1, proximity * 1.6);
+    this.waveTarget.amplitude = amplitude * (1 - suppress);
+    this.waveTarget.spread    = tileMin * 0.065 + (1 - proximity) * tileMin * 0.16;
+    this.waveTarget.opacity   = Math.min(1, proximity * 1.6) * (1 - suppress);
     this.waveTarget.angle     = Math.atan2(my * scaleY - nearestY, mx * scaleX - nearestX);
 
     this.startWaveAnim();
@@ -433,7 +464,16 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
       else                   return [0, H-(tn-2*W-H)];
     };
 
-    const tLeft = t - s, tRight = t + s;
+    // Corner coordinates for center's edge (used to measure foot proximity to corners)
+    let edgeStart: number, edgeEnd: number;
+    if (t <= W)           { edgeStart = 0;      edgeEnd = W; }
+    else if (t <= W+H)    { edgeStart = W;       edgeEnd = W+H; }
+    else if (t <= 2*W+H)  { edgeStart = W+H;     edgeEnd = 2*W+H; }
+    else                  { edgeStart = 2*W+H;   edgeEnd = perim; }
+
+    // Unclamped — feet wrap to adjacent edges smoothly
+    const tLeft  = t - s;
+    const tRight = t + s;
     const [lx, ly] = perimPt(tLeft);
     const [rx, ry] = perimPt(tRight);
     const tipx = cx + A * odx;
@@ -442,13 +482,19 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
     const flat  = s * 0.50;
     const crest = s * 0.40;
 
-    // Direction from each base toward the wave center — continuous everywhere, no corner jumps.
-    // On a straight edge this equals the edge tangent (flat wave start).
-    // Through a corner it blends diagonally — no snap, no mode switch.
+    // Direction from each base toward the wave center — continuous, no corner jumps.
+    // When foot is pinned at a corner, zero the ctrl offset → straight line to tip (no deformed partial wave).
+    // How free each foot is: 1 = fully free from corner, 0 = pinned at corner.
+    // Scales ctrl offset smoothly to 0 as foot approaches corner — no binary snap.
+    const freeL = Math.min(1, Math.max(0, (t - edgeStart) / (s || 1)));
+    const freeR = Math.min(1, Math.max(0, (edgeEnd - t)   / (s || 1)));
+
     const dcLx = cx - lx, dcLy = cy - ly, dcL = Math.hypot(dcLx, dcLy) || 1;
     const dcRx = cx - rx, dcRy = cy - ry, dcR = Math.hypot(dcRx, dcRy) || 1;
-    const c1lx = lx + (dcLx/dcL)*flat,  c1ly = ly + (dcLy/dcL)*flat;
-    const c2rx = rx + (dcRx/dcR)*flat,  c2ry = ry + (dcRy/dcR)*flat;
+    const c1lx = lx + (dcLx/dcL)*flat*freeL;
+    const c1ly = ly + (dcLy/dcL)*flat*freeL;
+    const c2rx = rx + (dcRx/dcR)*flat*freeR;
+    const c2ry = ry + (dcRy/dcR)*flat*freeR;
 
     const f = (n: number) => n.toFixed(2);
     const d = `M${f(lx)},${f(ly)} `
@@ -464,6 +510,7 @@ export class BoardTileComponent implements OnDestroy, AfterViewInit {
 
     p.setAttribute('d', d);
     p.style.opacity = String(Math.min(1, opacity));
+    p.style.fill = this.isDrawingConnector ? 'rgba(255, 213, 79, 0.35)' : '';
     p.style.pointerEvents = 'painted';
   };
 }

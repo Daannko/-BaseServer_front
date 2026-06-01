@@ -17,6 +17,7 @@
     transform: translate(-50%, -50%);
     white-space: nowrap;
     line-height: 1;
+    user-select: none;
 
     &:hover {
         color: white;
