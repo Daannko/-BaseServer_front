@@ -9,5 +9,4 @@ export interface Topic {
   y: number;
   width: number;
   height: number;
-  relatedTopics?: string[];
 }

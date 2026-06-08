@@ -1,5 +1,5 @@
 <div
-  boardTileResize
+  boardItemResize
   [rect]="{
     x: tile.x,
     y: tile.y,
@@ -31,7 +31,7 @@
     </button>
     <div
       class="note-controls-move"
-      boardTileMove=""
+      boardItemMove=""
       [pos]="{ x: tile.x, y: tile.y }"
       [zoom]="zoom"
       (posChange)="onTileWorldPosChange($event)"
@@ -189,7 +189,7 @@
     [style.--note-border-color]="noteBorderColor"
     [style.--note-border-width]="noteBorderWidth + 'px'"
     [style.--note-border-glow]="noteBorderGlow"
-    boardTileMove=""
+    boardItemMove=""
     [pos]="{ x: tile.x, y: tile.y }"
     [zoom]="zoom"
     (posChange)="onTileWorldPosChange($event)"

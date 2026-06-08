@@ -15,10 +15,10 @@ export interface Position {
 }
 
 @Directive({
-  selector: '[boardTileMove]',
+  selector: '[boardItemMove]',
   standalone: true,
 })
-export class TileMoveDirective implements OnInit, OnDestroy {
+export class ItemMoveDirective implements OnInit, OnDestroy {
   @Input({ required: true }) pos!: Position;
   @Input({ required: true }) zoom = 1;
 

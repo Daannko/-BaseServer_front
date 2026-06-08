@@ -1,18 +1,14 @@
-import { BoardConnector } from '../board-connector/board-connector';
-import { BoardTile } from '../board-tile/board-tile.data';
+import { BoardItem } from '../board-item/board-item.data';
 import { Topic } from '../models/topic.model';
 import { emptyDoc } from '../../../helpers/rich-text.util';
 
-export const NOTE_MARKER = '__note__';
-
 export interface NoteOptions {
-  padding?: number | null; // px; null/undefined = auto-scaled
-  // future: borderColor, fontScale, opacity, etc.
+  padding?: number | null;
 }
 
 export const DEFAULT_NOTE_OPTIONS: NoteOptions = {};
 
-export class BoardNote extends BoardTile {
+export class BoardNote extends BoardItem {
   readonly isNote = true as const;
   bgColor: string | null = null;
   borderColor: string | null = null;
@@ -23,7 +19,6 @@ export class BoardNote extends BoardTile {
     return new BoardNote(
       globalThis.crypto.randomUUID(),
       x, y, width, height,
-      new Set<BoardConnector>(), 0,
       emptyDoc(), emptyDoc(),
     );
   }
@@ -33,7 +28,6 @@ export class BoardNote extends BoardTile {
       topic.id,
       topic.x, topic.y,
       topic.width, topic.height,
-      new Set<BoardConnector>(), 0,
       emptyDoc(),
       topic.content ?? emptyDoc(),
     );

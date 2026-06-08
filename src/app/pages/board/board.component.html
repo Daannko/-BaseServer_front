@@ -180,40 +180,21 @@
     </div>
 
     <div class="board-viewport" #viewport>
-      <div style="display: block">
-        <ng-container *ngFor="let connector of connectors">
-          <app-board-connector
-            [data]="connector"
-            [zoom]="zoom"
-            (click)="moveToItem(connector.itemB)"
-          >
-          </app-board-connector>
-        </ng-container>
-      </div>
-
       <div #itemsContainer>
         <ng-container *ngFor="let item of notes">
           <app-board-note
             [tile]="item"
             [zoom]="zoom"
             (mousedown)="bringToFront(item)"
-            (dblclick)="onTileDblClick($event, item)"
-            (navbarChange)="onTileNavbarChange($event)"
-            (deleteTile)="onDeleteTile(item)"
-            (connectorDragStart)="onConnectorDragStart(item)"
+            (dblclick)="onNoteDblClick($event, item)"
+            (navbarChange)="onNoteNavbarChange($event)"
+            (deleteTile)="onDeleteNote(item)"
             *ngIf="isItemVisible(item)"
           >
           </app-board-note>
         </ng-container>
       </div>
-
     </div>
-
-    <svg class="trail-svg">
-      <path #trailGlowPath class="trail-glow"/>
-      <path #trailLinePath class="trail-line"/>
-      <circle #trailDot class="trail-dot" r="4" cx="-9999" cy="-9999"/>
-    </svg>
   </div>
 
   <!-- Delete board confirmation modal -->

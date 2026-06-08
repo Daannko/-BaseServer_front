@@ -21,7 +21,10 @@
       "Bash(npx tsc *)",
       "Bash(npx ng *)",
       "Bash(npm run *)",
-      "mcp__playwright__browser_run_code_unsafe"
+      "mcp__playwright__browser_run_code_unsafe",
+      "Bash(Get-ChildItem -Path \"D:\\\\BaseServer_front\\\\src\\\\app\\\\pages\\\\board\" -Recurse -File)",
+      "Bash(Select-Object FullName)",
+      "Bash(Sort-Object FullName)"
     ]
   }
 }

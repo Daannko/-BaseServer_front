@@ -16,7 +16,7 @@ import {
   PersistentSelection,
   PersistentSelectionKey,
 } from '../../../helpers/tiptap/PersistentSelector';
-import type { BoardTile } from './board-tile.data';
+import type { BoardItem } from './board-item.data';
 import { ParagraphAttrPlugin, ParagraphWithMarks } from './tiptap.extension';
 
 type SelectionRange = { from: number; to: number };
@@ -75,7 +75,7 @@ export class TiptapService {
   ) {}
 
   initEditors(options: {
-    tile: BoardTile;
+    tile: BoardItem;
     contentElement: HTMLElement;
   }) {
     const { tile, contentElement } = options;

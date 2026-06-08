@@ -8,6 +8,5 @@ export interface CreateTopic {
   y: number;
   width: number;
   height: number;
-  relatedTopics: Array<string>;
   note?: string;
 }

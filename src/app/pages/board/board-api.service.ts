@@ -5,7 +5,7 @@ import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { SnackBarService } from '../../service/snackbar.service';
 import { Topic } from './models/topic.model';
 import { Board } from './models/board.model';
-import { BoardTile } from './board-tile/board-tile.data';
+import { BoardItem } from './board-item/board-item.data';
 import { UpdateTopic } from './models/updateTopic.model';
 import { CreateTopic } from './models/create-topic.model';
 
@@ -194,7 +194,7 @@ export class BoardApiService {
     }
   }
 
-  async createTopic(topic: BoardTile, boardId: string): Promise<Topic | null> {
+  async createTopic(topic: BoardItem, boardId: string): Promise<Topic | null> {
     const payload: CreateTopic = {
       boardId,
       title: topic.name,
@@ -203,8 +203,7 @@ export class BoardApiService {
       y: topic.y,
       width: topic.width,
       height: topic.height,
-      relatedTopics: [],
-      note: ('isNote' in topic && (topic as any).isNote) ? '__note__' : undefined,
+      note: '__note__',
     };
     const createTopicUrl = `${this.apiUrl}/topic`;
     try {
@@ -233,10 +232,7 @@ export class BoardApiService {
     }
   }
 
-  async saveTopic(
-    topic: BoardTile,
-    resolveTopicId?: (id: string) => string,
-  ): Promise<void> {
+  async saveTopic(topic: BoardItem): Promise<void> {
     const payload: Partial<UpdateTopic> = {};
 
     if (topic.nameUpdated) {
@@ -254,7 +250,6 @@ export class BoardApiService {
       payload.height = topic.height;
     }
     if (Object.keys(payload).length === 0) return;
-    console.log(payload);
     const apiId = topic.serverId ?? topic.id;
     const saveTopicUrl = `${this.apiUrl}/topic/${apiId}`;
     try {
@@ -280,23 +275,4 @@ export class BoardApiService {
     }
   }
 
-  async linkTopics(topicIdA: string, topicIdB: string): Promise<void> {
-    try {
-      await firstValueFrom(
-        this.http.post(`${this.apiUrl}/topic/${topicIdA}/link/${topicIdB}`, {}),
-      );
-    } catch (e) {
-      this.snackBarService.error('Failed to link topics');
-    }
-  }
-
-  async unlinkTopics(topicIdA: string, topicIdB: string): Promise<void> {
-    try {
-      await firstValueFrom(
-        this.http.delete(`${this.apiUrl}/topic/${topicIdA}/unlink/${topicIdB}`),
-      );
-    } catch (e) {
-      this.snackBarService.error('Failed to unlink topics');
-    }
-  }
 }

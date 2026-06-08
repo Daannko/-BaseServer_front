@@ -12,7 +12,7 @@ import {
 
 export type ResizeHandle = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
 
-export interface TileRect {
+export interface ItemRect {
   x: number;
   y: number;
   width: number;
@@ -20,16 +20,16 @@ export interface TileRect {
 }
 
 @Directive({
-  selector: '[boardTileResize]',
+  selector: '[boardItemResize]',
   standalone: true,
 })
-export class TileResizeDirective implements OnInit, OnDestroy {
-  @Input({ required: true }) rect!: TileRect;
+export class ItemResizeDirective implements OnInit, OnDestroy {
+  @Input({ required: true }) rect!: ItemRect;
   @Input() minW = 160;
   @Input() minH = 120;
   @Input({ required: true }) zoom = 1;
 
-  @Output() rectChange = new EventEmitter<TileRect>();
+  @Output() rectChange = new EventEmitter<ItemRect>();
 
   private handles: HTMLElement[] = [];
   private cleanup: Array<() => void> = [];
@@ -74,7 +74,7 @@ export class TileResizeDirective implements OnInit, OnDestroy {
   startResize(ev: PointerEvent, handle: ResizeHandle) {
     const startX = ev.clientX;
     const startY = ev.clientY;
-    const start: TileRect = { ...this.rect };
+    const start: ItemRect = { ...this.rect };
 
     const hasE = handle.includes('e');
     const hasW = handle.includes('w');
@@ -113,7 +113,7 @@ export class TileResizeDirective implements OnInit, OnDestroy {
         if (hasN) y = start.y + (start.height - h);
       }
 
-      const next: TileRect = {
+      const next: ItemRect = {
         x: Math.round(x),
         y: Math.round(y),
         width: Math.round(w),

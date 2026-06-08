@@ -1,6 +1,6 @@
 import { ElementRef, Injectable, NgZone } from '@angular/core';
 import { BehaviorSubject, Subject } from 'rxjs';
-import { BoardTile } from './board-tile/board-tile.data';
+import { BoardItem } from './board-item/board-item.data';
 
 export type BoardContextMenuRequest = {
   clientX: number;
@@ -52,8 +52,8 @@ export class BoardMainService {
     });
   }
 
-  tiles: Array<BoardTile> = [];
-  tileComponents: any[] = [];
+  notes: Array<BoardItem> = [];
+  noteComponents: any[] = [];
   cdr: any = null; // optional ChangeDetectorRef
   onBackgroundMouseDown: (() => void) | null = null;
   isDragging: boolean = false;
@@ -63,8 +63,8 @@ export class BoardMainService {
   initialize(options: {
     boardRef: ElementRef;
     viewportRef?: ElementRef;
-    tiles?: Array<BoardTile>;
-    tileComponents?: any[];
+    notes?: Array<BoardItem>;
+    noteComponents?: any[];
     cdr?: any;
     zoom?: number;
     cameraX?: number;
@@ -73,8 +73,8 @@ export class BoardMainService {
   }) {
     this.boardRef = options.boardRef;
     this.viewportRef = options.viewportRef ?? this.viewportRef;
-    this.tiles = options.tiles || this.tiles;
-    this.tileComponents = options.tileComponents || this.tileComponents;
+    this.notes = options.notes || this.notes;
+    this.noteComponents = options.noteComponents || this.noteComponents;
     this.cdr = options.cdr || this.cdr;
     if (typeof options.zoom === 'number') {
       this.setZoom(options.zoom);
@@ -102,7 +102,7 @@ export class BoardMainService {
     board.style.backgroundPosition = `${-this.cameraX * this.zoom}px ${-this.cameraY * this.zoom}px`;
   }
 
-  isItemVisible(item: BoardTile): boolean {
+  isItemVisible(item: BoardItem): boolean {
     if (!this.boardRef) return true;
     const board = this.boardRef.nativeElement as HTMLElement;
     const viewW = board.offsetWidth / this.zoom;
@@ -127,7 +127,7 @@ export class BoardMainService {
     return item.forceToRender || item.inView;
   }
 
-  centerOnItem(item: BoardTile) {
+  centerOnItem(item: BoardItem) {
     if (!this.boardRef) return;
     const board = this.boardRef.nativeElement as HTMLElement;
     const viewportWidth = board.offsetWidth;
@@ -147,7 +147,7 @@ export class BoardMainService {
     this.updateBoard();
   }
 
-  moveToItem(item: BoardTile) {
+  moveToItem(item: BoardItem) {
     item.forceToRender = true;
     if (this.cdr && typeof this.cdr.detectChanges === 'function') {
       this.cdr.detectChanges();
@@ -156,7 +156,7 @@ export class BoardMainService {
     this.updateBoard();
 
     Promise.resolve().then(() => {
-      const centerTile = this.tileComponents.find(
+      const centerTile = this.noteComponents.find(
         (tile) => tile.tile.id === item.id,
       );
       if (centerTile) {
@@ -212,7 +212,7 @@ export class BoardMainService {
 
       const tileEl = path.find(
         (p): p is HTMLElement => p instanceof HTMLElement &&
-          (p.tagName === 'APP-BOARD-TILE' || p.tagName === 'APP-BOARD-NOTE'),
+          p.tagName === 'APP-BOARD-NOTE',
       ) as HTMLElement | undefined;
       const isInsideTileBounds = tileEl
         ? (() => {
