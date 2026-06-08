@@ -38,11 +38,18 @@ export class BoardMainService {
   }
 
   setZoom(nextZoom: number) {
-    this.zoomSubject.next(nextZoom);
+    if (!isFinite(nextZoom) || nextZoom <= 0) return;
+    this.zoomSubject.next(Math.max(0.01, Math.min(100, nextZoom)));
   }
 
   setCamera(x: number, y: number) {
-    this.cameraSubject.next({ x, y });
+    if (!isFinite(x) || !isFinite(y)) return;
+    // Keep |camX * zoom| < 5e6 so the CSS transform matrix never overflows ~32-bit float precision.
+    const limit = 5_000_000 / Math.max(0.001, this.zoom);
+    this.cameraSubject.next({
+      x: Math.max(-limit, Math.min(limit, x)),
+      y: Math.max(-limit, Math.min(limit, y)),
+    });
   }
 
   tiles: Array<BoardTile> = [];
@@ -204,7 +211,8 @@ export class BoardMainService {
         path.some((p) => p instanceof HTMLElement && p.tagName === tag);
 
       const tileEl = path.find(
-        (p): p is HTMLElement => p instanceof HTMLElement && p.tagName === 'APP-BOARD-TILE',
+        (p): p is HTMLElement => p instanceof HTMLElement &&
+          (p.tagName === 'APP-BOARD-TILE' || p.tagName === 'APP-BOARD-NOTE'),
       ) as HTMLElement | undefined;
       const isInsideTileBounds = tileEl
         ? (() => {
@@ -282,7 +290,8 @@ export class BoardMainService {
 
     // Background-only menu (avoid opening when interacting with UI/tile/connector).
     const tileEl = path.find(
-      (p): p is HTMLElement => p instanceof HTMLElement && p.tagName === 'APP-BOARD-TILE',
+      (p): p is HTMLElement => p instanceof HTMLElement &&
+        (p.tagName === 'APP-BOARD-TILE' || p.tagName === 'APP-BOARD-NOTE'),
     ) as HTMLElement | undefined;
     const isInsideTileBounds = tileEl
       ? (() => {

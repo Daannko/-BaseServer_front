@@ -192,8 +192,8 @@
       </div>
 
       <div #itemsContainer>
-        <ng-container *ngFor="let item of tiles">
-          <app-board-tile
+        <ng-container *ngFor="let item of notes">
+          <app-board-note
             [tile]="item"
             [zoom]="zoom"
             (mousedown)="bringToFront(item)"
@@ -203,7 +203,7 @@
             (connectorDragStart)="onConnectorDragStart(item)"
             *ngIf="isItemVisible(item)"
           >
-          </app-board-tile>
+          </app-board-note>
         </ng-container>
       </div>
 

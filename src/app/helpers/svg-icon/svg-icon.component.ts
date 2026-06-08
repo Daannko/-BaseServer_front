@@ -50,6 +50,7 @@ export class SvgIconComponent {
       'table-move-left': 'board_icons/table/table-move-left.svg',
       'table-move-right': 'board_icons/table/table-move-right.svg',
       'close-x': 'general/close-x.svg',
+      options: 'board_icons/ellipsis.svg',
       'chevron-left': 'general/chevron-left.svg',
       'font-size-up': 'board_icons/arrow-up-alt2-svgrepo-com.svg',
       'font-size-down': 'board_icons/arrow-down-alt2-svgrepo-com.svg',

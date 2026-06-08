@@ -1,0 +1,399 @@
+<div
+  boardTileResize
+  [rect]="{
+    x: tile.x,
+    y: tile.y,
+    width: tile.width,
+    height: tile.height,
+  }"
+  [minW]="1"
+  [minH]="1"
+  [zoom]="zoom"
+  (rectChange)="onTileWorldRectChange($event)"
+  class="board-item"
+  [style.--tile-w]="tile.width + 'px'"
+  [style.--tile-h]="tile.height + 'px'"
+  [style.--tile-min]="
+    (tile.width > tile.height ? tile.width : tile.height) + 'px'
+  "
+>
+  <!-- controls bar: appears when focused, sits above the note -->
+  <div class="note-controls-bar" [class.is-visible]="isFocused">
+    <button
+      class="note-controls-options"
+      [class.active]="isOptionsPanelOpen"
+      (mousedown)="$event.stopPropagation()"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="isOptionsPanelOpen = !isOptionsPanelOpen"
+      title="Note options"
+    >
+      <app-svg-icon icon="options"></app-svg-icon>
+    </button>
+    <div
+      class="note-controls-move"
+      boardTileMove=""
+      [pos]="{ x: tile.x, y: tile.y }"
+      [zoom]="zoom"
+      (posChange)="onTileWorldPosChange($event)"
+      (moveStart)="onMoveStart()"
+      (moveEnd)="onMoveEnd()"
+      (pointerdown)="$event.stopPropagation()"
+      (mousedown)="$event.stopPropagation()"
+    >
+      <span class="note-controls-grip"></span>
+    </div>
+    <button
+      class="note-controls-delete"
+      [class.confirm]="deleteConfirmPending"
+      (mousedown)="$event.stopPropagation()"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="onDeleteClick($event)"
+      title="Delete note"
+    >
+      <span class="note-controls-delete-label">Delete?</span>
+      <app-svg-icon icon="close-x"></app-svg-icon>
+    </button>
+  </div>
+
+  <!-- options side panel: opens to the left of the note when the options button is toggled -->
+  <div
+    class="note-options-side-panel"
+    [class.is-open]="isOptionsPanelOpen && isFocused"
+    (mousedown)="$event.stopPropagation()"
+    (pointerdown)="$event.stopPropagation()"
+  >
+    <div class="note-options-section note-options-section--stacked">
+      <span class="note-options-section-label">Background</span>
+      <div class="note-options-swatches">
+        <button
+          *ngFor="let color of recentBgColors"
+          class="note-options-swatch"
+          [class.active]="noteBgColor === color"
+          [style.background]="color"
+          (click)="setBgColor(color)"
+          [title]="color"
+        ></button>
+        <label
+          class="note-options-swatch note-options-swatch--palette"
+          [class.active]="noteBgColor !== null && !recentBgColors.includes(noteBgColor)"
+          title="Custom color (RGB)"
+        >
+          <input
+            type="color"
+            [value]="customBgColorHex"
+            (input)="onCustomBgColorInput($event)"
+            (change)="onCustomBgColorChange($event)"
+          />
+        </label>
+        <button
+          class="note-options-swatch note-options-swatch--none"
+          [class.active]="noteBgColor === null"
+          (click)="setBgColor(null)"
+          title="No background"
+        ></button>
+      </div>
+      <div class="note-options-alpha" *ngIf="noteBgColor !== null">
+        <input
+          type="range"
+          class="note-options-alpha-slider"
+          min="0.02"
+          max="1"
+          step="0.01"
+          [value]="noteBgAlpha"
+          [style.--track-color]="noteBgSolidColor"
+          (input)="onBgAlphaInput($event)"
+        />
+        <span class="note-options-alpha-value">{{ (noteBgAlpha * 100).toFixed(0) }}%</span>
+      </div>
+    </div>
+    <div class="note-options-section note-options-section--stacked">
+      <span class="note-options-section-label">Border</span>
+      <div class="note-options-swatches">
+        <button
+          *ngFor="let color of recentBorderColors"
+          class="note-options-swatch"
+          [class.active]="noteBorderColor === color"
+          [style.background]="color"
+          (click)="setBorderColor(color)"
+          [title]="color"
+        ></button>
+        <label
+          class="note-options-swatch note-options-swatch--palette"
+          [class.active]="noteBorderColor !== null && !recentBorderColors.includes(noteBorderColor)"
+          title="Custom color (RGB)"
+        >
+          <input
+            type="color"
+            [value]="customBorderColorHex"
+            (input)="onCustomBorderColorInput($event)"
+            (change)="onCustomBorderColorChange($event)"
+          />
+        </label>
+        <button
+          class="note-options-swatch note-options-swatch--none"
+          [class.active]="noteBorderColor === null"
+          (click)="setBorderColor(null)"
+          title="No border"
+        ></button>
+      </div>
+      <div class="note-options-alpha" *ngIf="noteBorderColor !== null">
+        <input
+          type="range"
+          class="note-options-alpha-slider"
+          min="0.02"
+          max="1"
+          step="0.01"
+          [value]="noteBorderAlpha"
+          [style.--track-color]="noteBorderSolidColor"
+          (input)="onBorderAlphaInput($event)"
+        />
+        <span class="note-options-alpha-value">{{ (noteBorderAlpha * 100).toFixed(0) }}%</span>
+      </div>
+      <div class="note-options-alpha note-options-border-width" *ngIf="noteBorderColor !== null">
+        <input
+          type="range"
+          class="note-options-alpha-slider note-options-width-slider"
+          min="1"
+          max="12"
+          step="0.5"
+          [value]="noteBorderWidth"
+          (input)="onBorderWidthInput($event)"
+        />
+        <span class="note-options-alpha-value">{{ noteBorderWidth }}px</span>
+      </div>
+    </div>
+    <div class="note-options-section">
+      <span class="note-options-section-label">Padding</span>
+      <input
+        type="number"
+        class="note-option-input"
+        [value]="noteOptions.padding ?? ''"
+        placeholder="auto"
+        min="0"
+        (input)="onOptionNumberInput('padding', $event)"
+      />
+    </div>
+  </div>
+
+  <svg class="connector-wave" aria-hidden="true">
+    <path #connectorWavePath class="connector-wave-path"
+      (pointerdown)="$event.stopPropagation()"
+      (dblclick)="$event.stopPropagation()"
+    />
+  </svg>
+
+  <div
+    class="note-surface"
+    [class.is-focused]="isFocused"
+    [style.background]="noteBgColor"
+    [style.--note-border-color]="noteBorderColor"
+    [style.--note-border-width]="noteBorderWidth + 'px'"
+    [style.--note-border-glow]="noteBorderGlow"
+    boardTileMove=""
+    [pos]="{ x: tile.x, y: tile.y }"
+    [zoom]="zoom"
+    (posChange)="onTileWorldPosChange($event)"
+    (moveStart)="onMoveStart()"
+    (moveEnd)="onMoveEnd()"
+  >
+    <div class="note-body" (pointerdown)="$event.stopPropagation()">
+      <div #contentElement class="content-editor"></div>
+    </div>
+  </div>
+
+  <ng-template #navbarContentTemplate let-tile="tile">
+    <div class="bar note-bar">
+      <div class="navbar-tile-controls">
+        <div class="selector-group">
+          <app-query-select
+            [options]="tiptap.fonts"
+            labelKey="name"
+            valueKey="name"
+            placeholder="Font"
+            title="Font family"
+            variant="text"
+            [allowCustom]="false"
+            [displayValue]="tiptap.currentFont"
+            (commit)="tiptap.applyFont($event, contentEditor)"
+            style="--qs-width: 120px"
+          ></app-query-select>
+          <app-query-select
+            [options]="tiptap.fontSizes"
+            labelKey="name"
+            valueKey="value"
+            placeholder="Size"
+            title="Font size"
+            variant="number"
+            [numbersOnly]="true"
+            [alwaysShowAll]="true"
+            [displayValue]="tiptap.currentSize"
+            (commit)="tiptap.applyFontSize($event, contentEditor)"
+            style="--qs-width: 52px"
+          ></app-query-select>
+          <button
+            (mousedown)="$event.preventDefault()"
+            (click)="tiptap.adjustFontSize(-1, contentEditor)"
+            title="Decrease font size"
+          >
+            <app-svg-icon icon="font-size-down"></app-svg-icon>
+          </button>
+          <button
+            (mousedown)="$event.preventDefault()"
+            (click)="tiptap.adjustFontSize(1, contentEditor)"
+            title="Increase font size"
+          >
+            <app-svg-icon icon="font-size-up"></app-svg-icon>
+          </button>
+        </div>
+        <div class="navbar-spacer"></div>
+        <div
+          class="color-picker-container"
+          (mouseenter)="isColorPaletteVisible = true"
+          (mouseleave)="isColorPaletteVisible = false"
+        >
+          <button title="Text color">
+            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
+          </button>
+          <div class="color-palette" [class.open]="isColorPaletteVisible">
+            <div class="temp"></div>
+            <button
+              *ngFor="let color of tiptap.colors"
+              [style.background-color]="color"
+              (click)="tiptap.setTextColor(color, contentEditor)"
+              [title]="color"
+              class="color-option"
+            ></button>
+          </div>
+        </div>
+        <div
+          class="color-picker-container"
+          (mouseenter)="isBgPaletteVisible = true"
+          (mouseleave)="isBgPaletteVisible = false"
+        >
+          <button title="Note background">
+            <span class="bg-icon-swatch" [style.background]="noteBgColor ?? 'transparent'"></span>
+          </button>
+          <div class="color-palette bg-palette" [class.open]="isBgPaletteVisible">
+            <div class="temp"></div>
+            <button
+              class="color-option color-option--none"
+              (click)="setBgColor(null)"
+              title="No background"
+            ></button>
+            <button
+              *ngFor="let color of recentBgColors"
+              [style.background-color]="color"
+              (click)="setBgColor(color)"
+              [title]="color"
+              class="color-option"
+            ></button>
+          </div>
+        </div>
+        <div class="navbar-spacer"></div>
+        <button (click)="tiptap.toggleBold(contentEditor)" title="Bold">
+          <app-svg-icon icon="editor-bold"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleItalic(contentEditor)" title="Italic">
+          <app-svg-icon icon="editor-italic"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleUnderline(contentEditor)" title="Underline">
+          <app-svg-icon icon="editor-underline"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleStrikethrough(contentEditor)" title="Strikethrough">
+          <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
+        </button>
+        <div class="navbar-spacer"></div>
+        <button (click)="tiptap.toggleQuote(contentEditor)" title="Quote">
+          <app-svg-icon icon="editor-quote"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleCodeBlock(contentEditor)" title="Code block">
+          <app-svg-icon icon="editor-code-duplicate"></app-svg-icon>
+        </button>
+        <div class="navbar-spacer"></div>
+        <button (click)="tiptap.toggleBulletList(contentEditor)" title="Bullet list">
+          <app-svg-icon icon="editor-ul"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleOrderedList(contentEditor)" title="Ordered list">
+          <app-svg-icon icon="editor-ol"></app-svg-icon>
+        </button>
+        <div class="navbar-spacer"></div>
+        <button (click)="tiptap.setAlignment('left', contentEditor)" title="Align left">
+          <app-svg-icon icon="editor-alignleft"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.setAlignment('center', contentEditor)" title="Align center">
+          <app-svg-icon icon="editor-aligncenter"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.setAlignment('right', contentEditor)" title="Align right">
+          <app-svg-icon icon="editor-alignright"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.setAlignment('justify', contentEditor)" title="Justify">
+          <app-svg-icon icon="editor-justify"></app-svg-icon>
+        </button>
+        <div class="navbar-spacer"></div>
+        <button (click)="tiptap.insertTable(contentEditor)" title="Insert table">
+          <app-svg-icon icon="table"></app-svg-icon>
+        </button>
+      </div>
+
+      <div class="table-controls" *ngIf="tiptap.isTableActive">
+        <button (click)="tiptap.addColumnBefore(contentEditor)" title="Add column before">
+          <app-svg-icon icon="table-add-column-before"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.addColumnAfter(contentEditor)" title="Add column after">
+          <app-svg-icon icon="table-add-column-after"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.addRowBefore(contentEditor)" title="Add row before">
+          <app-svg-icon icon="table-add-row-before"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.addRowAfter(contentEditor)" title="Add row after">
+          <app-svg-icon icon="table-add-row-after"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.deleteColumn(contentEditor)" title="Delete column">
+          <app-svg-icon icon="table-delete-column"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.deleteRow(contentEditor)" title="Delete row">
+          <app-svg-icon icon="table-delete-row"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.mergeCells(contentEditor)" title="Merge cells">
+          <app-svg-icon icon="table-merge-cells"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.splitCell(contentEditor)" title="Split cell">
+          <app-svg-icon icon="table-split-cell"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleHeaderColumn(contentEditor)" title="Toggle header column">
+          <app-svg-icon icon="table-freeze-column"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleHeaderRow(contentEditor)" title="Toggle header row">
+          <app-svg-icon icon="table-freeze-row"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleHeaderCell(contentEditor)" title="Toggle header cell">
+          <app-svg-icon icon="table-freeze-cell"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.alignTableLeft(contentEditor)" title="Align table left">
+          <app-svg-icon icon="editor-alignleft"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.alignTableCenter(contentEditor)" title="Align table center">
+          <app-svg-icon icon="editor-aligncenter"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.alignTableRight(contentEditor)" title="Align table right">
+          <app-svg-icon icon="editor-alignright"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.deleteTable(contentEditor)" title="Delete table">
+          <app-svg-icon icon="table-delete"></app-svg-icon>
+        </button>
+      </div>
+
+      <div class="note-options-panel">
+        <span class="note-options-label">Padding</span>
+        <input
+          type="number"
+          class="note-option-input"
+          [value]="noteOptions.padding ?? ''"
+          placeholder="auto"
+          min="0"
+          (input)="onOptionNumberInput('padding', $event)"
+        />
+      </div>
+    </div>
+  </ng-template>
+</div>

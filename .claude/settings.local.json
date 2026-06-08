@@ -17,7 +17,11 @@
       "Bash(cd /d \"D:\\\\BaseServer_front\\\\src\\\\app\\\\pages\\\\board\")",
       "Bash(findstr /s /n \"isItemVisible\" *.ts board-main.service.ts board.component.ts board.component.html)",
       "Bash(echo \"Server starting with PID $!\")",
-      "mcp__playwright__browser_hover"
+      "mcp__playwright__browser_hover",
+      "Bash(npx tsc *)",
+      "Bash(npx ng *)",
+      "Bash(npm run *)",
+      "mcp__playwright__browser_run_code_unsafe"
     ]
   }
 }

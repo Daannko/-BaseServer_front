@@ -15,7 +15,8 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { NavbarComponent } from '../../helpers/navbar/navbar.component';
 import { BoardTile } from './board-tile/board-tile.data';
-import { BoardTileComponent } from './board-tile/board-tile.component';
+import { BoardNote } from './board-note/board-note.data';
+import { BoardNoteComponent } from './board-note/board-note.component';
 import { BoardConnector } from './board-connector/board-connector';
 import { BoardConnectorComponent } from './board-connector/board-connector.component';
 import { NavbarService } from '../../helpers/navbar/navbar.service';
@@ -25,7 +26,6 @@ import { Observable, Subject, takeUntil } from 'rxjs';
 import { SvgIconComponent } from '../../helpers/svg-icon/svg-icon.component';
 import { Board } from './models/board.model';
 import { Topic } from './models/topic.model';
-import { emptyDoc } from '../../helpers/rich-text.util';
 import {
   ContextMenuComponent,
   ContextMenuItem,
@@ -39,7 +39,7 @@ import { StorageService } from '../../service/storage.service';
     CommonModule,
     NavbarComponent,
     FormsModule,
-    BoardTileComponent,
+    BoardNoteComponent,
     BoardConnectorComponent,
     SvgIconComponent,
     ContextMenuComponent,
@@ -58,8 +58,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   defaultNavbarTemplate!: TemplateRef<any>;
   @ViewChildren(BoardConnectorComponent)
   connectorComponents!: QueryList<BoardConnectorComponent>;
-  @ViewChildren(BoardTileComponent)
-  tileComponents!: QueryList<BoardTileComponent>;
+  @ViewChildren(BoardNoteComponent)
+  noteComponents!: QueryList<BoardNoteComponent>;
   @ViewChild('newBoardNameInput', { static: false })
   nameInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild('searchInput', { static: false })
@@ -76,7 +76,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   zoom = 1;
   private readonly destroy$ = new Subject<void>();
 
-  tiles: BoardTile[] = [];
+  notes: BoardNote[] = [];
   connectors: Array<BoardConnector> = [];
   tilesMap: Map<string, BoardTile> = new Map();
   requiredConnectors: Map<string, string[]> = new Map();
@@ -168,7 +168,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private resetTileState(): void {
-    this.tiles.length = 0;
+    this.notes.length = 0;
     this.connectors.length = 0;
     this.tilesMap.clear();
     this.requiredConnectors.clear();
@@ -176,8 +176,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private rebuildConnectors(): void {
     this.connectors.length = 0;
-    for (const tile of this.tiles) {
-      for (const conn of tile.connectors) {
+    for (const item of this.notes) {
+      for (const conn of item.connectors) {
         if (conn.active) this.connectors.push(conn);
       }
     }
@@ -299,10 +299,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.mainBoardService.initialize({
         boardRef: this.boardRef,
         viewportRef: this.viewportRef,
-        tiles: this.tiles,
-        tileComponents: this.tileComponents
-          ? this.tileComponents.toArray()
-          : [],
+        tiles: this.notes,
+        tileComponents: this.noteComponents?.toArray() ?? [],
         cdr: this.cdr,
         onBackgroundMouseDown: () =>
           this.navBarService.setTemplate(
@@ -320,8 +318,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         defaultNavbarContext,
       );
       this.connectorComponents?.forEach((c) => c.updateSize());
-      if (this.tiles.length > 0) {
-        this.mainBoardService.centerOnItem(this.tiles[0]);
+      if (this.notes.length > 0) {
+        this.mainBoardService.centerOnItem(this.notes[0]);
       }
     } catch (e) {
       console.error('Failed to load board', e);
@@ -360,7 +358,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const path = (event.composedPath?.() ?? []) as EventTarget[];
     const tileEl = path.find(
       (p): p is HTMLElement =>
-        p instanceof HTMLElement && p.tagName === 'APP-BOARD-TILE',
+        p instanceof HTMLElement &&
+        (p.tagName === 'APP-BOARD-TILE' || p.tagName === 'APP-BOARD-NOTE'),
     ) as HTMLElement | undefined;
     if (!tileEl) return;
     const r = tileEl.getBoundingClientRect();
@@ -475,7 +474,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.ctxMenu.x = req.clientX;
         this.ctxMenu.y = req.clientY;
         this.ctxMenu.items = [
-          { id: 'create', label: 'Create tile here' },
+          { id: 'create-note', label: 'Create note here' },
           { id: 'save', label: 'Save board', shortcut: 'Ctrl+S' },
         ];
         this.ctxMenu.visible = true;
@@ -501,8 +500,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mainBoardService.initialize({
       boardRef: this.boardRef,
       viewportRef: this.viewportRef,
-      tiles: this.tiles,
-      tileComponents: this.tileComponents ? this.tileComponents.toArray() : [],
+      tiles: this.notes,
+      tileComponents: this.noteComponents?.toArray() ?? [],
       cdr: this.cdr,
       zoom: this.zoom,
       cameraX: 0,
@@ -515,8 +514,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       defaultNavbarContext,
     );
     this.mainBoardService.setupListeners();
-    if (this.tiles.length > 0) {
-      this.mainBoardService.centerOnItem(this.tiles[0]);
+    if (this.notes.length > 0) {
+      this.mainBoardService.centerOnItem(this.notes[0]);
     }
 
     Promise.resolve()
@@ -531,9 +530,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   addBoardTile(topic: Topic) {
-    const tile = BoardTile.fromTopic(topic);
-
-    this.tiles.push(tile);
+    const tile = BoardNote.fromNoteTopic(topic);
+    this.notes.push(tile);
     this.tilesMap.set(tile.id, tile);
 
     const waitingIds = this.requiredConnectors.get(tile.id) ?? [];
@@ -564,28 +562,27 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  private createTileAt(worldX: number, worldY: number): void {
+  private createNoteAt(worldX: number, worldY: number): void {
     if (!this.selectedBoard) return;
 
     const zoom = this.mainBoardService.zoom;
-    const width = 440 / zoom;
-    const height = 600 / zoom;
-    const tile = BoardTile.newTile(
-      worldX - width / 2,
-      worldY - height / 2,
-      width,
-      height,
+    const size = 300 / zoom;
+    const note = BoardNote.newNote(
+      worldX - size / 2,
+      worldY - size / 2,
+      size,
+      size,
     );
 
-    this.tiles.push(tile);
-    this.tilesMap.set(tile.id, tile);
-    this.centerOnItem(tile);
+    this.notes.push(note);
+    this.tilesMap.set(note.id, note);
+    this.centerOnItem(note);
 
     Promise.resolve().then(() => {
       this.cdr.detectChanges();
-      this.mainBoardService.tileComponents = this.tileComponents
-        ? this.tileComponents.toArray()
-        : [];
+      this.mainBoardService.tileComponents = this.noteComponents?.toArray() ?? [];
+      const noteComp = this.noteComponents?.find(c => c.tile.id === note.id);
+      noteComp?.focus();
     });
   }
 
@@ -613,7 +610,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const tileId = tile.id;
     this.connectors = this.connectors.filter(c => c.itemA.id !== tileId && c.itemB.id !== tileId);
-    this.tiles = this.tiles.filter(t => t.id !== tile.id);
+    this.notes = this.notes.filter(n => n.id !== tileId);
     this.tilesMap.delete(tileId);
     this.cdr.detectChanges();
   }
@@ -658,8 +655,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const w = this.screenToWorld(e.clientX, e.clientY);
 
-      // Drop on an existing tile → connect instead of creating
-      const targetTile = this.tiles.find(t =>
+      // Drop on an existing note → connect instead of creating
+      const targetTile = this.notes.find(t =>
         t !== tile &&
         w.x >= t.x && w.x <= t.x + t.width &&
         w.y >= t.y && w.y <= t.y + t.height,
@@ -688,29 +685,26 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       const minDist = Math.min(tile.width, tile.height) * 0.25;
       if (distToEdge < minDist) return;
 
-      // Create new tile at drop position
+      // Create new note at drop position
       const zoom = this.mainBoardService.zoom;
-      const width = 440 / zoom;
-      const height = 600 / zoom;
-      const newTile = BoardTile.newTile(
-        w.x - width / 2,
-        w.y - height / 2,
-        width,
-        height,
+      const size = 300 / zoom;
+      const newNote = BoardNote.newNote(
+        w.x - size / 2,
+        w.y - size / 2,
+        size,
+        size,
       );
-      this.tiles.push(newTile);
-      this.tilesMap.set(newTile.id, newTile);
+      this.notes.push(newNote);
+      this.tilesMap.set(newNote.id, newNote);
 
-      tile.addConnectors(newTile);
+      tile.addConnectors(newNote);
       for (const conn of tile.connectors) {
-        if (conn.active && conn.itemB === newTile) { this.connectors.push(conn); break; }
+        if (conn.active && conn.itemB === newNote) { this.connectors.push(conn); break; }
       }
 
       Promise.resolve().then(() => {
         this.cdr.detectChanges();
-        this.mainBoardService.tileComponents = this.tileComponents
-          ? this.tileComponents.toArray()
-          : [];
+        this.mainBoardService.tileComponents = this.noteComponents?.toArray() ?? [];
       });
     };
 
@@ -759,7 +753,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.selectedBoard) return;
 
     const boardId = this.selectedBoard.id;
-    const tilesToCreate = this.tiles.filter((t) => !t.serverId);
+    const tilesToCreate = this.notes.filter((t) => !t.serverId);
 
     if (tilesToCreate.length > 0) {
       const createdTopics = await Promise.all(
@@ -773,7 +767,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     const resolveTopicId = (id: string) => this.tilesMap.get(id)?.serverId ?? id;
-    const tilesWithServerId = this.tiles.filter((t) => Boolean(t.serverId));
+    const tilesWithServerId = this.notes.filter((t) => Boolean(t.serverId));
 
     // Read connector changes synchronously before saveTopic clears them via saved()
     const ops: Promise<void>[] = [];
@@ -800,8 +794,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'save':
         this.saveBoard();
         return;
-      case 'create':
-        this.createTileAt(this.lastWorldX, this.lastWorldY);
+      case 'create-note':
+        this.createNoteAt(this.lastWorldX, this.lastWorldY);
         return;
       default:
         console.log(item.label);

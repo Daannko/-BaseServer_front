@@ -204,6 +204,7 @@ export class BoardApiService {
       width: topic.width,
       height: topic.height,
       relatedTopics: [],
+      note: ('isNote' in topic && (topic as any).isNote) ? '__note__' : undefined,
     };
     const createTopicUrl = `${this.apiUrl}/topic`;
     try {

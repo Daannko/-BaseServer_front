@@ -9,4 +9,5 @@ export interface CreateTopic {
   width: number;
   height: number;
   relatedTopics: Array<string>;
+  note?: string;
 }
