@@ -1,0 +1,61 @@
+// Controls bar (delete button) and resize handles are shared with
+// board-note / board-section:
+@import '../board-item/item-controls';
+
+:host {
+  position: absolute;
+  display: block;
+  pointer-events: auto;
+}
+
+.board-item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+.image-surface {
+  position: relative;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  cursor: grab;
+  overflow: hidden;
+
+  &:active { cursor: grabbing; }
+}
+
+.image-content {
+  display: block;
+  width: 100%;
+  height: 100%;
+  // Stretch to fill the element so resizing distorts the image instead of
+  // letterboxing inside a larger box.
+  object-fit: fill;
+  // Pointer events go to the surface so dragging works anywhere on the image.
+  pointer-events: none;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+// Options-panel button (scales with the note-options-side-panel --s var).
+.image-option-button {
+  font-size: calc(var(--s) * 0.026);
+  color: rgba(255, 255, 255, 0.82);
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: calc(var(--s) * 0.02);
+  padding: calc(var(--s) * 0.012) calc(var(--s) * 0.03);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 120ms, color 120ms;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+  }
+}

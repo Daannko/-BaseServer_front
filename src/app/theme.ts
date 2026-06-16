@@ -3,6 +3,9 @@
 // Keep in sync with src/styles/_theme.scss.
 
 export const Theme = {
+  default:     'rgba(255, 255, 255, 0.65)', // --bp-default
+  defaultBg:   'rgba(255, 255, 255, 0.08)', // --bp-default-bg
+
   amber:       '#ffd54f',          // --bp-amber
   amberGlow:   'rgba(255, 160, 0, 0.8)',
   amberLight:  'rgba(255, 230, 120, 0.95)',

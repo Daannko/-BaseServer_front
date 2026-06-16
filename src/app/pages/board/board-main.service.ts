@@ -26,6 +26,8 @@ export class BoardMainService {
   private readonly contextMenuSubject = new Subject<BoardContextMenuRequest>();
   readonly contextMenu$ = this.contextMenuSubject.asObservable();
 
+  private zoomSettleTimer: ReturnType<typeof setTimeout> | null = null;
+
   get cameraX(): number {
     return this.cameraSubject.value.x;
   }
@@ -53,6 +55,8 @@ export class BoardMainService {
   }
 
   notes: Array<BoardItem> = [];
+  sections: Array<BoardItem> = [];
+  images: Array<BoardItem> = [];
   noteComponents: any[] = [];
   cdr: any = null; // optional ChangeDetectorRef
   onBackgroundMouseDown: (() => void) | null = null;
@@ -64,6 +68,8 @@ export class BoardMainService {
     boardRef: ElementRef;
     viewportRef?: ElementRef;
     notes?: Array<BoardItem>;
+    sections?: Array<BoardItem>;
+    images?: Array<BoardItem>;
     noteComponents?: any[];
     cdr?: any;
     zoom?: number;
@@ -74,6 +80,8 @@ export class BoardMainService {
     this.boardRef = options.boardRef;
     this.viewportRef = options.viewportRef ?? this.viewportRef;
     this.notes = options.notes || this.notes;
+    this.sections = options.sections || this.sections;
+    this.images = options.images || this.images;
     this.noteComponents = options.noteComponents || this.noteComponents;
     this.cdr = options.cdr || this.cdr;
     if (typeof options.zoom === 'number') {
@@ -100,6 +108,22 @@ export class BoardMainService {
     // Keep background "stuck" to world coordinates.
     // (Background moves in screen px, so multiply camera by zoom.)
     board.style.backgroundPosition = `${-this.cameraX * this.zoom}px ${-this.cameraY * this.zoom}px`;
+  }
+
+  // Promote the viewport to its own compositor layer only while a zoom gesture
+  // is in flight. While promoted, the browser scales the cached raster (fast
+  // but blurry); dropping `will-change` after the gesture settles forces a
+  // re-rasterization at the final zoom level so content is sharp again.
+  private beginZoomGesture() {
+    if (!this.viewportRef) return;
+    const viewport = this.viewportRef.nativeElement as HTMLElement;
+    viewport.style.willChange = 'transform';
+
+    if (this.zoomSettleTimer !== null) clearTimeout(this.zoomSettleTimer);
+    this.zoomSettleTimer = setTimeout(() => {
+      this.zoomSettleTimer = null;
+      viewport.style.willChange = 'auto';
+    }, 150);
   }
 
   isItemVisible(item: BoardItem): boolean {
@@ -133,11 +157,11 @@ export class BoardMainService {
     const viewportWidth = board.offsetWidth;
     const viewportHeight = board.offsetHeight;
 
-    // subtracting here to make place for the connectors
-    // const zoomHeightRatio = viewportHeight / item.height - 0.3;
-    // const zoomWidthRatio = viewportWidth / item.width - 0.4;
-
-    // this.setZoom(Math.min(zoomHeightRatio, zoomWidthRatio));
+    // Fit the whole item in view with breathing room (0.7), capped so small
+    // items don't blow up to extreme zoom levels.
+    const fitZoom =
+      Math.min(viewportWidth / item.width, viewportHeight / item.height) * 0.7;
+    this.setZoom(Math.min(1.5, fitZoom));
 
     this.setCamera(
       item.getCenterX() - viewportWidth / (2 * this.zoom),
@@ -197,6 +221,7 @@ export class BoardMainService {
         worldMouseY - mouseY / this.zoom,
       );
 
+      this.beginZoomGesture();
       this.updateBoard();
     });
 
@@ -212,7 +237,7 @@ export class BoardMainService {
 
       const tileEl = path.find(
         (p): p is HTMLElement => p instanceof HTMLElement &&
-          p.tagName === 'APP-BOARD-NOTE',
+          (p.tagName === 'APP-BOARD-NOTE' || p.tagName === 'APP-BOARD-IMAGE'),
       ) as HTMLElement | undefined;
       const isInsideTileBounds = tileEl
         ? (() => {
@@ -228,7 +253,11 @@ export class BoardMainService {
         isInsideTileBounds ||
         hasTag('APP-BOARD-CONNECTOR') ||
         hasClass('search-window') ||
-        hasTag('APP-NAVBAR')
+        hasTag('APP-NAVBAR') ||
+        // Section frames are pannable background, but their resize handles
+        // and header must not start a board pan.
+        hasClass('resize-handle') ||
+        hasClass('section-header')
       ) {
         return;
       }
@@ -291,7 +320,8 @@ export class BoardMainService {
     // Background-only menu (avoid opening when interacting with UI/tile/connector).
     const tileEl = path.find(
       (p): p is HTMLElement => p instanceof HTMLElement &&
-        (p.tagName === 'APP-BOARD-TILE' || p.tagName === 'APP-BOARD-NOTE'),
+        (p.tagName === 'APP-BOARD-TILE' || p.tagName === 'APP-BOARD-NOTE' ||
+         p.tagName === 'APP-BOARD-IMAGE'),
     ) as HTMLElement | undefined;
     const isInsideTileBounds = tileEl
       ? (() => {
@@ -307,7 +337,8 @@ export class BoardMainService {
       isInsideTileBounds ||
       hasTag('APP-BOARD-CONNECTOR') ||
       hasClass('search-window') ||
-      hasTag('APP-NAVBAR')
+      hasTag('APP-NAVBAR') ||
+      hasClass('section-header')
     ) {
       return;
     }

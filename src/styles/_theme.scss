@@ -3,6 +3,11 @@
 // To support user theming in future, swap these values at runtime on :root.
 
 :root {
+  // ── Default ─────────────────────────────────────────────────────────────
+  // General-purpose colors until proper theming lands.
+  --bp-default:       rgba(255, 255, 255, 0.65);  // lines / decorations
+  --bp-default-bg:    rgba(255, 255, 255, 0.08);  // translucent whitish fill (sections etc.)
+
   // ── Accent ──────────────────────────────────────────────────────────────
   --bp-amber:         #ffd54f;
   --bp-amber-dim:     rgba(255, 213, 79, 0.18);

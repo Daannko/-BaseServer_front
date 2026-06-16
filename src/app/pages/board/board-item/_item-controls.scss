@@ -1,0 +1,319 @@
+// Shared styles for board item chrome: controls bar (options / move grip /
+// delete), the options side panel, and resize handles.
+// Used by board-note and board-section components via @import.
+// Expects CSS vars on an ancestor: --tile-w, --tile-h, --board-zoom.
+
+.note-controls-bar {
+  // Base size keeps the controls usable at any zoom (the /zoom term holds a
+  // ~constant on-screen size); the note-size term adds a small bump so bigger
+  // notes get slightly bigger controls.
+  --ctrl-size: clamp(
+    16px,
+    calc(24px / var(--board-zoom, 1) + min(var(--tile-w), var(--tile-h)) * 0.014),
+    96px
+  );
+  position: absolute;
+  bottom: calc(100% + clamp(2px, calc(3px / var(--board-zoom, 1)), 8px));
+  left: 0;
+  right: 0;
+  height: var(--ctrl-size);
+  display: flex;
+  align-items: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-bottom: none;
+  border-radius: calc(var(--tile-w) * 0.02) calc(var(--tile-w) * 0.02) 0 0;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms ease-out;
+
+  &.is-visible {
+    pointer-events: auto;
+    opacity: 1;
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: clamp(-8px, calc(-5px / var(--board-zoom, 1)), -2px);
+    left: -1px;
+    right: -1px;
+    height: clamp(2px, calc(5px / var(--board-zoom, 1)), 8px);
+    border-left: 1px solid transparent;
+    border-right: 1px solid transparent;
+    pointer-events: none;
+  }
+}
+
+.note-controls-move {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-top: clamp(2px, calc(5px / var(--board-zoom, 1)), 10px);
+  cursor: grab;
+  &:active { cursor: grabbing; }
+}
+
+.note-controls-grip {
+  display: block;
+  width: calc(var(--tile-w) * 0.3);
+  height: clamp(2px, calc(3px / var(--board-zoom, 1)), 5px);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.3);
+  transition: background 120ms;
+
+  .note-controls-move:hover & { background: rgba(255, 255, 255, 0.55); }
+}
+
+.note-controls-options {
+  position: absolute;
+  left: 2px;
+  top: 0;
+  height: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  padding: 0;
+  transition: color 150ms, background 150ms;
+
+  app-svg-icon {
+    flex-shrink: 0;
+    width: calc(var(--ctrl-size) * 0.55);
+    height: calc(var(--ctrl-size) * 0.55);
+    display: block;
+    background: currentColor;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+  }
+
+  &:hover,
+  &.active { color: rgba(255, 255, 255, 0.85); background: rgba(255,255,255,0.08); }
+}
+
+.note-options-side-panel {
+  // 1.5× scale: every dimension inside the panel derives from --s.
+  --s: calc(min(var(--tile-w), var(--tile-h)) * 1.5);
+  position: absolute;
+  top: 0;
+  right: calc(100% + 10px);
+  // max-content: size purely from the (--s scaled) content so the panel
+  // keeps the same proportions at any tile size.
+  width: max-content;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: calc(var(--s) * 0.01) 0;
+  box-sizing: border-box;
+  background: rgba(30, 30, 40, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: calc(var(--s) * 0.02);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity 120ms ease-out, transform 120ms ease-out;
+  z-index: 5;
+  white-space: nowrap;
+
+  &.is-open {
+    pointer-events: auto;
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.note-options-section {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: calc(var(--s) * 0.015);
+  padding: calc(var(--s) * 0.012) calc(var(--s) * 0.025);
+
+  & + & {
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  &--stacked {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: calc(var(--s) * 0.012);
+  }
+}
+
+.note-options-section-label {
+  font-size: calc(var(--s) * 0.026);
+  color: rgba(255, 255, 255, 0.4);
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  user-select: none;
+}
+
+.note-options-alpha {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: calc(var(--s) * 0.015);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.note-options-alpha-slider {
+  flex: 1;
+  height: calc(var(--s) * 0.015);
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--track-color, rgba(255,255,255,0.8))
+  ),
+  repeating-conic-gradient(rgba(255,255,255,0.12) 0% 25%, transparent 0% 50%) 0 0 / 8px 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: calc(var(--s) * 0.03);
+    height: calc(var(--s) * 0.03);
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+  &::-moz-range-thumb {
+    width: calc(var(--s) * 0.03);
+    height: calc(var(--s) * 0.03);
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+}
+
+.note-options-width-slider {
+  background: linear-gradient(
+    to right,
+    rgba(255,255,255,0.25),
+    rgba(255,255,255,0.8)
+  ) !important;
+}
+
+.note-options-alpha-value {
+  font-size: calc(var(--s) * 0.025);
+  color: rgba(255,255,255,0.45);
+  min-width: calc(var(--s) * 0.07);
+  text-align: right;
+  user-select: none;
+}
+
+.note-controls-delete {
+  position: absolute;
+  right: 2px;
+  top: 0;
+  height: 100%;
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--tile-w) * 0.02);
+  color: rgba(255, 255, 255, 0.5);
+  cursor: pointer;
+  overflow: hidden;
+  white-space: nowrap;
+  padding: 0;
+  gap: 0;
+  transition: color 150ms, background 150ms, width 200ms;
+
+  app-svg-icon {
+    flex-shrink: 0;
+    width: calc(var(--ctrl-size) * 0.55);
+    height: calc(var(--ctrl-size) * 0.55);
+    display: block;
+    background: currentColor;
+    -webkit-mask-size: contain;
+    -webkit-mask-repeat: no-repeat;
+    -webkit-mask-position: center;
+  }
+
+  .note-controls-delete-label {
+    font-size: clamp(9px, calc(11px / var(--board-zoom, 1)), 14px);
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 0;
+    opacity: 0;
+    flex-shrink: 0;
+    padding-left: 0;
+    transition: max-width 200ms, opacity 150ms 50ms, padding 200ms;
+  }
+
+  &:hover { color: rgba(255, 255, 255, 0.85); background: rgba(255,255,255,0.08); }
+
+  &.confirm {
+    color: var(--bp-danger);
+    aspect-ratio: unset;
+    width: clamp(44px, calc(64px / var(--board-zoom, 1)), 80px);
+
+    .note-controls-delete-label {
+      max-width: clamp(30px, calc(48px / var(--board-zoom, 1)), 60px);
+      opacity: 1;
+      padding-left: clamp(2px, calc(4px / var(--board-zoom, 1)), 6px);
+    }
+  }
+}
+
+// ── Resize handles (created by ItemResizeDirective) ────────────────────────
+.resize-handle {
+  position: absolute;
+  z-index: 50;
+}
+
+.resize-handle--nw,
+.resize-handle--ne,
+.resize-handle--sw,
+.resize-handle--se {
+  width: calc(15px / var(--board-zoom, 1));
+  height: calc(15px / var(--board-zoom, 1));
+}
+
+.resize-handle--nw { cursor: nwse-resize; left: calc(-7px / var(--board-zoom, 1)); top: calc(-7px / var(--board-zoom, 1)); }
+.resize-handle--ne { cursor: nesw-resize; right: calc(-7px / var(--board-zoom, 1)); top: calc(-7px / var(--board-zoom, 1)); }
+.resize-handle--sw { cursor: nesw-resize; left: calc(-7px / var(--board-zoom, 1)); bottom: calc(-7px / var(--board-zoom, 1)); }
+.resize-handle--se { cursor: nwse-resize; right: calc(-7px / var(--board-zoom, 1)); bottom: calc(-7px / var(--board-zoom, 1)); }
+
+.resize-handle--n,
+.resize-handle--s {
+  left: calc(10px / var(--board-zoom, 1));
+  right: calc(10px / var(--board-zoom, 1));
+  height: calc(10px / var(--board-zoom, 1));
+  cursor: ns-resize;
+}
+
+.resize-handle--n { top: calc(-5px / var(--board-zoom, 1)); }
+.resize-handle--s { bottom: calc(-5px / var(--board-zoom, 1)); }
+
+.resize-handle--w,
+.resize-handle--e {
+  top: calc(10px / var(--board-zoom, 1));
+  bottom: calc(10px / var(--board-zoom, 1));
+  width: calc(10px / var(--board-zoom, 1));
+  cursor: ew-resize;
+}
+
+.resize-handle--w { left: calc(-5px / var(--board-zoom, 1)); }
+.resize-handle--e { right: calc(-5px / var(--board-zoom, 1)); }

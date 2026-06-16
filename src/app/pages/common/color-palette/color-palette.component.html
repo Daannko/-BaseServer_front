@@ -1,0 +1,50 @@
+<div
+  class="cp-swatches"
+  [class.cp-grid]="gridColumns !== null"
+  [style.gridTemplateColumns]="gridColumns"
+>
+  <button
+    *ngIf="allowNone"
+    type="button"
+    class="cp-swatch cp-swatch--none"
+    [class.active]="selected === null"
+    (click)="pick(null)"
+    title="None"
+  ></button>
+  <button
+    *ngFor="let color of displayColors"
+    type="button"
+    class="cp-swatch"
+    [class.active]="selected === color"
+    [style.background]="color"
+    (click)="pick(color)"
+    [title]="color"
+  ></button>
+  <label
+    *ngIf="allowCustom"
+    class="cp-swatch cp-swatch--custom"
+    [class.active]="isCustomActive"
+    title="Custom color"
+  >
+    <input
+      type="color"
+      [value]="customHex"
+      (input)="onCustomInput($event)"
+      (change)="onCustomChange($event)"
+    />
+  </label>
+</div>
+
+<div class="cp-alpha" *ngIf="showAlpha && selected !== null">
+  <input
+    type="range"
+    class="cp-alpha-slider"
+    min="0.02"
+    max="1"
+    step="0.01"
+    [value]="alpha"
+    [style.--track-color]="solidColor"
+    (input)="onAlphaInput($event)"
+  />
+  <span class="cp-alpha-value">{{ (alpha * 100).toFixed(0) }}%</span>
+</div>

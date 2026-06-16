@@ -7,10 +7,11 @@ import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TextAlign } from '@tiptap/extension-text-align';
 import { CodeBlock } from '@tiptap/extension-code-block';
-import { FontSize, TextStyle } from '@tiptap/extension-text-style';
+import { BackgroundColor, FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
 import { RichTextService } from '../../../helpers/rich-text.service';
+import { DEFAULT_PALETTE_COLORS } from '../../common/color-palette/color-palette.component';
 
 import {
   PersistentSelection,
@@ -32,18 +33,7 @@ export class TiptapService {
 
   private lastContentSelection: SelectionRange | null = null;
 
-  readonly colors = [
-    '#ffffff',
-    '#e6ebf0',
-    '#ffd54f',
-    '#ff6b6b',
-    '#4ecdc4',
-    '#45b7d1',
-    '#96ceb4',
-    '#dda15e',
-    '#bc6c25',
-    '#111111',
-  ];
+  readonly colors = DEFAULT_PALETTE_COLORS;
 
   readonly fonts = [
     {
@@ -91,6 +81,7 @@ export class TiptapService {
         TextStyle,
         FontSize,
         Color.configure({ types: ['textStyle'] }),
+        BackgroundColor,
         FontFamily,
         Table.configure({ resizable: true }),
         TableRow,
@@ -124,6 +115,15 @@ export class TiptapService {
     });
 
     this.applyDisableTextDrag(this.disableTextDrag);
+  }
+
+  /**
+   * For components that create their own Editor (e.g. board-section's name
+   * editor) but still want currentFont/currentSize tracking for toolbars.
+   * Call from the editor's onFocus/onUpdate/onSelectionUpdate.
+   */
+  trackStyles(editor: Editor) {
+    this.updateCurrentStyles(editor);
   }
 
   destroyEditors() {
@@ -264,6 +264,14 @@ export class TiptapService {
     editor.chain().setMark('textStyle', { color }).run();
   }
 
+  setHighlight(color: string, editor: Editor) {
+    editor.chain().setMark('textStyle', { backgroundColor: color }).run();
+  }
+
+  unsetHighlight(editor: Editor) {
+    editor.chain().setMark('textStyle', { backgroundColor: null }).run();
+  }
+
   setFont(fontFamily: string, editor: Editor) {
     editor.chain().setFontFamily(fontFamily).run();
   }
@@ -351,7 +359,10 @@ export class TiptapService {
 
   adjustFontSize(delta: number, editor: Editor) {
     const current = editor.getAttributes('textStyle')['fontSize'] as string | undefined;
-    const num = parseInt(current ?? '14', 10);
+    // No explicit size → fall back to the note's computed base, which scales
+    // with note size (see --note-font-size), not a fixed 21px.
+    const base = current ?? this.computedSizeAt(editor, editor.state.selection.from);
+    const num = parseInt(base || '21', 10);
     const next = Math.max(1, num + delta);
     this.applyFontSize(String(next), editor);
   }

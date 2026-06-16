@@ -51,6 +51,145 @@
   width: 100%;
 }
 
+// Center cluster of the default board navbar. Row layout: secondary actions
+// on the left, the global search front and center, future controls append
+// after it.
+::ng-deep .board-navbar-controls {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+
+::ng-deep .global-search {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+::ng-deep .global-search-icon {
+  position: absolute;
+  left: 11px;
+  width: 14px !important;
+  height: 14px !important;
+  color: var(--bp-text-muted);
+  pointer-events: none;
+}
+
+::ng-deep .global-search-input {
+  width: 320px;
+  height: 34px;
+  padding: 0 12px 0 34px;
+  box-sizing: border-box;
+  border-radius: 9999px;
+  border: 1px solid var(--bp-border);
+  background: var(--bp-surface-ctrl);
+  color: var(--bp-text);
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 150ms, background 150ms, width 200ms ease-out;
+
+  &::placeholder { color: var(--bp-text-muted); }
+
+  &:focus {
+    border-color: var(--bp-amber-border);
+    background: var(--bp-surface-hi);
+    width: 380px;
+  }
+}
+
+::ng-deep .global-search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 100%;
+  width: 340px;
+  max-height: 320px;
+  overflow-y: auto;
+  background: rgba(30, 30, 40, 0.95);
+  border: 1px solid var(--bp-border);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  z-index: 1001;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+::ng-deep .global-search-result {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 8px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--bp-text);
+  font-size: 0.82rem;
+  text-align: left;
+  cursor: pointer;
+
+  &:hover { background: rgba(255, 255, 255, 0.08); }
+}
+
+::ng-deep .global-search-kind {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--bp-cyan);
+  background: var(--bp-cyan-dim);
+
+  &.is-section {
+    color: var(--bp-amber);
+    background: var(--bp-amber-dim);
+  }
+}
+
+::ng-deep .global-search-snippet {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  flex: 1 1 auto;
+  white-space: nowrap;
+  color: var(--bp-text);
+
+  // Context before the match and the match itself always stay fully visible.
+  .gss-before,
+  .gss-hit {
+    flex: 0 0 auto;
+    white-space: pre;
+  }
+
+  // Trailing text fills the remaining width and clips with an ellipsis.
+  .gss-after {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: pre;
+  }
+
+  .gss-hit {
+    color: var(--bp-amber);
+    background: var(--bp-amber-dim);
+    border-radius: 3px;
+    padding: 0 1px;
+    font-weight: 600;
+  }
+}
+
+::ng-deep .global-search-empty {
+  padding: 10px 8px;
+  font-size: 0.8rem;
+  color: var(--bp-text-muted);
+  text-align: center;
+}
+
 ::ng-deep .board-search-button {
   background: rgb(30, 30, 30);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -145,7 +284,74 @@
   position: absolute;
   inset: 0;
   transform-origin: 0 0;
-  will-change: transform;
+  // `will-change: transform` is applied dynamically by BoardMainService during
+  // zoom gestures only. Keeping it permanent freezes the layer's raster scale,
+  // which leaves content blurry after zooming in.
+}
+
+// Separate stacking contexts: sections can never paint above notes,
+// regardless of their internal z-index values.
+.sections-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 0;
+}
+
+.notes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 1;
+}
+
+.images-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 2;
+}
+
+.snap-guide-line {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+  border-left: 1.5px dashed var(--bp-default);
+
+  &--h {
+    border-left: none;
+    border-top: 1.5px dashed var(--bp-default);
+  }
+}
+
+.snap-guide-rect {
+  position: absolute;
+  border: 1.5px dashed var(--bp-default);
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 1000;
+}
+
+// Original-ratio reference shown while resizing an image. Deliberately subtle.
+.aspect-guide-line {
+  position: absolute;
+  pointer-events: none;
+  z-index: 1000;
+  border-left: 0 dashed rgba(255, 255, 255, 0.3);
+  border-top: 0 dashed rgba(255, 255, 255, 0.3);
+}
+
+.aspect-guide-label {
+  position: absolute;
+  pointer-events: none;
+  user-select: none;
+  z-index: 1001;
+  color: rgba(255, 255, 255, 0.5);
+  font-family: monospace;
+  line-height: 1;
+  white-space: nowrap;
+  background: rgba(20, 20, 28, 0.45);
+  border-radius: 3px;
 }
 
 p {

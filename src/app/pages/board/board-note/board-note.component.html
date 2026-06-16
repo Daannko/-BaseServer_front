@@ -10,6 +10,7 @@
   [minH]="1"
   [zoom]="zoom"
   (rectChange)="onTileWorldRectChange($event)"
+  (resizeEnd)="onResizeEnd()"
   class="board-item"
   [style.--tile-w]="tile.width + 'px'"
   [style.--tile-h]="tile.height + 'px'"
@@ -64,91 +65,26 @@
   >
     <div class="note-options-section note-options-section--stacked">
       <span class="note-options-section-label">Background</span>
-      <div class="note-options-swatches">
-        <button
-          *ngFor="let color of recentBgColors"
-          class="note-options-swatch"
-          [class.active]="noteBgColor === color"
-          [style.background]="color"
-          (click)="setBgColor(color)"
-          [title]="color"
-        ></button>
-        <label
-          class="note-options-swatch note-options-swatch--palette"
-          [class.active]="noteBgColor !== null && !recentBgColors.includes(noteBgColor)"
-          title="Custom color (RGB)"
-        >
-          <input
-            type="color"
-            [value]="customBgColorHex"
-            (input)="onCustomBgColorInput($event)"
-            (change)="onCustomBgColorChange($event)"
-          />
-        </label>
-        <button
-          class="note-options-swatch note-options-swatch--none"
-          [class.active]="noteBgColor === null"
-          (click)="setBgColor(null)"
-          title="No background"
-        ></button>
-      </div>
-      <div class="note-options-alpha" *ngIf="noteBgColor !== null">
-        <input
-          type="range"
-          class="note-options-alpha-slider"
-          min="0.02"
-          max="1"
-          step="0.01"
-          [value]="noteBgAlpha"
-          [style.--track-color]="noteBgSolidColor"
-          (input)="onBgAlphaInput($event)"
-        />
-        <span class="note-options-alpha-value">{{ (noteBgAlpha * 100).toFixed(0) }}%</span>
-      </div>
+      <app-color-palette
+        [colors]="recentBgColors"
+        [selected]="noteBgColor"
+        [allowNone]="true"
+        [showAlpha]="true"
+        (colorChange)="onBgPaletteChange($event)"
+        (colorCommit)="setBgColor($event)"
+      ></app-color-palette>
     </div>
     <div class="note-options-section note-options-section--stacked">
       <span class="note-options-section-label">Border</span>
-      <div class="note-options-swatches">
-        <button
-          *ngFor="let color of recentBorderColors"
-          class="note-options-swatch"
-          [class.active]="noteBorderColor === color"
-          [style.background]="color"
-          (click)="setBorderColor(color)"
-          [title]="color"
-        ></button>
-        <label
-          class="note-options-swatch note-options-swatch--palette"
-          [class.active]="noteBorderColor !== null && !recentBorderColors.includes(noteBorderColor)"
-          title="Custom color (RGB)"
-        >
-          <input
-            type="color"
-            [value]="customBorderColorHex"
-            (input)="onCustomBorderColorInput($event)"
-            (change)="onCustomBorderColorChange($event)"
-          />
-        </label>
-        <button
-          class="note-options-swatch note-options-swatch--none"
-          [class.active]="noteBorderColor === null"
-          (click)="setBorderColor(null)"
-          title="No border"
-        ></button>
-      </div>
-      <div class="note-options-alpha" *ngIf="noteBorderColor !== null">
-        <input
-          type="range"
-          class="note-options-alpha-slider"
-          min="0.02"
-          max="1"
-          step="0.01"
-          [value]="noteBorderAlpha"
-          [style.--track-color]="noteBorderSolidColor"
-          (input)="onBorderAlphaInput($event)"
-        />
-        <span class="note-options-alpha-value">{{ (noteBorderAlpha * 100).toFixed(0) }}%</span>
-      </div>
+      <app-color-palette
+        [colors]="recentBorderColors"
+        [selected]="noteBorderColor"
+        [allowNone]="true"
+        [showAlpha]="true"
+        [customAlpha]="0.6"
+        (colorChange)="onBorderPaletteChange($event)"
+        (colorCommit)="setBorderColor($event)"
+      ></app-color-palette>
       <div class="note-options-alpha note-options-border-width" *ngIf="noteBorderColor !== null">
         <input
           type="range"
@@ -185,6 +121,7 @@
   <div
     class="note-surface"
     [class.is-focused]="isFocused"
+    [class.is-clear]="isClear"
     [style.background]="noteBgColor"
     [style.--note-border-color]="noteBorderColor"
     [style.--note-border-width]="noteBorderWidth + 'px'"
@@ -256,13 +193,13 @@
           </button>
           <div class="color-palette" [class.open]="isColorPaletteVisible">
             <div class="temp"></div>
-            <button
-              *ngFor="let color of tiptap.colors"
-              [style.background-color]="color"
-              (click)="tiptap.setTextColor(color, contentEditor)"
-              [title]="color"
-              class="color-option"
-            ></button>
+            <app-color-palette
+              variant="dropdown"
+              [rows]="2"
+              [swatchCount]="9"
+              [swatchSize]="28"
+              (colorChange)="onTextColorPick($event)"
+            ></app-color-palette>
           </div>
         </div>
         <div
@@ -270,23 +207,19 @@
           (mouseenter)="isBgPaletteVisible = true"
           (mouseleave)="isBgPaletteVisible = false"
         >
-          <button title="Note background">
-            <span class="bg-icon-swatch" [style.background]="noteBgColor ?? 'transparent'"></span>
+          <button title="Text highlight">
+            <app-svg-icon icon="editor-highlight"></app-svg-icon>
           </button>
           <div class="color-palette bg-palette" [class.open]="isBgPaletteVisible">
             <div class="temp"></div>
-            <button
-              class="color-option color-option--none"
-              (click)="setBgColor(null)"
-              title="No background"
-            ></button>
-            <button
-              *ngFor="let color of recentBgColors"
-              [style.background-color]="color"
-              (click)="setBgColor(color)"
-              [title]="color"
-              class="color-option"
-            ></button>
+            <app-color-palette
+              variant="dropdown"
+              [allowNone]="true"
+              [rows]="2"
+              [swatchCount]="8"
+              [swatchSize]="28"
+              (colorChange)="onHighlightPick($event)"
+            ></app-color-palette>
           </div>
         </div>
         <div class="navbar-spacer"></div>
@@ -383,17 +316,6 @@
         </button>
       </div>
 
-      <div class="note-options-panel">
-        <span class="note-options-label">Padding</span>
-        <input
-          type="number"
-          class="note-option-input"
-          [value]="noteOptions.padding ?? ''"
-          placeholder="auto"
-          min="0"
-          (input)="onOptionNumberInput('padding', $event)"
-        />
-      </div>
     </div>
   </ng-template>
 </div>

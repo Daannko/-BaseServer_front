@@ -29,6 +29,13 @@ import {
   ContextMenuItem,
 } from '../common/context-menu/context-menu.component';
 import { StorageService } from '../../service/storage.service';
+import { AspectGuide, BoardSnapService, SnapGuides } from './board-snap.service';
+import { BoardHistoryService } from './board-history.service';
+import { BoardSectionComponent } from './board-section/board-section.component';
+import { BoardSection, SECTION_MARKER } from './board-section/board-section.data';
+import { BoardImageComponent } from './board-image/board-image.component';
+import { BoardImage, IMAGE_MARKER } from './board-image/board-image.data';
+import { extractPlainText } from '../../helpers/rich-text.util';
 
 @Component({
   selector: 'app-board',
@@ -38,6 +45,8 @@ import { StorageService } from '../../service/storage.service';
     NavbarComponent,
     FormsModule,
     BoardNoteComponent,
+    BoardSectionComponent,
+    BoardImageComponent,
     SvgIconComponent,
     ContextMenuComponent,
   ],
@@ -62,6 +71,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   boards$!: Observable<Board[] | null>;
   topics$!: Observable<Topic[] | null>;
+  snapGuides$!: Observable<SnapGuides>;
+  aspectGuide$!: Observable<AspectGuide | null>;
   isSearchOpen = true;
   isCreateOpen = false;
   newBoardName = '';
@@ -73,6 +84,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   notes: BoardNote[] = [];
   notesMap: Map<string, BoardItem> = new Map();
+  sections: BoardSection[] = [];
+  images: BoardImage[] = [];
 
   selectedBoard: Board | null = null;
   private activeNavbarNote: BoardItem | null = null;
@@ -116,9 +129,16 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   private lastWorldX = 0;
   private lastWorldY = 0;
   private zCounter = 1;
+  private sectionZCounter = 1;
 
   bringToFront(tile: BoardItem) {
     tile.zIndex = ++this.zCounter;
+  }
+
+  // Sections stack among themselves; the sections layer always renders
+  // below the notes layer, so they can never cover a note.
+  bringSectionToFront(section: BoardItem) {
+    section.zIndex = ++this.sectionZCounter;
   }
 
   private buildDefaultNavbarContext() {
@@ -158,6 +178,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   private resetState(): void {
     this.notes.length = 0;
     this.notesMap.clear();
+    this.sections.length = 0;
+    this.images.length = 0;
+    this.history.clear();
   }
 
   get isCreateNameValid(): boolean {
@@ -170,9 +193,36 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private mainBoardService: BoardMainService,
     private boardSearchService: BoardApiService,
     private storageSerice: StorageService,
+    private snapService: BoardSnapService,
+    private history: BoardHistoryService,
   ) {
     this.boards$ = this.boardSearchService.boards$;
     this.topics$ = this.boardSearchService.topics$;
+    this.snapGuides$ = this.snapService.guides$;
+    this.aspectGuide$ = this.snapService.aspectGuide$;
+    this.history.onChange = () => this.cdr.detectChanges();
+  }
+
+  // ── Element list mutation helpers (used by history commands) ───────────────
+
+  private addToList(item: BoardItem, list: BoardItem[], map?: Map<string, BoardItem>): void {
+    if (!list.includes(item)) list.push(item);
+    map?.set(item.id, item);
+    this.cdr.detectChanges();
+  }
+
+  private removeFromList(item: BoardItem, list: BoardItem[], map?: Map<string, BoardItem>): void {
+    const i = list.indexOf(item);
+    if (i >= 0) list.splice(i, 1);
+    map?.delete(item.id);
+    this.cdr.detectChanges();
+  }
+
+  private recordCreate(item: BoardItem, list: BoardItem[], map?: Map<string, BoardItem>): void {
+    this.history.push({
+      undo: () => this.removeFromList(item, list, map),
+      redo: () => this.addToList(item, list, map),
+    });
   }
 
   resetNewBoardForm() {
@@ -265,7 +315,13 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         false,
       );
       for (const topic of topics) {
-        this.addBoardNote(topic);
+        if (topic.note === SECTION_MARKER) {
+          this.addBoardSection(topic);
+        } else if (topic.note === IMAGE_MARKER) {
+          this.addBoardImage(topic);
+        } else {
+          this.addBoardNote(topic);
+        }
       }
 
       await Promise.resolve();
@@ -275,6 +331,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         boardRef: this.boardRef,
         viewportRef: this.viewportRef,
         notes: this.notes,
+        sections: this.sections,
+        images: this.images,
         noteComponents: this.noteComponents?.toArray() ?? [],
         cdr: this.cdr,
         onBackgroundMouseDown: () =>
@@ -412,13 +470,143 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @HostListener('window:keydown', ['$event'])
   onGlobalKeydown(event: KeyboardEvent) {
-    const isSave =
-      (event.ctrlKey || event.metaKey) &&
-      (event.key === 's' || event.key === 'S');
-    if (!isSave) return;
+    const mod = event.ctrlKey || event.metaKey;
+    if (mod && (event.key === 's' || event.key === 'S')) {
+      event.preventDefault();
+      this.saveBoard();
+      return;
+    }
+    if (mod && (event.key === 'f' || event.key === 'F')) {
+      event.preventDefault();
+      this.openGlobalSearch();
+      return;
+    }
+    // Undo / redo for board actions. While a text editor is focused, let tiptap
+    // handle Ctrl+Z/Y itself (its keymap fires on the editor) and do nothing here.
+    if (mod && (event.key === 'z' || event.key === 'Z')) {
+      if (isTextEditingActive()) return;
+      event.preventDefault();
+      if (event.shiftKey) this.history.redo();
+      else this.history.undo();
+      return;
+    }
+    if (mod && (event.key === 'y' || event.key === 'Y')) {
+      if (isTextEditingActive()) return;
+      event.preventDefault();
+      this.history.redo();
+    }
+  }
 
-    event.preventDefault();
-    this.saveBoard();
+  // ── Global content search (notes text + section names) ───────────────────
+
+  globalSearchQuery = '';
+  globalSearchOpen = false;
+  globalSearchResults: Array<{
+    item: BoardItem;
+    kind: 'note' | 'section';
+    match: { before: string; hit: string; after: string };
+  }> = [];
+
+  // Extracted plain text per item, invalidated by document reference —
+  // tiptap produces a new JSON object on every edit, so a reference compare
+  // is a correct and cheap dirty check.
+  private searchTextCache = new WeakMap<
+    BoardItem,
+    { src: unknown; raw: string; lower: string }
+  >();
+
+  private itemSearchText(item: BoardItem, doc: unknown): { raw: string; lower: string } {
+    const cached = this.searchTextCache.get(item);
+    if (cached && cached.src === doc) return cached;
+    const raw = extractPlainText(doc as any).replace(/\s+/g, ' ').trim();
+    const entry = { src: doc, raw, lower: raw.toLowerCase() };
+    this.searchTextCache.set(item, entry);
+    return entry;
+  }
+
+  openGlobalSearch() {
+    // Make sure the default navbar (which hosts the search box) is shown.
+    this.navBarService.setTemplate(
+      this.defaultNavbarTemplate,
+      this.buildDefaultNavbarContext(),
+    );
+    this.isSearchOpen = false;
+    this.globalSearchOpen = true;
+    this.cdr.detectChanges();
+    (document.querySelector('.global-search-input') as HTMLInputElement | null)?.focus();
+  }
+
+  closeGlobalSearch() {
+    this.globalSearchOpen = false;
+    this.globalSearchQuery = '';
+    this.globalSearchResults = [];
+  }
+
+  onGlobalSearchInput() {
+    const q = this.globalSearchQuery.trim().toLowerCase();
+    if (!q) {
+      this.globalSearchResults = [];
+      return;
+    }
+
+    const results: typeof this.globalSearchResults = [];
+    const MAX_RESULTS = 8;
+
+    for (const section of this.sections) {
+      if (results.length >= MAX_RESULTS) break;
+      const { raw, lower } = this.itemSearchText(section, section.name);
+      const idx = lower.indexOf(q);
+      if (idx >= 0) {
+        results.push({ item: section, kind: 'section', match: this.searchMatch(raw, idx, q.length) });
+      }
+    }
+    for (const note of this.notes) {
+      if (results.length >= MAX_RESULTS) break;
+      const { raw, lower } = this.itemSearchText(note, note.content);
+      const idx = lower.indexOf(q);
+      if (idx >= 0) {
+        results.push({ item: note, kind: 'note', match: this.searchMatch(raw, idx, q.length) });
+      }
+    }
+    this.globalSearchResults = results;
+  }
+
+  // A few chars of context before the match (empty if the match is at the
+  // start), the matched text itself (highlighted in the template), and the
+  // full remainder. The trailing text is clipped by the element width in CSS.
+  private searchMatch(
+    text: string,
+    idx: number,
+    matchLen: number,
+  ): { before: string; hit: string; after: string } {
+    const PREFIX = 8;
+    const start = Math.max(0, idx - PREFIX);
+    return {
+      before: (start > 0 ? '…' : '') + text.slice(start, idx),
+      hit: text.slice(idx, idx + matchLen),
+      after: text.slice(idx + matchLen),
+    };
+  }
+
+  goToGlobalResult(result: { item: BoardItem; kind: 'note' | 'section' }) {
+    this.closeGlobalSearch();
+    if (result.kind === 'note') {
+      this.mainBoardService.moveToItem(result.item);
+    } else {
+      this.bringSectionToFront(result.item);
+      result.item.forceToRender = true;
+      this.mainBoardService.centerOnItem(result.item);
+      Promise.resolve().then(() => (result.item.forceToRender = false));
+    }
+    this.cdr.detectChanges();
+  }
+
+  @HostListener('document:mousedown', ['$event'])
+  onDocumentMouseDownForSearch(event: MouseEvent) {
+    if (!this.globalSearchOpen) return;
+    const target = event.target as HTMLElement | null;
+    if (target?.closest('.global-search')) return;
+    this.globalSearchOpen = false;
   }
 
   ngOnInit() {
@@ -447,6 +635,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.ctxMenu.y = req.clientY;
         this.ctxMenu.items = [
           { id: 'create-note', label: 'Create note here' },
+          { id: 'create-section', label: 'Create section here' },
           { id: 'save', label: 'Save board', shortcut: 'Ctrl+S' },
         ];
         this.ctxMenu.visible = true;
@@ -473,6 +662,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       boardRef: this.boardRef,
       viewportRef: this.viewportRef,
       notes: this.notes,
+      sections: this.sections,
+      images: this.images,
       noteComponents: this.noteComponents?.toArray() ?? [],
       cdr: this.cdr,
       zoom: this.zoom,
@@ -499,11 +690,53 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.notesMap.set(note.id, note);
   }
 
+  addBoardSection(topic: Topic) {
+    const section = BoardSection.fromSectionTopic(topic);
+    this.sections.push(section);
+  }
+
+  addBoardImage(topic: Topic) {
+    const image = BoardImage.fromImageTopic(topic);
+    this.images.push(image);
+  }
+
+  private createSectionAt(worldX: number, worldY: number): void {
+    if (!this.selectedBoard) return;
+
+    const zoom = this.mainBoardService.zoom;
+    const width = 1350 / zoom;
+    const height = 900 / zoom;
+    const section = BoardSection.newSection(
+      worldX - width / 2,
+      worldY - height / 2,
+      width,
+      height,
+    );
+
+    this.sections.push(section);
+    this.bringSectionToFront(section);
+    this.recordCreate(section, this.sections);
+    this.cdr.detectChanges();
+  }
+
+  async onDeleteSection(section: BoardSection): Promise<void> {
+    if (section.serverId) {
+      try {
+        await this.boardSearchService.deleteTopic(section.serverId);
+      } catch {
+        return;
+      }
+    }
+
+    this.recordDelete(section, this.sections);
+    this.removeFromList(section, this.sections);
+  }
+
   private createNoteAt(worldX: number, worldY: number): void {
     if (!this.selectedBoard) return;
 
     const zoom = this.mainBoardService.zoom;
-    const size = 300 / zoom;
+    const size = 450 / zoom;
     const note = BoardNote.newNote(
       worldX - size / 2,
       worldY - size / 2,
@@ -513,6 +746,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     this.notes.push(note);
     this.notesMap.set(note.id, note);
+    this.recordCreate(note, this.notes, this.notesMap);
     this.centerOnItem(note);
 
     Promise.resolve().then(() => {
@@ -521,6 +755,104 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       const noteComp = this.noteComponents?.find(c => c.tile.id === note.id);
       noteComp?.focus();
     });
+  }
+
+  async onDeleteImage(image: BoardImage): Promise<void> {
+    if (image.serverId) {
+      try {
+        await this.boardSearchService.deleteTopic(image.serverId);
+      } catch {
+        return;
+      }
+    }
+    this.recordDelete(image, this.images);
+    this.removeFromList(image, this.images);
+  }
+
+  /** Records an element removal so Ctrl+Z restores it. The restored item loses
+   *  its serverId (the topic was already deleted) and is marked dirty so the
+   *  next save re-creates it. */
+  private recordDelete(item: BoardItem, list: BoardItem[], map?: Map<string, BoardItem>): void {
+    this.history.push({
+      undo: () => {
+        item.serverId = undefined;
+        item.positionUpdated = true;
+        item.sizeUpdated = true;
+        item.contentUpdated = true;
+        item.nameUpdated = true;
+        this.addToList(item, list, map);
+      },
+      redo: () => this.removeFromList(item, list, map),
+    });
+  }
+
+  // ── Paste image (Ctrl+V) ──────────────────────────────────────────────────
+
+  @HostListener('window:paste', ['$event'])
+  onPaste(event: ClipboardEvent): void {
+    if (!this.selectedBoard) return;
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    for (let i = 0; i < items.length; i++) {
+      const it = items[i];
+      if (it.kind === 'file' && it.type.startsWith('image/')) {
+        const file = it.getAsFile();
+        if (!file) continue;
+        event.preventDefault();
+        const reader = new FileReader();
+        reader.onload = () => {
+          const src = reader.result as string;
+          if (src) this.addImageFromSrc(src);
+        };
+        reader.readAsDataURL(file);
+        return;
+      }
+    }
+  }
+
+  /** Create an image element from a data URL, sized from its natural dimensions
+   *  and placed at the center of the current viewport. */
+  private addImageFromSrc(src: string): void {
+    if (!this.selectedBoard) return;
+
+    const probe = new Image();
+    probe.onload = () => {
+      const MAX_SCREEN = 600;
+      let sw = probe.naturalWidth || 400;
+      let sh = probe.naturalHeight || 300;
+      if (sw > MAX_SCREEN || sh > MAX_SCREEN) {
+        const k = Math.min(MAX_SCREEN / sw, MAX_SCREEN / sh);
+        sw *= k;
+        sh *= k;
+      }
+
+      const zoom = this.mainBoardService.zoom;
+      const worldW = sw / zoom;
+      const worldH = sh / zoom;
+
+      const board = this.boardRef.nativeElement as HTMLElement;
+      const rect = board.getBoundingClientRect();
+      const center = this.screenToWorld(
+        rect.left + rect.width / 2,
+        rect.top + rect.height / 2,
+      );
+
+      const image = BoardImage.newImage(
+        center.x - worldW / 2,
+        center.y - worldH / 2,
+        worldW,
+        worldH,
+        src,
+      );
+      image.setNatural(probe.naturalWidth, probe.naturalHeight);
+
+      this.images.push(image);
+      this.bringToFront(image);
+      this.recordCreate(image, this.images);
+      this.cdr.detectChanges();
+    };
+    probe.src = src;
   }
 
   async onDeleteNote(tile: BoardItem): Promise<void> {
@@ -532,9 +864,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       }
     }
 
-    this.notes = this.notes.filter(n => n.id !== tile.id);
-    this.notesMap.delete(tile.id);
-    this.cdr.detectChanges();
+    this.recordDelete(tile, this.notes, this.notesMap);
+    this.removeFromList(tile, this.notes, this.notesMap);
   }
 
   private screenToWorld(
@@ -554,11 +885,22 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.selectedBoard) return;
 
     const boardId = this.selectedBoard.id;
-    const tilesToCreate = this.notes.filter((t) => !t.serverId);
+    const allItems: BoardItem[] = [...this.notes, ...this.sections, ...this.images];
+    const tilesToCreate = allItems.filter((t) => !t.serverId);
 
     if (tilesToCreate.length > 0) {
       const createdTopics = await Promise.all(
-        tilesToCreate.map((t) => this.boardSearchService.createTopic(t, boardId)),
+        tilesToCreate.map((t) =>
+          this.boardSearchService.createTopic(
+            t,
+            boardId,
+            t instanceof BoardSection
+              ? SECTION_MARKER
+              : t instanceof BoardImage
+                ? IMAGE_MARKER
+                : '__note__',
+          ),
+        ),
       );
       for (let i = 0; i < createdTopics.length; i++) {
         const created = createdTopics[i];
@@ -568,7 +910,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     await Promise.all(
-      this.notes.filter(t => Boolean(t.serverId)).map(t => this.boardSearchService.saveTopic(t)),
+      allItems.filter(t => Boolean(t.serverId)).map(t => this.boardSearchService.saveTopic(t)),
     );
   }
 
@@ -586,9 +928,24 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       case 'create-note':
         this.createNoteAt(this.lastWorldX, this.lastWorldY);
         return;
+      case 'create-section':
+        this.createSectionAt(this.lastWorldX, this.lastWorldY);
+        return;
       default:
         console.log(item.label);
         return;
     }
   }
+}
+
+/** True when focus is in a text field / rich-text editor, so Ctrl+Z/Y should be
+ *  handled by that editor rather than the board history. */
+function isTextEditingActive(): boolean {
+  const el = document.activeElement as HTMLElement | null;
+  return (
+    !!el &&
+    (el.isContentEditable ||
+      el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA')
+  );
 }

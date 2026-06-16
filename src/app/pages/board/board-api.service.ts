@@ -194,7 +194,11 @@ export class BoardApiService {
     }
   }
 
-  async createTopic(topic: BoardItem, boardId: string): Promise<Topic | null> {
+  async createTopic(
+    topic: BoardItem,
+    boardId: string,
+    note: string = '__note__',
+  ): Promise<Topic | null> {
     const payload: CreateTopic = {
       boardId,
       title: topic.name,
@@ -203,7 +207,7 @@ export class BoardApiService {
       y: topic.y,
       width: topic.width,
       height: topic.height,
-      note: '__note__',
+      note,
     };
     const createTopicUrl = `${this.apiUrl}/topic`;
     try {

@@ -1,0 +1,75 @@
+<div
+  class="board-item"
+  boardItemResize
+  [rect]="{
+    x: tile.x,
+    y: tile.y,
+    width: tile.width,
+    height: tile.height,
+  }"
+  [minW]="20"
+  [minH]="20"
+  [zoom]="zoom"
+  [lockCornerAspect]="true"
+  (rectChange)="onRectChange($event)"
+  (resizeEnd)="onResizeEnd()"
+>
+  <!-- controls bar: options + delete, appears when focused -->
+  <div class="note-controls-bar" [class.is-visible]="isFocused">
+    <button
+      class="note-controls-options"
+      [class.active]="isOptionsPanelOpen"
+      (mousedown)="$event.stopPropagation()"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="isOptionsPanelOpen = !isOptionsPanelOpen"
+      title="Image options"
+    >
+      <app-svg-icon icon="options"></app-svg-icon>
+    </button>
+    <button
+      class="note-controls-delete"
+      [class.confirm]="deleteConfirmPending"
+      (mousedown)="$event.stopPropagation()"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="onDeleteClick($event)"
+      title="Delete image"
+    >
+      <span class="note-controls-delete-label">Delete?</span>
+      <app-svg-icon icon="close-x"></app-svg-icon>
+    </button>
+  </div>
+
+  <!-- options side panel -->
+  <div
+    class="note-options-side-panel"
+    [class.is-open]="isOptionsPanelOpen && isFocused"
+    (mousedown)="$event.stopPropagation()"
+    (pointerdown)="$event.stopPropagation()"
+  >
+    <div class="note-options-section">
+      <button class="image-option-button" (click)="resetRatio()">
+        Reset ratio
+      </button>
+    </div>
+  </div>
+
+  <!-- the image surface; draggable to move, image stretches to fill it -->
+  <div
+    class="image-surface"
+    boardItemMove=""
+    [pos]="{ x: tile.x, y: tile.y }"
+    [zoom]="zoom"
+    (posChange)="onPosChange($event)"
+    (moveStart)="onMoveStart()"
+    (moveEnd)="onMoveEnd()"
+    (click)="onSurfaceClick()"
+  >
+    <img
+      class="image-content"
+      [src]="tile.src"
+      (load)="onImgLoad($event)"
+      draggable="false"
+      alt=""
+    />
+  </div>
+</div>

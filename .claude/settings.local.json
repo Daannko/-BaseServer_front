@@ -24,7 +24,14 @@
       "mcp__playwright__browser_run_code_unsafe",
       "Bash(Get-ChildItem -Path \"D:\\\\BaseServer_front\\\\src\\\\app\\\\pages\\\\board\" -Recurse -File)",
       "Bash(Select-Object FullName)",
-      "Bash(Sort-Object FullName)"
+      "Bash(Sort-Object FullName)",
+      "PowerShell(npx tsc -p tsconfig.app.json --noEmit)",
+      "PowerShell(npx ng build --configuration development 2>$null | Select-Object -Last 5)",
+      "PowerShell(Remove-Item *)",
+      "PowerShell(npx ng build --configuration development 2>$null | Select-Object -Last 3; Test-Path dist\\\\base-server-app\\\\browser\\\\assets\\\\board_icons\\\\editor-highlight.svg)",
+      "PowerShell(npx ng build --configuration development 2>$null | Select-Object -Last 4)",
+      "PowerShell(npm start *)",
+      "PowerShell(npx tsc --noEmit -p tsconfig.app.json 2>&1 | Select-Object -First 40)"
     ]
   }
 }

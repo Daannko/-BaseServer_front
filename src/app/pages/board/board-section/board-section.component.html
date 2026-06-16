@@ -1,0 +1,215 @@
+<div
+  class="board-item"
+  boardItemResize
+  [rect]="{
+    x: tile.x,
+    y: tile.y,
+    width: tile.width,
+    height: tile.height,
+  }"
+  [minW]="120"
+  [minH]="80"
+  [zoom]="zoom"
+  (rectChange)="onRectChange($event)"
+  (resizeEnd)="onResizeEnd()"
+>
+  <!-- everything above the frame: name row on top, controls bar below it -->
+  <div class="section-stack">
+  <!-- name: top-left, above the controls -->
+  <div class="section-header" (pointerdown)="$event.stopPropagation()">
+    <div #nameElement class="section-name"></div>
+  </div>
+  <!-- controls bar: appears when focused, sits just above the section -->
+  <div class="note-controls-bar" [class.is-visible]="isFocused">
+    <button
+      class="note-controls-options"
+      [class.active]="isOptionsPanelOpen"
+      (mousedown)="$event.stopPropagation()"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="isOptionsPanelOpen = !isOptionsPanelOpen"
+      title="Section options"
+    >
+      <app-svg-icon icon="options"></app-svg-icon>
+    </button>
+    <div
+      class="note-controls-move"
+      boardItemMove=""
+      [pos]="{ x: tile.x, y: tile.y }"
+      [zoom]="zoom"
+      (posChange)="onPosChange($event)"
+      (moveStart)="onMoveStart()"
+      (moveEnd)="onMoveEnd()"
+      (pointerdown)="$event.stopPropagation()"
+      (mousedown)="$event.stopPropagation()"
+    >
+      <span class="note-controls-grip"></span>
+    </div>
+    <button
+      class="note-controls-delete"
+      [class.confirm]="deleteConfirmPending"
+      (mousedown)="$event.stopPropagation()"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="onDeleteClick($event)"
+      title="Delete section"
+    >
+      <span class="note-controls-delete-label">Delete?</span>
+      <app-svg-icon icon="close-x"></app-svg-icon>
+    </button>
+  </div>
+  </div>
+
+  <!-- options side panel: same as notes minus the padding option -->
+  <div
+    class="note-options-side-panel"
+    [class.is-open]="isOptionsPanelOpen && isFocused"
+    (mousedown)="$event.stopPropagation()"
+    (pointerdown)="$event.stopPropagation()"
+  >
+    <div class="note-options-section note-options-section--stacked">
+      <span class="note-options-section-label">Background</span>
+      <app-color-palette
+        [colors]="recentBgColors"
+        [selected]="sectionBgColor"
+        [allowNone]="true"
+        [showAlpha]="true"
+        (colorChange)="onBgPaletteChange($event)"
+        (colorCommit)="setBgColor($event)"
+      ></app-color-palette>
+    </div>
+    <div class="note-options-section note-options-section--stacked">
+      <span class="note-options-section-label">Border</span>
+      <app-color-palette
+        [colors]="recentBorderColors"
+        [selected]="sectionBorderColor"
+        [allowNone]="true"
+        [showAlpha]="true"
+        [customAlpha]="0.6"
+        (colorChange)="onBorderPaletteChange($event)"
+        (colorCommit)="setBorderColor($event)"
+      ></app-color-palette>
+      <div class="note-options-alpha note-options-border-width" *ngIf="sectionBorderColor !== null">
+        <input
+          type="range"
+          class="note-options-alpha-slider note-options-width-slider"
+          min="1"
+          max="12"
+          step="0.5"
+          [value]="sectionBorderWidth"
+          (input)="onBorderWidthInput($event)"
+        />
+        <span class="note-options-alpha-value">{{ sectionBorderWidth }}px</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- the section background itself; board panning passes through it -->
+  <div
+    class="section-frame"
+    [class.is-focused]="isFocused"
+    [style.background]="sectionBgColor"
+    [style.--section-border-color]="sectionBorderColor"
+    [style.--section-border-width]="sectionBorderWidth + 'px'"
+    (click)="onFrameClick()"
+  ></div>
+
+  <ng-template #navbarContentTemplate let-tile="tile">
+    <div class="bar note-bar">
+      <div class="navbar-tile-controls">
+        <div class="selector-group">
+          <app-query-select
+            [options]="tiptap.fonts"
+            labelKey="name"
+            valueKey="name"
+            placeholder="Font"
+            title="Font family"
+            variant="text"
+            [allowCustom]="false"
+            [displayValue]="tiptap.currentFont"
+            (commit)="tiptap.applyFont($event, editor)"
+            style="--qs-width: 120px"
+          ></app-query-select>
+          <app-query-select
+            [options]="tiptap.fontSizes"
+            labelKey="name"
+            valueKey="value"
+            placeholder="Size"
+            title="Font size"
+            variant="number"
+            [numbersOnly]="true"
+            [alwaysShowAll]="true"
+            [displayValue]="tiptap.currentSize"
+            (commit)="tiptap.applyFontSize($event, editor)"
+            style="--qs-width: 52px"
+          ></app-query-select>
+          <button
+            (mousedown)="$event.preventDefault()"
+            (click)="tiptap.adjustFontSize(-1, editor)"
+            title="Decrease font size"
+          >
+            <app-svg-icon icon="font-size-down"></app-svg-icon>
+          </button>
+          <button
+            (mousedown)="$event.preventDefault()"
+            (click)="tiptap.adjustFontSize(1, editor)"
+            title="Increase font size"
+          >
+            <app-svg-icon icon="font-size-up"></app-svg-icon>
+          </button>
+        </div>
+        <div class="navbar-spacer"></div>
+        <div
+          class="color-picker-container"
+          (mouseenter)="isColorPaletteVisible = true"
+          (mouseleave)="isColorPaletteVisible = false"
+        >
+          <button title="Text color">
+            <app-svg-icon icon="editor-textcolor"></app-svg-icon>
+          </button>
+          <div class="color-palette" [class.open]="isColorPaletteVisible">
+            <div class="temp"></div>
+            <app-color-palette
+              variant="dropdown"
+              [rows]="2"
+              [swatchCount]="9"
+              [swatchSize]="28"
+              (colorChange)="onTextColorPick($event)"
+            ></app-color-palette>
+          </div>
+        </div>
+        <div
+          class="color-picker-container"
+          (mouseenter)="isHighlightPaletteVisible = true"
+          (mouseleave)="isHighlightPaletteVisible = false"
+        >
+          <button title="Text highlight">
+            <app-svg-icon icon="editor-highlight"></app-svg-icon>
+          </button>
+          <div class="color-palette bg-palette" [class.open]="isHighlightPaletteVisible">
+            <div class="temp"></div>
+            <app-color-palette
+              variant="dropdown"
+              [allowNone]="true"
+              [rows]="2"
+              [swatchCount]="8"
+              [swatchSize]="28"
+              (colorChange)="onHighlightPick($event)"
+            ></app-color-palette>
+          </div>
+        </div>
+        <div class="navbar-spacer"></div>
+        <button (click)="tiptap.toggleBold(editor)" title="Bold">
+          <app-svg-icon icon="editor-bold"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleItalic(editor)" title="Italic">
+          <app-svg-icon icon="editor-italic"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleUnderline(editor)" title="Underline">
+          <app-svg-icon icon="editor-underline"></app-svg-icon>
+        </button>
+        <button (click)="tiptap.toggleStrikethrough(editor)" title="Strikethrough">
+          <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
+        </button>
+      </div>
+    </div>
+  </ng-template>
+</div>

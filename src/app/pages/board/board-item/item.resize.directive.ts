@@ -28,8 +28,12 @@ export class ItemResizeDirective implements OnInit, OnDestroy {
   @Input() minW = 160;
   @Input() minH = 120;
   @Input({ required: true }) zoom = 1;
+  /** When true, corner handles keep the item's current aspect ratio (uniform
+   *  scale); edge handles still stretch one axis freely. */
+  @Input() lockCornerAspect = false;
 
   @Output() rectChange = new EventEmitter<ItemRect>();
+  @Output() resizeEnd = new EventEmitter<void>();
 
   private handles: HTMLElement[] = [];
   private cleanup: Array<() => void> = [];
@@ -113,6 +117,19 @@ export class ItemResizeDirective implements OnInit, OnDestroy {
         if (hasN) y = start.y + (start.height - h);
       }
 
+      // Corner drag with aspect lock: scale uniformly from the item's current
+      // ratio, driven by whichever axis the user pulled further, then re-anchor
+      // to the fixed (opposite) corner.
+      const isCorner = (hasE || hasW) && (hasN || hasS);
+      if (this.lockCornerAspect && isCorner && start.width > 0 && start.height > 0) {
+        let scale = Math.max(w / start.width, h / start.height);
+        scale = Math.max(scale, this.minW / start.width, this.minH / start.height);
+        w = start.width * scale;
+        h = start.height * scale;
+        x = hasW ? start.x + start.width - w : start.x;
+        y = hasN ? start.y + start.height - h : start.y;
+      }
+
       const next: ItemRect = {
         x: Math.round(x),
         y: Math.round(y),
@@ -126,6 +143,7 @@ export class ItemResizeDirective implements OnInit, OnDestroy {
     const onUp = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', onUp);
+      this.zone.run(() => this.resizeEnd.emit());
     };
 
     window.addEventListener('pointermove', onMove, { passive: true });

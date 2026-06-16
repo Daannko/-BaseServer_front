@@ -21,6 +21,7 @@ export interface Position {
 export class ItemMoveDirective implements OnInit, OnDestroy {
   @Input({ required: true }) pos!: Position;
   @Input({ required: true }) zoom = 1;
+  @Input() moveDisabled = false;
 
   @Output() posChange = new EventEmitter<Position>();
   @Output() moveStart = new EventEmitter<void>();
@@ -47,6 +48,7 @@ export class ItemMoveDirective implements OnInit, OnDestroy {
         const pev = ev as PointerEvent;
         // Only left mouse button (touch/pen usually report 0)
         if (typeof pev.button === 'number' && pev.button !== 0) return;
+        if (this.moveDisabled) return;
 
         // Ensure the host stays rendered during drag (prevents ngIf virtualization glitches).
         this.zone.run(() => this.moveStart.emit());

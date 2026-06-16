@@ -37,336 +37,9 @@
   overflow: visible;
 }
 
-.note-controls-bar {
-  position: absolute;
-  bottom: calc(100% + clamp(2px, calc(3px / var(--board-zoom, 1)), 8px));
-  left: 0;
-  right: 0;
-  height: clamp(16px, calc(28px / var(--board-zoom, 1)), 44px);
-  display: flex;
-  align-items: center;
-  background: transparent;
-  border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: calc(var(--tile-w) * 0.02) calc(var(--tile-w) * 0.02) 0 0;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms ease-out;
-
-  &.is-visible {
-    pointer-events: auto;
-    opacity: 1;
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    bottom: clamp(-8px, calc(-5px / var(--board-zoom, 1)), -2px);
-    left: -1px;
-    right: -1px;
-    height: clamp(2px, calc(5px / var(--board-zoom, 1)), 8px);
-    border-left: 1px solid transparent;
-    border-right: 1px solid transparent;
-    pointer-events: none;
-  }
-}
-
-.note-controls-move {
-  flex: 1;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-top: clamp(2px, calc(5px / var(--board-zoom, 1)), 10px);
-  cursor: grab;
-  &:active { cursor: grabbing; }
-}
-
-.note-controls-grip {
-  display: block;
-  width: calc(var(--tile-w) * 0.3);
-  height: clamp(2px, calc(3px / var(--board-zoom, 1)), 5px);
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.3);
-  transition: background 120ms;
-
-  .note-controls-move:hover & { background: rgba(255, 255, 255, 0.55); }
-}
-
-.note-controls-options {
-  position: absolute;
-  left: 2px;
-  top: 0;
-  height: 100%;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: 6px;
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  padding: 0;
-  transition: color 150ms, background 150ms;
-
-  app-svg-icon {
-    flex-shrink: 0;
-    width: clamp(10px, calc(14px / (0.5 * var(--board-zoom, 1) + 0.5)), 22px);
-    height: clamp(10px, calc(14px / (0.5 * var(--board-zoom, 1) + 0.5)), 22px);
-    display: block;
-    background: currentColor;
-    -webkit-mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-  }
-
-  &:hover,
-  &.active { color: rgba(255, 255, 255, 0.85); background: rgba(255,255,255,0.08); }
-}
-
-.note-options-side-panel {
-  --s: min(var(--tile-w), var(--tile-h));
-  position: absolute;
-  top: 0;
-  right: calc(100% + 10px);
-  width: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-  padding: calc(var(--s) * 0.01) 0;
-  box-sizing: border-box;
-  background: rgba(30, 30, 40, 0.95);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: calc(var(--s) * 0.02);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
-  opacity: 0;
-  transform: translateX(6px);
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
-  z-index: 5;
-  white-space: nowrap;
-
-  &.is-open {
-    pointer-events: auto;
-    opacity: 1;
-    transform: translateX(0);
-  }
-}
-
-.note-options-section {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: calc(var(--s) * 0.015);
-  padding: calc(var(--s) * 0.012) calc(var(--s) * 0.025);
-
-  & + & {
-    border-top: 1px solid rgba(255, 255, 255, 0.08);
-  }
-
-  &--stacked {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: calc(var(--s) * 0.012);
-  }
-}
-
-.note-options-section-label {
-  font-size: calc(var(--s) * 0.026);
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  user-select: none;
-}
-
-.note-options-alpha {
-  display: flex;
-  flex-direction: row;
-  align-items: center;
-  gap: calc(var(--s) * 0.015);
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.note-options-alpha-slider {
-  flex: 1;
-  height: calc(var(--s) * 0.015);
-  -webkit-appearance: none;
-  appearance: none;
-  border-radius: 9999px;
-  outline: none;
-  cursor: pointer;
-  background: linear-gradient(
-    to right,
-    transparent,
-    var(--track-color, rgba(255,255,255,0.8))
-  ),
-  repeating-conic-gradient(rgba(255,255,255,0.12) 0% 25%, transparent 0% 50%) 0 0 / 8px 8px;
-  border: 1px solid rgba(255,255,255,0.12);
-
-  &::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: calc(var(--s) * 0.03);
-    height: calc(var(--s) * 0.03);
-    border-radius: 50%;
-    background: #fff;
-    border: 1px solid rgba(0,0,0,0.3);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-    cursor: pointer;
-  }
-  &::-moz-range-thumb {
-    width: calc(var(--s) * 0.03);
-    height: calc(var(--s) * 0.03);
-    border-radius: 50%;
-    background: #fff;
-    border: 1px solid rgba(0,0,0,0.3);
-    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
-    cursor: pointer;
-  }
-}
-
-.note-options-width-slider {
-  background: linear-gradient(
-    to right,
-    rgba(255,255,255,0.25),
-    rgba(255,255,255,0.8)
-  ) !important;
-}
-
-.note-options-alpha-value {
-  font-size: calc(var(--s) * 0.025);
-  color: rgba(255,255,255,0.45);
-  min-width: calc(var(--s) * 0.07);
-  text-align: right;
-  user-select: none;
-}
-
-.note-options-swatches {
-  display: flex;
-  flex-direction: row;
-  gap: calc(var(--s) * 0.011);
-  align-items: center;
-}
-
-.note-options-swatch {
-  position: relative;
-  width: calc(var(--s) * 0.045);
-  height: calc(var(--s) * 0.045);
-  flex-shrink: 0;
-  border-radius: calc(var(--s) * 0.01);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  background: transparent;
-  padding: 0;
-  cursor: pointer;
-  transition: border-color 120ms, box-shadow 120ms;
-
-  &:hover { border-color: rgba(255, 255, 255, 0.4); }
-
-  &.active {
-    border-color: var(--bp-amber-border);
-    box-shadow: 0 0 0 2px var(--bp-amber-dim);
-  }
-
-  &--none::before,
-  &--none::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 70%;
-    height: 1px;
-    background: rgba(255, 100, 100, 0.7);
-  }
-  &--none::before { transform: translate(-50%, -50%) rotate(45deg); }
-  &--none::after  { transform: translate(-50%, -50%) rotate(-45deg); }
-
-  &--palette {
-    display: block;
-    overflow: hidden;
-    background: conic-gradient(
-      from 0deg,
-      hsl(0,80%,55%), hsl(45,80%,55%), hsl(90,75%,45%),
-      hsl(150,70%,45%), hsl(200,80%,55%), hsl(260,70%,60%),
-      hsl(310,75%,55%), hsl(360,80%,55%)
-    ) !important;
-    border-color: transparent !important;
-    opacity: 0.85;
-    transition: opacity 120ms, box-shadow 120ms !important;
-
-    &:hover { opacity: 1; }
-    &.active { opacity: 1; box-shadow: 0 0 0 2px var(--bp-amber-dim) !important; }
-
-    input[type='color'] {
-      position: absolute;
-      inset: 0;
-      width: 100%;
-      height: 100%;
-      opacity: 0;
-      border: none;
-      padding: 0;
-      cursor: pointer;
-    }
-  }
-}
-
-.note-controls-delete {
-  position: absolute;
-  right: 2px;
-  top: 0;
-  height: 100%;
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: transparent;
-  border: none;
-  border-radius: calc(var(--tile-w) * 0.02);
-  color: rgba(255, 255, 255, 0.5);
-  cursor: pointer;
-  overflow: hidden;
-  white-space: nowrap;
-  padding: 0;
-  gap: 0;
-  transition: color 150ms, background 150ms, width 200ms;
-
-  app-svg-icon {
-    flex-shrink: 0;
-    width: clamp(10px, calc(14px / (0.5 * var(--board-zoom, 1) + 0.5)), 22px);
-    height: clamp(10px, calc(14px / (0.5 * var(--board-zoom, 1) + 0.5)), 22px);
-    display: block;
-    background: currentColor;
-    -webkit-mask-size: contain;
-    -webkit-mask-repeat: no-repeat;
-    -webkit-mask-position: center;
-  }
-
-  .note-controls-delete-label {
-    font-size: clamp(9px, calc(11px / var(--board-zoom, 1)), 14px);
-    white-space: nowrap;
-    overflow: hidden;
-    max-width: 0;
-    opacity: 0;
-    flex-shrink: 0;
-    padding-left: 0;
-    transition: max-width 200ms, opacity 150ms 50ms, padding 200ms;
-  }
-
-  &:hover { color: rgba(255, 255, 255, 0.85); background: rgba(255,255,255,0.08); }
-
-  &.confirm {
-    color: var(--bp-danger);
-    aspect-ratio: unset;
-    width: clamp(44px, calc(64px / var(--board-zoom, 1)), 80px);
-
-    .note-controls-delete-label {
-      max-width: clamp(30px, calc(48px / var(--board-zoom, 1)), 60px);
-      opacity: 1;
-      padding-left: clamp(2px, calc(4px / var(--board-zoom, 1)), 6px);
-    }
-  }
-}
+// Controls bar, options side panel, swatches, sliders, delete button and
+// resize handles are shared with board-section:
+@import '../board-item/item-controls';
 
 .note-surface {
   position: relative;
@@ -378,7 +51,6 @@
   background: transparent;
   cursor: grab;
   overflow: hidden;
-  will-change: transform;
   transition:
     border-color 120ms ease-out,
     box-shadow 120ms ease-out;
@@ -391,6 +63,25 @@
     border-color: var(--note-border-color, rgba(255, 255, 255, 0.65));
     box-shadow: 0 0 0 3px var(--note-border-glow, rgba(255, 255, 255, 0.15));
     cursor: default;
+  }
+
+  // Empty note with no bg/border set: show a clearly visible dashed outline
+  // so the note doesn't vanish into the canvas.
+  &.is-clear {
+    border-style: dashed;
+    // Scale with note size so the outline stays visible on big notes
+    // (a fixed 2px disappears when the note is large / zoomed out).
+    border-width: max(2px, calc(var(--tile-min, 200px) * 0.005));
+    border-color: rgba(255, 255, 255, 0.45);
+
+    &:hover {
+      border-color: rgba(255, 255, 255, 0.6);
+    }
+
+    &.is-focused {
+      border-style: solid;
+      border-color: rgba(255, 255, 255, 0.7);
+    }
   }
 }
 
@@ -413,46 +104,6 @@
 }
 
 
-.resize-handle {
-  position: absolute;
-  z-index: 50;
-}
-
-.resize-handle--nw,
-.resize-handle--ne,
-.resize-handle--sw,
-.resize-handle--se {
-  width: calc(15px / var(--board-zoom, 1));
-  height: calc(15px / var(--board-zoom, 1));
-}
-
-.resize-handle--nw { cursor: nwse-resize; left: calc(-7px / var(--board-zoom, 1)); top: calc(-7px / var(--board-zoom, 1)); }
-.resize-handle--ne { cursor: nesw-resize; right: calc(-7px / var(--board-zoom, 1)); top: calc(-7px / var(--board-zoom, 1)); }
-.resize-handle--sw { cursor: nesw-resize; left: calc(-7px / var(--board-zoom, 1)); bottom: calc(-7px / var(--board-zoom, 1)); }
-.resize-handle--se { cursor: nwse-resize; right: calc(-7px / var(--board-zoom, 1)); bottom: calc(-7px / var(--board-zoom, 1)); }
-
-.resize-handle--n,
-.resize-handle--s {
-  left: calc(10px / var(--board-zoom, 1));
-  right: calc(10px / var(--board-zoom, 1));
-  height: calc(10px / var(--board-zoom, 1));
-  cursor: ns-resize;
-}
-
-.resize-handle--n { top: calc(-5px / var(--board-zoom, 1)); }
-.resize-handle--s { bottom: calc(-5px / var(--board-zoom, 1)); }
-
-.resize-handle--w,
-.resize-handle--e {
-  top: calc(10px / var(--board-zoom, 1));
-  bottom: calc(10px / var(--board-zoom, 1));
-  width: calc(10px / var(--board-zoom, 1));
-  cursor: ew-resize;
-}
-
-.resize-handle--w { left: calc(-5px / var(--board-zoom, 1)); }
-.resize-handle--e { right: calc(-5px / var(--board-zoom, 1)); }
-
 ::ng-deep .pm-persistent-selection {
   background: rgba(180, 213, 255, 0.65);
 }
@@ -461,25 +112,6 @@
   flex-direction: column !important;
   align-items: center;
   gap: 4px;
-}
-
-::ng-deep .note-options-panel {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px;
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
-  width: 100%;
-  box-sizing: border-box;
-  justify-content: center;
-}
-
-::ng-deep .note-options-label {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  letter-spacing: 0.5px;
-  text-transform: uppercase;
-  user-select: none;
 }
 
 ::ng-deep .note-option-input {
@@ -521,6 +153,14 @@
     margin: 0 0 4px !important;
   }
 
+  // Base text size scales with the note (see --note-font-size). Set here on
+  // the real .tiptap/.ProseMirror selector — the :global(...) block below is
+  // an invalid Angular selector and gets dropped by the browser.
+  .tiptap,
+  .ProseMirror {
+    font-size: var(--note-font-size, 21px);
+  }
+
   :global(.ProseMirror),
   :global(.tiptap) {
     min-height: 100%;
@@ -533,7 +173,7 @@
   :global(.tiptap) {
     outline: none;
     color: rgba(255, 255, 255, 0.86);
-    font-size: 14px;
+    font-size: var(--note-font-size, 21px);
     line-height: 1.4;
 
     span[style*="font-size"] {
@@ -723,8 +363,6 @@
   padding: 8px;
   display: none;
   z-index: 1000;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 6px;
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   top: calc(100% + 8px);
@@ -734,39 +372,7 @@
 }
 
 ::ng-deep .color-palette.open {
-  display: grid;
-}
-
-::ng-deep .bg-icon-swatch {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  flex-shrink: 0;
-}
-
-::ng-deep .color-option--none {
-  position: relative;
-  width: 22px;
-  height: 22px;
-  border-radius: 3px;
-  border: 1px solid rgba(255, 255, 255, 0.2) !important;
-  background: transparent !important;
-
-  &::before,
-  &::after {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    width: 70%;
-    height: 1px;
-    background: rgba(255, 100, 100, 0.8);
-    transform-origin: center;
-  }
-  &::before { transform: translate(-50%, -50%) rotate(45deg); }
-  &::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+  display: block;
 }
 
 ::ng-deep .temp {

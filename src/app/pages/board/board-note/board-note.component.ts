@@ -18,9 +18,12 @@ import { FormsModule } from '@angular/forms';
 import type { Editor } from '@tiptap/core';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
 import { QuerySelectComponent } from '../../common/query-select/query-select.component';
+import { ColorPaletteComponent } from '../../common/color-palette/color-palette.component';
 import { ItemRect, ItemResizeDirective } from '../board-item/item.resize.directive';
 import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
 import { TiptapService } from '../board-item/tiptap.service';
+import { BoardSnapService } from '../board-snap.service';
+import { BoardHistoryService } from '../board-history.service';
 
 @Component({
   selector: 'app-board-note',
@@ -30,6 +33,7 @@ import { TiptapService } from '../board-item/tiptap.service';
     FormsModule,
     SvgIconComponent,
     QuerySelectComponent,
+    ColorPaletteComponent,
     ItemResizeDirective,
     ItemMoveDirective,
   ],
@@ -76,6 +80,11 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
 
   @HostBinding('style.--board-zoom') get boardZoomVar() {
     return String(this.zoom);
+  }
+
+  // Frozen at note creation (see BoardNote.fontSize); resizing won't rescale it.
+  @HostBinding('style.--note-font-size') get noteFontSize() {
+    return `${(this.tile as BoardNote).fontSize ?? 42}px`;
   }
 
   @HostBinding('style.--note-pad-v') get notePadV() {
@@ -130,31 +139,24 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     }
   }
 
-  private static readonly CUSTOM_BG_ALPHA = 0.13;
-
-  get customBgColorHex(): string {
-    const match = this.noteBgColor?.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-    if (!match) return '#ffffff';
-    const toHex = (n: string) => Math.min(255, parseInt(n, 10)).toString(16).padStart(2, '0');
-    return `#${toHex(match[1])}${toHex(match[2])}${toHex(match[3])}`;
+  onBgPaletteChange(color: string | null): void {
+    (this.tile as BoardNote).bgColor = color;
   }
 
-  get noteBgAlpha(): number {
-    const match = this.noteBgColor?.match(/rgba?\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
-    return match ? parseFloat(match[1]) : BoardNoteComponent.CUSTOM_BG_ALPHA;
+  onBorderPaletteChange(color: string | null): void {
+    (this.tile as BoardNote).borderColor = color;
   }
 
-  onBgAlphaInput(event: Event): void {
-    if (!this.noteBgColor) return;
-    const alpha = parseFloat((event.target as HTMLInputElement).value);
-    const match = this.noteBgColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (!match) return;
-    (this.tile as BoardNote).bgColor = `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${alpha})`;
+  onTextColorPick(color: string | null): void {
+    if (color !== null) this.tiptap.setTextColor(color, this.contentEditor);
   }
 
-  get noteBgSolidColor(): string {
-    const match = this.noteBgColor?.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    return match ? `rgb(${match[1]}, ${match[2]}, ${match[3]})` : 'rgb(255,255,255)';
+  onHighlightPick(color: string | null): void {
+    if (color === null) {
+      this.tiptap.unsetHighlight(this.contentEditor);
+    } else {
+      this.tiptap.setHighlight(color, this.contentEditor);
+    }
   }
 
   get noteBorderWidth(): number {
@@ -165,22 +167,13 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     (this.tile as BoardNote).borderWidth = parseFloat((event.target as HTMLInputElement).value);
   }
 
-  get noteBorderAlpha(): number {
-    const match = this.noteBorderColor?.match(/rgba?\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)/);
-    return match ? parseFloat(match[1]) : 0.6;
-  }
-
-  onBorderAlphaInput(event: Event): void {
-    if (!this.noteBorderColor) return;
-    const alpha = parseFloat((event.target as HTMLInputElement).value);
-    const match = this.noteBorderColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    if (!match) return;
-    (this.tile as BoardNote).borderColor = `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${alpha})`;
-  }
-
-  get noteBorderSolidColor(): string {
-    const match = this.noteBorderColor?.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-    return match ? `rgb(${match[1]}, ${match[2]}, ${match[3]})` : 'rgb(255,255,255)';
+  /** Clear = no background, no border color, no text. Gets a visible outline so it stays findable. */
+  get isClear(): boolean {
+    return (
+      this.noteBgColor === null &&
+      this.noteBorderColor === null &&
+      (this.tiptap.contentEditor?.isEmpty ?? true)
+    );
   }
 
   get noteBorderGlow(): string | null {
@@ -188,46 +181,6 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     if (!match) return null;
     const alpha = Math.min(1, parseFloat(match[4] ?? '1') * 0.28);
     return `rgba(${match[1]}, ${match[2]}, ${match[3]}, ${alpha})`;
-  }
-
-  get customBorderColorHex(): string {
-    const match = this.noteBorderColor?.match(/rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
-    if (!match) return '#ffffff';
-    const toHex = (n: string) => Math.min(255, parseInt(n, 10)).toString(16).padStart(2, '0');
-    return `#${toHex(match[1])}${toHex(match[2])}${toHex(match[3])}`;
-  }
-
-  onCustomBorderColorInput(event: Event): void {
-    const alpha = this.noteBorderAlpha;
-    const hex = (event.target as HTMLInputElement).value;
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    (this.tile as BoardNote).borderColor = `rgba(${r}, ${g}, ${b}, ${alpha})`;
-  }
-
-  onCustomBorderColorChange(event: Event): void {
-    const alpha = this.noteBorderAlpha;
-    const hex = (event.target as HTMLInputElement).value;
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    this.setBorderColor(`rgba(${r}, ${g}, ${b}, ${alpha})`);
-  }
-
-  private hexToRgba(hex: string): string {
-    const r = parseInt(hex.slice(1, 3), 16);
-    const g = parseInt(hex.slice(3, 5), 16);
-    const b = parseInt(hex.slice(5, 7), 16);
-    return `rgba(${r}, ${g}, ${b}, ${BoardNoteComponent.CUSTOM_BG_ALPHA})`;
-  }
-
-  onCustomBgColorInput(event: Event): void {
-    (this.tile as BoardNote).bgColor = this.hexToRgba((event.target as HTMLInputElement).value);
-  }
-
-  onCustomBgColorChange(event: Event): void {
-    this.setBgColor(this.hexToRgba((event.target as HTMLInputElement).value));
   }
 
   private navbarPinned = false;
@@ -238,7 +191,15 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   constructor(
     private host: ElementRef<HTMLElement>,
     public tiptap: TiptapService,
+    private snap: BoardSnapService,
+    private history: BoardHistoryService,
   ) {}
+
+  // Rect snapshot at the start of a move/resize gesture, for history.
+  private gestureBefore: { x: number; y: number; width: number; height: number } | null = null;
+  private rectSnapshot() {
+    return { x: this.tile.x, y: this.tile.y, width: this.tile.width, height: this.tile.height };
+  }
 
   get contentEditor(): Editor { return this.tiptap.contentEditor!; }
 
@@ -250,29 +211,6 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     this.tiptap.contentEditor?.commands.focus('end');
   }
 
-  @HostListener('wheel', ['$event'])
-  onWheel(event: WheelEvent) {
-    const path = (event.composedPath?.() ?? []) as EventTarget[];
-    const isExempt = path.some(el => el instanceof HTMLElement &&
-      (el.classList.contains('content-editor') || el.classList.contains('note-options-side-panel')));
-    if (isExempt) return;
-
-    event.preventDefault();
-    event.stopPropagation();
-
-    const factor = event.deltaY < 0 ? 1.1 : 0.9;
-    const newW = Math.max(1, this.tile.width * factor);
-    const newH = Math.max(1, this.tile.height * factor);
-    const cx = this.tile.x + this.tile.width / 2;
-    const cy = this.tile.y + this.tile.height / 2;
-    this.onTileWorldRectChange({
-      x: cx - newW / 2,
-      y: cy - newH / 2,
-      width: newW,
-      height: newH,
-    });
-  }
-
   @HostListener('document:mousedown', ['$event'])
   onDocumentMouseDown(ev: MouseEvent) {
     const path = (ev.composedPath?.() ?? []) as EventTarget[];
@@ -280,6 +218,17 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     this.isFocused = false;
     this.isOptionsPanelOpen = false;
     this.navbarPinned = false;
+    // Clear any text selection anchored in this note. Background panning
+    // calls preventDefault(), so the browser never clears it on its own —
+    // and a lingering selection would re-pin the note navbar on mouseup.
+    const selection = window.getSelection();
+    if (
+      selection &&
+      this.contentElement?.nativeElement?.contains(selection.anchorNode)
+    ) {
+      selection.removeAllRanges();
+      this.tiptap.clearSelectionHighlight();
+    }
     if (!this.isDraggingTile && !this.tiptap.hasActiveSelection) {
       this.tile.forceToRender = false;
     }
@@ -303,14 +252,17 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
       }
     };
 
-    document.addEventListener('mouseup', () => {
+    const onDocumentMouseUp = () => {
       const selection = window.getSelection();
       if (selection && selection.toString().length > 0) {
         if (contentRoot.contains(selection.anchorNode)) {
           this.requestNavbar(this.navbarContentTemplate);
         }
       }
-    });
+    };
+    document.addEventListener('mouseup', onDocumentMouseUp);
+    this.removeDocumentMouseUp = () =>
+      document.removeEventListener('mouseup', onDocumentMouseUp);
 
     contentRoot.addEventListener('mousemove', (e: MouseEvent) => {
       const el = (e.target as HTMLElement) || null;
@@ -331,16 +283,33 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   }
 
   onTileWorldRectChange(r: ItemRect) {
-    this.tile.x = r.x; this.tile.y = r.y;
-    this.tile.width = r.width; this.tile.height = r.height;
+    const prev: ItemRect = {
+      x: this.tile.x,
+      y: this.tile.y,
+      width: this.tile.width,
+      height: this.tile.height,
+    };
+    if (!this.gestureBefore) this.gestureBefore = prev;
+    const s = this.snap.snapResize(r, prev, this.tile.id);
+    this.tile.x = s.x; this.tile.y = s.y;
+    this.tile.width = s.width; this.tile.height = s.height;
   }
 
   onTileWorldPosChange(p: Position) {
-    this.tile.x = p.x; this.tile.y = p.y;
+    const s = this.snap.snapMove(
+      { x: p.x, y: p.y, width: this.tile.width, height: this.tile.height },
+      this.tile.id,
+    );
+    this.tile.x = s.x; this.tile.y = s.y;
   }
 
   onDeleteClick(event: MouseEvent) {
     event.stopPropagation();
+    this.triggerDelete();
+  }
+
+  /** Two-step delete: first call arms the confirm ("Delete?"), second deletes. */
+  private triggerDelete() {
     if (this.deleteConfirmPending) {
       clearTimeout(this.deleteConfirmTimeout);
       this.deleteConfirmPending = false;
@@ -351,8 +320,20 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     }
   }
 
+  @HostListener('document:keydown', ['$event'])
+  onKeydown(ev: KeyboardEvent) {
+    if (!this.isFocused) return;
+    if (ev.key !== 'Delete' && ev.key !== 'Backspace') return;
+    if (isTextEditingActive()) return;
+    ev.preventDefault();
+    this.triggerDelete();
+  }
+
+  private removeDocumentMouseUp?: () => void;
+
   ngOnDestroy() {
     clearTimeout(this.deleteConfirmTimeout);
+    this.removeDocumentMouseUp?.();
     this.resizeObserver?.disconnect();
     this.tiptap.destroyEditors();
   }
@@ -364,10 +345,33 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     this.navbarChange.emit({ template, context: { tile: this.tile } });
   }
 
-  onMoveStart() { this.isDraggingTile = true; this.tile.forceToRender = true; }
+  onMoveStart() {
+    this.isDraggingTile = true;
+    this.tile.forceToRender = true;
+    this.gestureBefore = this.rectSnapshot();
+  }
   onMoveEnd() {
     this.isDraggingTile = false;
     if (!this.navbarPinned) this.tile.forceToRender = false;
+    this.snap.clearGuides();
+    if (this.gestureBefore) { this.history.pushRect(this.tile, this.gestureBefore); this.gestureBefore = null; }
   }
 
+  onResizeEnd() {
+    this.snap.clearGuides();
+    if (this.gestureBefore) { this.history.pushRect(this.tile, this.gestureBefore); this.gestureBefore = null; }
+  }
+
+}
+
+/** True when focus is in a text field / rich-text editor, so Delete/Backspace
+ *  should edit text rather than remove the board element. */
+function isTextEditingActive(): boolean {
+  const el = document.activeElement as HTMLElement | null;
+  return (
+    !!el &&
+    (el.isContentEditable ||
+      el.tagName === 'INPUT' ||
+      el.tagName === 'TEXTAREA')
+  );
 }

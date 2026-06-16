@@ -22,6 +22,45 @@
         >
           <span>Search boards</span>
         </button>
+
+        <div class="global-search" *ngIf="selectedBoard">
+          <app-svg-icon class="global-search-icon" icon="search"></app-svg-icon>
+          <input
+            class="global-search-input"
+            type="text"
+            [(ngModel)]="globalSearchQuery"
+            (ngModelChange)="onGlobalSearchInput()"
+            (focus)="globalSearchOpen = true"
+            (keydown.escape)="closeGlobalSearch()"
+            (keydown.enter)="globalSearchResults.length && goToGlobalResult(globalSearchResults[0])"
+            placeholder="Search notes & sections  (Ctrl+F)"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <div
+            class="global-search-results"
+            *ngIf="globalSearchOpen && globalSearchQuery.trim().length"
+          >
+            <button
+              class="global-search-result"
+              *ngFor="let r of globalSearchResults"
+              type="button"
+              (click)="goToGlobalResult(r)"
+            >
+              <span class="global-search-kind" [class.is-section]="r.kind === 'section'">
+                {{ r.kind === 'section' ? 'Section' : 'Note' }}
+              </span>
+              <span class="global-search-snippet"
+                ><span class="gss-before">{{ r.match.before }}</span
+                ><mark class="gss-hit">{{ r.match.hit }}</mark
+                ><span class="gss-after">{{ r.match.after }}</span
+              ></span>
+            </button>
+            <div class="global-search-empty" *ngIf="!globalSearchResults.length">
+              No matches
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </ng-template>
@@ -180,7 +219,22 @@
     </div>
 
     <div class="board-viewport" #viewport>
-      <div #itemsContainer>
+      <!-- Sections always render below notes (separate stacking context) -->
+      <div class="sections-layer">
+        <ng-container *ngFor="let section of sections">
+          <app-board-section
+            [tile]="section"
+            [zoom]="zoom"
+            (mousedown)="bringSectionToFront(section)"
+            (navbarChange)="onNoteNavbarChange($event)"
+            (deleteSection)="onDeleteSection(section)"
+            *ngIf="isItemVisible(section)"
+          >
+          </app-board-section>
+        </ng-container>
+      </div>
+
+      <div #itemsContainer class="notes-layer">
         <ng-container *ngFor="let item of notes">
           <app-board-note
             [tile]="item"
@@ -194,6 +248,71 @@
           </app-board-note>
         </ng-container>
       </div>
+
+      <div class="images-layer">
+        <ng-container *ngFor="let image of images">
+          <app-board-image
+            [tile]="image"
+            [zoom]="zoom"
+            (mousedown)="bringToFront(image)"
+            (deleteImage)="onDeleteImage(image)"
+            *ngIf="isItemVisible(image)"
+          >
+          </app-board-image>
+        </ng-container>
+      </div>
+
+      <!-- Snap alignment guides (world coordinates, drawn during drag/resize) -->
+      <ng-container *ngIf="snapGuides$ | async as guides">
+        <div
+          *ngFor="let l of guides.lines"
+          class="snap-guide-line"
+          [class.snap-guide-line--h]="l.orientation === 'h'"
+          [style.left.px]="l.orientation === 'v' ? l.pos : l.from"
+          [style.top.px]="l.orientation === 'v' ? l.from : l.pos"
+          [style.width.px]="l.orientation === 'v' ? 0 : l.to - l.from"
+          [style.height.px]="l.orientation === 'v' ? l.to - l.from : 0"
+          [style.borderLeftWidth.px]="l.orientation === 'v' ? 1.5 / zoom : 0"
+          [style.borderTopWidth.px]="l.orientation === 'h' ? 1.5 / zoom : 0"
+        ></div>
+        <div
+          *ngFor="let r of guides.rects"
+          class="snap-guide-rect"
+          [style.left.px]="r.x"
+          [style.top.px]="r.y"
+          [style.width.px]="r.width"
+          [style.height.px]="r.height"
+          [style.borderWidth.px]="1.5 / zoom"
+        ></div>
+      </ng-container>
+
+      <!-- Original-ratio reference while resizing an image -->
+      <ng-container *ngIf="aspectGuide$ | async as ag">
+        <div
+          class="aspect-guide-line"
+          [style.left.px]="ag.vLineX"
+          [style.top.px]="ag.vLineTop"
+          [style.height.px]="ag.vLineHeight"
+          [style.borderLeftWidth.px]="1 / zoom"
+        ></div>
+        <div
+          class="aspect-guide-line"
+          [style.left.px]="ag.hLineLeft"
+          [style.top.px]="ag.hLineY"
+          [style.width.px]="ag.hLineWidth"
+          [style.borderTopWidth.px]="1 / zoom"
+        ></div>
+        <div
+          class="aspect-guide-label"
+          [style.left.px]="ag.crossX"
+          [style.top.px]="ag.crossY"
+          [style.fontSize.px]="11 / zoom"
+          [style.padding.px]="3 / zoom"
+          [style.transform]="
+            'translate(' + (5 / zoom) + 'px, ' + (5 / zoom) + 'px)'
+          "
+        >{{ ag.label }}</div>
+      </ng-container>
     </div>
   </div>
 

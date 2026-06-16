@@ -31,6 +31,7 @@ export class SvgIconComponent {
       'editor-indent': 'board_icons/editor-indent.svg',
       'editor-outdent': 'board_icons/editor-outdent.svg',
       'editor-textcolor': 'board_icons/editor-textcolor.svg',
+      'editor-highlight': 'board_icons/editor-highlight.svg',
       'editor-break': 'board_icons/editor-break.svg',
       'editor-paste-text': 'board_icons/editor-paste-text.svg',
       'editor-paste-word': 'board_icons/editor-paste-word.svg',

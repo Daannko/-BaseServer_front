@@ -1,0 +1,78 @@
+// Controls bar, options side panel, swatches, sliders, delete button and
+// resize handles are shared with board-note:
+@import '../board-item/item-controls';
+
+:host {
+  position: absolute;
+  display: block;
+}
+
+.board-item {
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: visible;
+}
+
+// ── Above-frame stack: controls bar on top, name row below it ─────────────
+.section-stack {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  gap: clamp(1px, calc(2px / var(--board-zoom, 1)), 4px);
+  padding-bottom: clamp(1px, calc(2px / var(--board-zoom, 1)), 4px);
+
+  // The shared bar is absolutely positioned for notes; here it lives in the
+  // stack flow so the name row can sit between it and the frame.
+  .note-controls-bar {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    right: auto;
+  }
+}
+
+.section-header {
+  align-self: flex-start;
+  max-width: 100%;
+  cursor: text;
+}
+
+.section-name {
+  color: var(--bp-text-muted);
+  font-size: 27px;
+  white-space: nowrap;
+
+  // ProseMirror DOM is created at runtime — needs ng-deep to be styled.
+  ::ng-deep .ProseMirror {
+    outline: none;
+    min-width: 60px;
+  }
+
+  ::ng-deep p {
+    margin: 0;
+  }
+}
+
+// ── The section background rectangle ──────────────────────────────────────
+.section-frame {
+  position: absolute;
+  inset: 0;
+  border-radius: 12px;
+  box-sizing: border-box;
+  border: var(--section-border-width, 1px) solid var(--section-border-color, transparent);
+
+  &:hover {
+    border-color: var(--section-border-color, var(--bp-border));
+  }
+
+  &.is-focused {
+    border-color: var(--section-border-color, var(--bp-border-hi));
+  }
+}

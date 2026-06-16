@@ -1,0 +1,168 @@
+// Sizing is driven by CSS vars so the palette adapts to its context:
+//  - panel variant scales with the tile (--s, set by the options side panel)
+//  - dropdown variant uses fixed px sizes (navbar)
+:host {
+  display: block;
+  // --cp-base: variant default size; overridable via [swatchSize].
+  // --cp-min/--cp-max: clamp bounds, overridable via [minSwatchSize]/[maxSwatchSize].
+  // No min/max clamp by default — size scales 1:1 with context so the
+  // palette keeps its proportions. [minSwatchSize]/[maxSwatchSize] opt in.
+  --cp-base: calc(var(--s, 400px) * 0.045);
+  --cp-size: clamp(var(--cp-min, 0px), var(--cp-base), var(--cp-max, 9999px));
+  --cp-gap: calc(var(--s, 400px) * 0.011);
+  --cp-radius: calc(var(--s, 400px) * 0.01);
+}
+
+:host(.cp-dropdown) {
+  --cp-base: 22px;
+  --cp-gap: 6px;
+  --cp-radius: 5px;
+}
+
+// Only cap width when swatches free-wrap; a fixed [rows] grid sizes itself.
+:host(.cp-dropdown):not(:has(.cp-grid)) {
+  max-width: 150px;
+}
+
+// When the container itself is styled ([bgColor]/[panelBorderColor]),
+// give it a padded, rounded box look.
+:host(.cp-boxed) {
+  padding: 6px 8px;
+  border-radius: 8px;
+  box-sizing: border-box;
+}
+
+.cp-swatches {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  gap: var(--cp-gap);
+  align-items: center;
+
+  // Panel variant: one row per palette, the panel sizes itself to fit.
+  :host(:not(.cp-dropdown)) & {
+    flex-wrap: nowrap;
+  }
+
+  // Fixed row count requested via [rows]
+  &.cp-grid {
+    display: grid;
+    justify-content: start;
+  }
+}
+
+.cp-swatch {
+  position: relative;
+  width: var(--cp-size);
+  height: var(--cp-size);
+  flex-shrink: 0;
+  border-radius: var(--cp-radius);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 120ms, box-shadow 120ms;
+
+  &:hover { border-color: rgba(255, 255, 255, 0.4); }
+
+  &.active {
+    border-color: var(--bp-amber-border);
+    box-shadow: 0 0 0 2px var(--bp-amber-dim);
+  }
+
+  &--none::before,
+  &--none::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 70%;
+    height: 1px;
+    background: rgba(255, 100, 100, 0.7);
+  }
+  &--none::before { transform: translate(-50%, -50%) rotate(45deg); }
+  &--none::after  { transform: translate(-50%, -50%) rotate(-45deg); }
+
+  &--custom {
+    display: block;
+    overflow: hidden;
+    background: conic-gradient(
+      from 0deg,
+      hsl(0,80%,55%), hsl(45,80%,55%), hsl(90,75%,45%),
+      hsl(150,70%,45%), hsl(200,80%,55%), hsl(260,70%,60%),
+      hsl(310,75%,55%), hsl(360,80%,55%)
+    ) !important;
+    border-color: transparent !important;
+    opacity: 0.85;
+    transition: opacity 120ms, box-shadow 120ms !important;
+
+    &:hover { opacity: 1; }
+    &.active { opacity: 1; box-shadow: 0 0 0 2px var(--bp-amber-dim) !important; }
+
+    input[type='color'] {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      opacity: 0;
+      border: none;
+      padding: 0;
+      cursor: pointer;
+    }
+  }
+}
+
+.cp-alpha {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: calc(var(--s, 400px) * 0.015);
+  width: 100%;
+  box-sizing: border-box;
+  margin-top: calc(var(--s, 400px) * 0.012);
+}
+
+.cp-alpha-slider {
+  flex: 1;
+  height: calc(var(--s, 400px) * 0.015);
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 9999px;
+  outline: none;
+  cursor: pointer;
+  background: linear-gradient(
+    to right,
+    transparent,
+    var(--track-color, rgba(255,255,255,0.8))
+  ),
+  repeating-conic-gradient(rgba(255,255,255,0.12) 0% 25%, transparent 0% 50%) 0 0 / 8px 8px;
+  border: 1px solid rgba(255,255,255,0.12);
+
+  &::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: calc(var(--s, 400px) * 0.03);
+    height: calc(var(--s, 400px) * 0.03);
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+  &::-moz-range-thumb {
+    width: calc(var(--s, 400px) * 0.03);
+    height: calc(var(--s, 400px) * 0.03);
+    border-radius: 50%;
+    background: #fff;
+    border: 1px solid rgba(0,0,0,0.3);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+    cursor: pointer;
+  }
+}
+
+.cp-alpha-value {
+  font-size: calc(var(--s, 400px) * 0.025);
+  color: rgba(255,255,255,0.45);
+  min-width: calc(var(--s, 400px) * 0.07);
+  text-align: right;
+  user-select: none;
+}
