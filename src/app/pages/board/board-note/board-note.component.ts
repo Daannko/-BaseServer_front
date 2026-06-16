@@ -22,6 +22,7 @@ import { ColorPaletteComponent } from '../../common/color-palette/color-palette.
 import { ItemRect, ItemResizeDirective } from '../board-item/item.resize.directive';
 import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
 import { TiptapService } from '../board-item/tiptap.service';
+import { BoardMainService } from '../board-main.service';
 import { BoardSnapService } from '../board-snap.service';
 import { BoardHistoryService } from '../board-history.service';
 import { BoardSelectionService } from '../board-selection.service';
@@ -195,6 +196,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   constructor(
     private host: ElementRef<HTMLElement>,
     public tiptap: TiptapService,
+    private main: BoardMainService,
     private snap: BoardSnapService,
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
@@ -247,7 +249,19 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     });
 
     const contentRoot = this.contentElement.nativeElement as HTMLElement;
-    contentRoot.addEventListener('click', () => {
+    contentRoot.addEventListener('click', (e: MouseEvent) => {
+      // Clicking board-linked text jumps the camera to its target element.
+      const path = (e.composedPath?.() ?? []) as EventTarget[];
+      const linkEl = path.find(
+        (p): p is HTMLElement =>
+          p instanceof HTMLElement && p.hasAttribute('data-board-link'),
+      );
+      const targetId = linkEl?.getAttribute('data-board-link');
+      if (targetId) {
+        e.preventDefault();
+        this.main.navigateToLink(targetId);
+        return;
+      }
       this.isFocused = true;
       this.requestNavbar(this.navbarContentTemplate);
     });

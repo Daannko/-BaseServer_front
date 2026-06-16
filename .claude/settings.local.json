@@ -35,7 +35,8 @@
       "PowerShell(Get-NetTCPConnection *)",
       "mcp__playwright__browser_network_requests",
       "mcp__playwright__browser_network_request",
-      "Read(//tmp/**)"
+      "Read(//tmp/**)",
+      "PowerShell(npm run *)"
     ]
   }
 }

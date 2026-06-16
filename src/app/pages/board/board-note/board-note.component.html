@@ -238,6 +238,16 @@
           <app-svg-icon icon="editor-strikethrough"></app-svg-icon>
         </button>
         <div class="navbar-spacer"></div>
+        <button
+          class="board-link-button"
+          [disabled]="!tiptap.hasActiveSelection"
+          (mousedown)="$event.preventDefault()"
+          (click)="tiptap.beginBoardLink(tile.id)"
+          title="Link selection to a board element (select text first)"
+        >
+          <app-svg-icon icon="editor-link"></app-svg-icon>
+        </button>
+        <div class="navbar-spacer"></div>
         <button (click)="tiptap.toggleQuote(contentEditor)" title="Quote">
           <app-svg-icon icon="editor-quote"></app-svg-icon>
         </button>

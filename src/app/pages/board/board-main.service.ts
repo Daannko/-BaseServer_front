@@ -154,6 +154,22 @@ export class BoardMainService {
     return item.forceToRender || item.inView;
   }
 
+  /** Resolve an element by its board-link targetId. Matches serverId first
+   *  (stable across reloads), then the client id (for not-yet-saved targets). */
+  findItemById(id: string): BoardItem | undefined {
+    if (!id) return undefined;
+    const all = [...this.notes, ...this.sections, ...this.images];
+    return (
+      all.find((i) => i.serverId === id) ?? all.find((i) => i.id === id)
+    );
+  }
+
+  /** Center on the element a board-link points at, if it still exists. */
+  navigateToLink(id: string): void {
+    const item = this.findItemById(id);
+    if (item) this.moveToItem(item);
+  }
+
   centerOnItem(item: BoardItem) {
     if (!this.boardRef) return;
     const board = this.boardRef.nativeElement as HTMLElement;

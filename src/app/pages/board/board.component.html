@@ -369,6 +369,17 @@
           "
         >{{ ag.label }}</div>
       </ng-container>
+
+      <!-- Link target highlight (world coords, while picking a board-link) -->
+      <div
+        *ngIf="linkPicking && linkCandidate"
+        class="link-target-outline"
+        [style.left.px]="linkCandidate.x"
+        [style.top.px]="linkCandidate.y"
+        [style.width.px]="linkCandidate.width"
+        [style.height.px]="linkCandidate.height"
+        [style.borderWidth.px]="2 / zoom"
+      ></div>
     </div>
 
     <!-- Screen-space draw capture: covers the whole board so strokes can start
@@ -545,6 +556,30 @@
       </div>
     </div>
   </ng-template>
+
+  <!-- Board-link target picker (top-center banner) -->
+  <div class="link-pick-bar" *ngIf="linkPicking">
+    <div class="link-pick-row">
+      <span class="link-pick-msg">
+        {{ linkCandidate ? 'Element selected — confirm the link' : 'Click an element to link it' }}
+      </span>
+      <button
+        class="link-pick-confirm"
+        type="button"
+        [disabled]="!linkCandidate"
+        (click)="confirmLink()"
+      >
+        Confirm
+      </button>
+      <button class="link-pick-cancel" type="button" (click)="cancelLink()">
+        Cancel
+      </button>
+    </div>
+    <span class="link-pick-hint">Hold Enter to confirm · Esc to cancel</span>
+    <div class="link-pick-progress" *ngIf="linkEnterProgress > 0">
+      <div class="link-pick-progress-fill" [style.width.%]="linkEnterProgress * 100"></div>
+    </div>
+  </div>
 
   <!-- Delete hold progress bar (top-center under navbar) -->
   <div

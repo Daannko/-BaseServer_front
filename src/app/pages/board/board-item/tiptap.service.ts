@@ -19,7 +19,8 @@ import {
   PersistentSelectionKey,
 } from '../../../helpers/tiptap/PersistentSelector';
 import type { BoardItem } from './board-item.data';
-import { ParagraphAttrPlugin, ParagraphWithMarks } from './tiptap.extension';
+import { BoardLink, ParagraphAttrPlugin, ParagraphWithMarks } from './tiptap.extension';
+import { BoardLinkService } from '../board-link.service';
 
 type SelectionRange = { from: number; to: number };
 
@@ -63,7 +64,15 @@ export class TiptapService {
   constructor(
     private richText: RichTextService,
     private ngZone: NgZone,
+    private boardLink: BoardLinkService,
   ) {}
+
+  /** Begin linking the current selection to a board element. Returns false if
+   *  nothing is selected (the menu button requires an active selection). */
+  beginBoardLink(sourceId?: string): boolean {
+    if (!this.contentEditor) return false;
+    return this.boardLink.beginLink(this.contentEditor, sourceId);
+  }
 
   initEditors(options: {
     tile: BoardItem;
@@ -92,6 +101,7 @@ export class TiptapService {
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
 
         ParagraphAttrPlugin,
+        BoardLink,
         PersistentSelection,
       ],
       content: tile.content,

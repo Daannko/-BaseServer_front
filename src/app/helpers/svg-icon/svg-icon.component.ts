@@ -32,6 +32,7 @@ export class SvgIconComponent {
       'editor-outdent': 'board_icons/editor-outdent.svg',
       'editor-textcolor': 'board_icons/editor-textcolor.svg',
       'editor-highlight': 'board_icons/editor-highlight.svg',
+      'editor-link': 'board_icons/editor-link.svg',
       'paint-brush': 'board_icons/paint-brush.svg',
       eraser: 'board_icons/eraser.svg',
       'editor-break': 'board_icons/editor-break.svg',

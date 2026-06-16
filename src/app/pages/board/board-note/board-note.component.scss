@@ -137,6 +137,24 @@
   }
 }
 
+.board-link-button:disabled {
+  opacity: 0.35;
+  cursor: default;
+  pointer-events: none;
+}
+
+::ng-deep .content-editor .board-link {
+  color: var(--bp-cyan, #64beff);
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+
+  &:hover {
+    color: var(--bp-amber, #ffd54f);
+  }
+}
+
 ::ng-deep .content-editor {
   flex: 1 1 auto;
   overflow-y: auto;

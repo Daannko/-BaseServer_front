@@ -1,4 +1,4 @@
-import { Node, mergeAttributes } from '@tiptap/core';
+import { Mark as TiptapMark, Node, mergeAttributes } from '@tiptap/core';
 import { Extension } from '@tiptap/core';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
@@ -48,6 +48,64 @@ export const ParagraphWithMarks = Node.create({
             ? { 'data-stored-marks': JSON.stringify(attrs['storedMarks']) }
             : {},
       },
+    };
+  },
+});
+
+/** Mark linking a span of text to another board element. Clicking the text
+ *  (handled in board-note.component) centers the camera on the target.
+ *  `targetId` stores the element's serverId when available, else its client id;
+ *  resolution (board-main.service) matches either field. */
+declare module '@tiptap/core' {
+  interface Commands<ReturnType> {
+    boardLink: {
+      setBoardLink: (attributes: { targetId: string }) => ReturnType;
+      unsetBoardLink: () => ReturnType;
+    };
+  }
+}
+
+export const BoardLink = TiptapMark.create({
+  name: 'boardLink',
+  inclusive: false,
+
+  addOptions() {
+    return { HTMLAttributes: { class: 'board-link' } };
+  },
+
+  addAttributes() {
+    return {
+      targetId: {
+        default: null,
+        parseHTML: (el) => el.getAttribute('data-board-link'),
+        renderHTML: (attrs) =>
+          attrs['targetId'] ? { 'data-board-link': attrs['targetId'] } : {},
+      },
+    };
+  },
+
+  parseHTML() {
+    return [{ tag: 'span[data-board-link]' }];
+  },
+
+  renderHTML({ HTMLAttributes }) {
+    return [
+      'span',
+      mergeAttributes(this.options.HTMLAttributes, HTMLAttributes),
+      0,
+    ];
+  },
+
+  addCommands() {
+    return {
+      setBoardLink:
+        (attributes) =>
+        ({ commands }) =>
+          commands.setMark(this.name, attributes),
+      unsetBoardLink:
+        () =>
+        ({ commands }) =>
+          commands.unsetMark(this.name),
     };
   },
 });

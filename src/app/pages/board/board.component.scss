@@ -65,6 +65,92 @@
 
 
 
+// ── Board-link picker (top-center banner + target highlight) ───────────────
+
+.link-pick-bar {
+  position: fixed;
+  top: calc(4rem + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1002;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--bp-amber-border, rgba(255, 213, 79, 0.5));
+  background: var(--bp-surface-hi, rgba(28, 28, 32, 0.95));
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.link-pick-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.link-pick-msg {
+  font-size: 0.85rem;
+  color: var(--bp-text, #eee);
+}
+
+.link-pick-confirm,
+.link-pick-cancel {
+  padding: 4px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
+  background: var(--bp-surface-ctrl, rgba(255, 255, 255, 0.06));
+  color: var(--bp-text, #eee);
+  font-size: 0.82rem;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--bp-amber, #ffd54f);
+    color: var(--bp-amber, #ffd54f);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
+}
+
+.link-pick-confirm {
+  border-color: var(--bp-amber-border, rgba(255, 213, 79, 0.5));
+  color: var(--bp-amber, #ffd54f);
+}
+
+.link-pick-hint {
+  font-size: 0.72rem;
+  color: var(--bp-text-muted, rgba(255, 255, 255, 0.5));
+}
+
+.link-pick-progress {
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.08);
+  overflow: hidden;
+}
+
+.link-pick-progress-fill {
+  height: 100%;
+  border-radius: 2px;
+  background: var(--bp-amber, #ffd54f);
+  transition: width 50ms linear;
+}
+
+/* Highlight ring around the element being linked to (world coords). */
+.link-target-outline {
+  position: absolute;
+  z-index: 400;
+  pointer-events: none;
+  border: solid var(--bp-amber, #ffd54f);
+  border-radius: 6px;
+  box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
+}
+
 .save-indicator {
   position: fixed;
   top: calc(4rem + 12px);

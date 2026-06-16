@@ -44,6 +44,7 @@ import {
 import { ColorPaletteComponent } from '../common/color-palette/color-palette.component';
 import { BoardDrawingComponent } from './board-drawing/board-drawing.component';
 import { BoardAiService } from './board-ai.service';
+import { BoardLinkService } from './board-link.service';
 import type {
   FactCheckResult,
   QuizQuestion,
@@ -110,6 +111,18 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   images: BoardImage[] = [];
   /** Elements marked for deletion — sent to server on next save. */
   pendingDeletes: BoardItem[] = [];
+
+  // ── Board-link picking (link selected note text to an element) ─────────────
+  /** True while choosing the element a text selection should link to. */
+  linkPicking = false;
+  /** The element currently chosen as the link target (awaiting confirm). */
+  linkCandidate: BoardItem | null = null;
+  /** Enter-hold-to-confirm progress (0–1). */
+  linkEnterProgress = 0;
+  private linkEnterHolding = false;
+  private linkEnterStart = 0;
+  private linkEnterTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly LINK_ENTER_HOLD_MS = 2000;
 
   // ── Draw mode (toggle with B) ──────────────────────────────────────────────
   drawMode = false;
@@ -262,6 +275,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
     private aiService: BoardAiService,
+    private linkService: BoardLinkService,
   ) {
     this.boards$ = this.boardSearchService.boards$;
     this.snapGuides$ = this.snapService.guides$;
@@ -590,6 +604,19 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   @HostListener('window:keydown', ['$event'])
   onGlobalKeydown(event: KeyboardEvent) {
     const mod = event.ctrlKey || event.metaKey;
+    // Link-picking mode owns Escape (cancel) and Enter-hold (confirm).
+    if (this.linkPicking) {
+      if (event.key === 'Escape') {
+        event.preventDefault();
+        this.cancelLink();
+        return;
+      }
+      if (event.key === 'Enter' && this.linkCandidate) {
+        event.preventDefault();
+        this.startLinkEnterHold();
+        return;
+      }
+    }
     // Toggle draw mode with a bare "b" — but not while typing in a note/input.
     if (!mod && !event.altKey && (event.key === 'b' || event.key === 'B')) {
       if (isTextEditingActive()) return;
@@ -647,6 +674,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   @HostListener('window:keyup', ['$event'])
   onGlobalKeyup(event: KeyboardEvent) {
+    if (event.key === 'Enter' && this.linkEnterProgress > 0) {
+      this.stopLinkEnterHold();
+    }
     if (event.code === 'Space' && this.spaceHeld) {
       this.spaceHeld = false;
       if (this.drawMode) this.mainBoardService.drawMode = true;
@@ -799,6 +829,17 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
       });
 
+    this.linkService.picking$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe((picking) => {
+        this.linkPicking = picking;
+        if (!picking) {
+          this.linkCandidate = null;
+          this.stopLinkEnterHold();
+        }
+        this.cdr.detectChanges();
+      });
+
     this.mainBoardService.contextMenu$
       .pipe(takeUntil(this.destroy$))
       .subscribe((req) => {
@@ -825,6 +866,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   ngOnDestroy(): void {
     this.stopSaveDots();
     this.stopDeleteHold();
+    this.stopLinkEnterHold();
     if (this.cameraZoomTimer !== null) { clearTimeout(this.cameraZoomTimer); this.cameraZoomTimer = null; }
     if (this.cameraPosTimer !== null) { clearTimeout(this.cameraPosTimer); this.cameraPosTimer = null; }
     // Clean up group drag listeners if mid-drag
@@ -1369,6 +1411,21 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private onBoardPointerDownCapture = (ev: PointerEvent): void => {
     if (ev.button !== 0 || this.drawMode) return;
+
+    // Link-picking mode: a left click on an element chooses it as the link
+    // target instead of panning/selecting/focusing.
+    if (this.linkPicking) {
+      const target = this.itemById(
+        this.findItemHost(ev)?.getAttribute('data-item-id') ?? null,
+      );
+      if (target) {
+        ev.preventDefault();
+        ev.stopPropagation();
+        this.pickLinkTarget(target);
+      }
+      return;
+    }
+
     const item = this.itemById(this.findItemHost(ev)?.getAttribute('data-item-id') ?? null);
 
     if (ev.ctrlKey || ev.metaKey) {
@@ -1522,12 +1579,65 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private onBoardClickCapture = (ev: MouseEvent): void => {
     if (this.drawMode) return;
+    // While picking a link target, swallow clicks so notes don't focus/edit.
+    if (this.linkPicking) {
+      if (this.findItemHost(ev)) {
+        ev.preventDefault();
+        ev.stopPropagation();
+      }
+      return;
+    }
     if (!(ev.ctrlKey || ev.metaKey)) return;
     if (!this.findItemHost(ev)) return;
     // Swallow the click that follows a Ctrl+press so nothing focuses.
     ev.preventDefault();
     ev.stopPropagation();
   };
+
+  // ── Board-link picking actions ─────────────────────────────────────────────
+
+  /** Mark an element as the pending link target (highlighted, awaiting confirm). */
+  pickLinkTarget(item: BoardItem): void {
+    this.linkCandidate = item;
+    this.cdr.detectChanges();
+  }
+
+  /** Commit the link to the chosen target and exit picking mode. */
+  confirmLink(): void {
+    const target = this.linkCandidate;
+    if (!target) return;
+    this.linkService.confirm(target.serverId ?? target.id);
+  }
+
+  /** Abort link picking without applying anything. */
+  cancelLink(): void {
+    this.linkService.cancel();
+  }
+
+  private startLinkEnterHold(): void {
+    if (this.linkEnterHolding) return;
+    this.linkEnterHolding = true;
+    this.linkEnterStart = Date.now();
+    this.linkEnterProgress = 0;
+    this.linkEnterTimer = setInterval(() => {
+      const elapsed = Date.now() - this.linkEnterStart;
+      this.linkEnterProgress = Math.min(1, elapsed / this.LINK_ENTER_HOLD_MS);
+      if (this.linkEnterProgress >= 1) {
+        this.stopLinkEnterHold();
+        this.confirmLink();
+      }
+      this.cdr.detectChanges();
+    }, 50);
+  }
+
+  private stopLinkEnterHold(): void {
+    if (this.linkEnterTimer !== null) {
+      clearInterval(this.linkEnterTimer);
+      this.linkEnterTimer = null;
+    }
+    this.linkEnterHolding = false;
+    this.linkEnterProgress = 0;
+  }
 
   get selectionCount(): number {
     return this.selection.size;
