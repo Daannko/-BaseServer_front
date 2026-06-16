@@ -1,5 +1,6 @@
 import { Injectable, NgZone } from '@angular/core';
 import { Editor } from '@tiptap/core';
+import type { JSONContent } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
@@ -67,8 +68,9 @@ export class TiptapService {
   initEditors(options: {
     tile: BoardItem;
     contentElement: HTMLElement;
+    defaultFontSize?: number; // px, applied as doc-level mark on empty content
   }) {
-    const { tile, contentElement } = options;
+    const { tile, contentElement, defaultFontSize } = options;
 
     // Destroy any existing editors (can happen if tile is re-rendered)
     this.destroyEditors();
@@ -93,6 +95,16 @@ export class TiptapService {
         PersistentSelection,
       ],
       content: tile.content,
+      onCreate: ({ editor }) => {
+        // Apply the note's default font size as a doc-level mark, but ONLY
+        // if the content doesn't already carry fontSize marks (e.g. loaded
+        // from server). Otherwise every text run already has its own fontSize
+        // via tiptap's TextStyle extension.
+        if (defaultFontSize != null && !contentHasFontSize(tile.content)) {
+          const sz = `${Math.round(defaultFontSize)}px`;
+          editor.chain().selectAll().setFontSize(sz).run();
+        }
+      },
       onFocus: ({ editor }) => {
         this.lastContentSelection = null;
         this.updateCurrentStyles(editor);
@@ -459,4 +471,13 @@ export class TiptapService {
       }
     }
   }
+}
+
+// ── Helper ──────────────────────────────────────────────────────────────────
+
+/** True when the document JSON contains at least one fontSize mark.
+ *  Used to decide whether onCreate should inject the note's base font size
+ *  (skip if server-saved content already carries per-text-run sizes). */
+function contentHasFontSize(doc: JSONContent): boolean {
+  return JSON.stringify(doc).includes('"fontSize"');
 }

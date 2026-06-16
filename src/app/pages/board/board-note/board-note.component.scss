@@ -153,12 +153,14 @@
     margin: 0 0 4px !important;
   }
 
-  // Base text size scales with the note (see --note-font-size). Set here on
-  // the real .tiptap/.ProseMirror selector — the :global(...) block below is
-  // an invalid Angular selector and gets dropped by the browser.
+  // Tiny fallback font-size on the ProseMirror root — every text run inside
+  // the note carries an explicit fontSize mark (applied by tiptap), so this
+  // only surfaces in edge cases. Keeping it small lets line-height (inherited
+  // from here) stay small, so the line box follows the largest *content* font
+  // on each line instead of being pinned to the note's base size.
   .tiptap,
   .ProseMirror {
-    font-size: var(--note-font-size, 21px);
+    font-size: 14px;
   }
 
   :global(.ProseMirror),
@@ -173,12 +175,20 @@
   :global(.tiptap) {
     outline: none;
     color: rgba(255, 255, 255, 0.86);
-    font-size: var(--note-font-size, 21px);
-    line-height: 1.4;
+    line-height: 1.35;
 
     span[style*="font-size"] {
-      line-height: 1;
+      line-height: 1.35;
     }
+
+    // Empty paragraphs: use the note base size so the caret & placeholder
+    // are proportionally scaled. Once text is typed the explicit fontSize
+    // marks take over.
+    p.is-editor-empty::before {
+      font-size: var(--note-font-size, 21px);
+    }
+
+    p { line-height: inherit; }
 
     h1, h2, h3, h4, h5, h6 {
       margin: 0.8em 0 0.45em;

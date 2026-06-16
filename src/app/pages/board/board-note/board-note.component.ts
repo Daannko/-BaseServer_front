@@ -243,6 +243,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     this.tiptap.initEditors({
       tile: this.tile,
       contentElement: this.contentElement.nativeElement,
+      defaultFontSize: (this.tile as BoardNote).fontSize,
     });
 
     const contentRoot = this.contentElement.nativeElement as HTMLElement;
