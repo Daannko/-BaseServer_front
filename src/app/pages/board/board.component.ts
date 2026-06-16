@@ -23,7 +23,6 @@ import { BoardApiService } from './board-api.service';
 import { Observable, Subject, takeUntil } from 'rxjs';
 import { SvgIconComponent } from '../../helpers/svg-icon/svg-icon.component';
 import { Board } from './models/board.model';
-import { Topic } from './models/topic.model';
 import {
   ContextMenuComponent,
   ContextMenuItem,
@@ -31,11 +30,19 @@ import {
 import { StorageService } from '../../service/storage.service';
 import { AspectGuide, BoardSnapService, SnapGuides } from './board-snap.service';
 import { BoardHistoryService } from './board-history.service';
+import { BoardSelectionService } from './board-selection.service';
 import { BoardSectionComponent } from './board-section/board-section.component';
-import { BoardSection, SECTION_MARKER } from './board-section/board-section.data';
+import { BoardSection } from './board-section/board-section.data';
 import { BoardImageComponent } from './board-image/board-image.component';
-import { BoardImage, IMAGE_MARKER } from './board-image/board-image.data';
+import { BoardImage } from './board-image/board-image.data';
 import { extractPlainText } from '../../helpers/rich-text.util';
+import {
+  BoardDrawing,
+  DrawPoint,
+  buildStrokePath,
+} from './board-draw.data';
+import { ColorPaletteComponent } from '../common/color-palette/color-palette.component';
+import { BoardDrawingComponent } from './board-drawing/board-drawing.component';
 
 @Component({
   selector: 'app-board',
@@ -49,6 +56,8 @@ import { extractPlainText } from '../../helpers/rich-text.util';
     BoardImageComponent,
     SvgIconComponent,
     ContextMenuComponent,
+    ColorPaletteComponent,
+    BoardDrawingComponent,
   ],
   templateUrl: './board.component.html',
   styleUrls: ['./board.component.scss'],
@@ -62,6 +71,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   navbarRef!: ElementRef;
   @ViewChild('defaultNavbarTemplate', { static: true })
   defaultNavbarTemplate!: TemplateRef<any>;
+  @ViewChild('drawNavbarTemplate', { static: true })
+  drawNavbarTemplate!: TemplateRef<any>;
+  @ViewChild('selectionNavbarTemplate', { static: true })
+  selectionNavbarTemplate!: TemplateRef<any>;
   @ViewChildren(BoardNoteComponent)
   noteComponents!: QueryList<BoardNoteComponent>;
   @ViewChild('newBoardNameInput', { static: false })
@@ -70,7 +83,6 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   searchInputRef?: ElementRef<HTMLInputElement>;
 
   boards$!: Observable<Board[] | null>;
-  topics$!: Observable<Topic[] | null>;
   snapGuides$!: Observable<SnapGuides>;
   aspectGuide$!: Observable<AspectGuide | null>;
   isSearchOpen = true;
@@ -86,6 +98,38 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   notesMap: Map<string, BoardItem> = new Map();
   sections: BoardSection[] = [];
   images: BoardImage[] = [];
+
+  // ── Draw mode (toggle with B) ──────────────────────────────────────────────
+  drawMode = false;
+  drawTool: 'pen' | 'eraser' = 'pen';
+  drawColor = '#ffd54f';
+  drawWidth = 4; // baseline thickness in *screen* px; world width = this / zoom
+  isDrawPaletteVisible = false;
+  drawings: BoardDrawing[] = [];
+  // In-progress pen stroke (absolute world points), rendered in the capture
+  // overlay until it's committed to a BoardDrawing element on pointer up.
+  activePoints: DrawPoint[] = [];
+  activeStrokeD = '';
+  drawing = false;
+  // Brush cursor preview (screen px relative to the board container).
+  cursorX = 0;
+  cursorY = 0;
+  cursorInside = false;
+  // Hold Space to temporarily pan instead of draw.
+  spaceHeld = false;
+  // Snapshot of the stroke list taken when an eraser drag starts, so the whole
+  // drag collapses into a single undo step.
+  private eraserBefore: BoardDrawing[] | null = null;
+
+  get activeStrokeWidth(): number {
+    return this.drawWidth / this.mainBoardService.zoom;
+  }
+
+  /** Brush preview diameter in screen px. Pen world width is drawWidth/zoom, so
+   *  on screen it's exactly drawWidth; the eraser shows a fixed ring. */
+  get brushCursorSize(): number {
+    return this.drawTool === 'eraser' ? 18 : Math.max(this.drawWidth, 4);
+  }
 
   selectedBoard: Board | null = null;
   private activeNavbarNote: BoardItem | null = null;
@@ -165,10 +209,16 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private onBackgroundMouseDown() {
     this.closeContextMenu();
+    // While drawing (incl. Space-pan), keep the draw bar in the navbar.
+    if (this.drawMode) {
+      this.navBarService.setTemplate(this.drawNavbarTemplate);
+      return;
+    }
     if (this.activeNavbarNote) {
       this.activeNavbarNote.forceToRender = false;
       this.activeNavbarNote = null;
     }
+    this.selection.clear();
     this.navBarService.setTemplate(
       this.defaultNavbarTemplate,
       this.buildDefaultNavbarContext(),
@@ -180,6 +230,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.notesMap.clear();
     this.sections.length = 0;
     this.images.length = 0;
+    this.drawings.length = 0;
+    this.selection.clear();
     this.history.clear();
   }
 
@@ -195,9 +247,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private storageSerice: StorageService,
     private snapService: BoardSnapService,
     private history: BoardHistoryService,
+    private selection: BoardSelectionService,
   ) {
     this.boards$ = this.boardSearchService.boards$;
-    this.topics$ = this.boardSearchService.topics$;
     this.snapGuides$ = this.snapService.guides$;
     this.aspectGuide$ = this.snapService.aspectGuide$;
     this.history.onChange = () => this.cdr.detectChanges();
@@ -308,20 +360,19 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       const defaultNavbarContext = this.buildDefaultNavbarContext();
 
       this.resetState();
-      this.boardSearchService.clearTopics();
 
-      const topics = await this.boardSearchService.getTopicsByIds(
-        board.topics,
-        false,
-      );
-      for (const topic of topics) {
-        if (topic.note === SECTION_MARKER) {
-          this.addBoardSection(topic);
-        } else if (topic.note === IMAGE_MARKER) {
-          this.addBoardImage(topic);
-        } else {
-          this.addBoardNote(topic);
-        }
+      const elements = await this.boardSearchService.getBoardElements(board.id);
+      for (const note of elements.notes) {
+        this.addBoardNote(note);
+      }
+      for (const section of elements.sections) {
+        this.addBoardSection(section);
+      }
+      for (const image of elements.images) {
+        this.addBoardImage(image);
+      }
+      for (const drawing of elements.drawings) {
+        this.addBoardDrawing(drawing);
       }
 
       await Promise.resolve();
@@ -471,6 +522,29 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   @HostListener('window:keydown', ['$event'])
   onGlobalKeydown(event: KeyboardEvent) {
     const mod = event.ctrlKey || event.metaKey;
+    // Toggle draw mode with a bare "b" — but not while typing in a note/input.
+    if (!mod && !event.altKey && (event.key === 'b' || event.key === 'B')) {
+      if (isTextEditingActive()) return;
+      event.preventDefault();
+      this.toggleDrawMode();
+      return;
+    }
+    if (this.drawMode && event.key === 'Escape') {
+      event.preventDefault();
+      this.toggleDrawMode();
+      return;
+    }
+    // Hold Space in draw mode to pan instead of draw.
+    if (this.drawMode && event.code === 'Space') {
+      if (isTextEditingActive()) return;
+      event.preventDefault();
+      if (!this.spaceHeld) {
+        this.spaceHeld = true;
+        this.mainBoardService.drawMode = false; // let the board pan
+        this.cdr.detectChanges();
+      }
+      return;
+    }
     if (mod && (event.key === 's' || event.key === 'S')) {
       event.preventDefault();
       this.saveBoard();
@@ -494,6 +568,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (isTextEditingActive()) return;
       event.preventDefault();
       this.history.redo();
+    }
+  }
+
+  @HostListener('window:keyup', ['$event'])
+  onGlobalKeyup(event: KeyboardEvent) {
+    if (event.code === 'Space' && this.spaceHeld) {
+      this.spaceHeld = false;
+      if (this.drawMode) this.mainBoardService.drawMode = true;
+      this.cdr.detectChanges();
     }
   }
 
@@ -625,6 +708,14 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.cdr.detectChanges();
       });
 
+    // Selection changes drive the merge/unmerge navbar.
+    this.selection.changed$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => {
+        this.updateSelectionNavbar();
+        this.cdr.detectChanges();
+      });
+
     this.mainBoardService.contextMenu$
       .pipe(takeUntil(this.destroy$))
       .subscribe((req) => {
@@ -649,6 +740,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    const boardEl = this.boardRef?.nativeElement;
+    boardEl?.removeEventListener('pointerdown', this.onBoardPointerDownCapture as EventListener, true);
+    boardEl?.removeEventListener('click', this.onBoardClickCapture as EventListener, true);
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -677,6 +771,13 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       defaultNavbarContext,
     );
     this.mainBoardService.setupListeners();
+
+    // Ctrl+click selection is handled centrally (capture phase) so it works for
+    // every element type without each component knowing about it.
+    const boardEl = this.boardRef.nativeElement;
+    boardEl.addEventListener('pointerdown', this.onBoardPointerDownCapture as EventListener, true);
+    boardEl.addEventListener('click', this.onBoardClickCapture as EventListener, true);
+
     if (this.notes.length > 0) {
       this.mainBoardService.centerOnItem(this.notes[0]);
     }
@@ -684,20 +785,25 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     Promise.resolve().then(() => this.mainBoardService.updateBoard());
   }
 
-  addBoardNote(topic: Topic) {
-    const note = BoardNote.fromNoteTopic(topic);
+  addBoardNote(el: import('./models/element.model').Note) {
+    const note = BoardNote.fromNoteElement(el);
     this.notes.push(note);
     this.notesMap.set(note.id, note);
   }
 
-  addBoardSection(topic: Topic) {
-    const section = BoardSection.fromSectionTopic(topic);
+  addBoardSection(el: import('./models/element.model').Section) {
+    const section = BoardSection.fromSectionElement(el);
     this.sections.push(section);
   }
 
-  addBoardImage(topic: Topic) {
-    const image = BoardImage.fromImageTopic(topic);
+  addBoardImage(el: import('./models/element.model').Image) {
+    const image = BoardImage.fromImageElement(el);
     this.images.push(image);
+  }
+
+  addBoardDrawing(el: import('./models/element.model').Drawing) {
+    const drawing = BoardDrawing.fromDrawingElement(el);
+    this.drawings.push(drawing);
   }
 
   private createSectionAt(worldX: number, worldY: number): void {
@@ -722,7 +828,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   async onDeleteSection(section: BoardSection): Promise<void> {
     if (section.serverId) {
       try {
-        await this.boardSearchService.deleteTopic(section.serverId);
+        await this.boardSearchService.deleteElement(section);
       } catch {
         return;
       }
@@ -760,13 +866,28 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   async onDeleteImage(image: BoardImage): Promise<void> {
     if (image.serverId) {
       try {
-        await this.boardSearchService.deleteTopic(image.serverId);
+        await this.boardSearchService.deleteElement(image);
       } catch {
         return;
       }
     }
     this.recordDelete(image, this.images);
     this.removeFromList(image, this.images);
+  }
+
+  async onDeleteDrawing(drawing: BoardDrawing): Promise<void> {
+    if (drawing.serverId) {
+      try {
+        await this.boardSearchService.deleteElement(drawing);
+      } catch {
+        return;
+      }
+    }
+    if (this.selection.isSelected(drawing)) {
+      this.selection.set(this.selection.items.filter((i) => i !== drawing));
+    }
+    this.recordDelete(drawing, this.drawings);
+    this.removeFromList(drawing, this.drawings);
   }
 
   /** Records an element removal so Ctrl+Z restores it. The restored item loses
@@ -800,65 +921,63 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         const file = it.getAsFile();
         if (!file) continue;
         event.preventDefault();
-        const reader = new FileReader();
-        reader.onload = () => {
-          const src = reader.result as string;
-          if (src) this.addImageFromSrc(src);
-        };
-        reader.readAsDataURL(file);
+        this.addImageFromFile(file);
         return;
       }
     }
   }
 
-  /** Create an image element from a data URL, sized from its natural dimensions
-   *  and placed at the center of the current viewport. */
-  private addImageFromSrc(src: string): void {
+  /** Upload an image blob and place the element at viewport center. */
+  private async addImageFromFile(file: File): Promise<void> {
     if (!this.selectedBoard) return;
+    const boardId = this.selectedBoard.id;
 
-    const probe = new Image();
-    probe.onload = () => {
-      const MAX_SCREEN = 600;
-      let sw = probe.naturalWidth || 400;
-      let sh = probe.naturalHeight || 300;
-      if (sw > MAX_SCREEN || sh > MAX_SCREEN) {
-        const k = Math.min(MAX_SCREEN / sw, MAX_SCREEN / sh);
-        sw *= k;
-        sh *= k;
-      }
+    const result = await this.boardSearchService.uploadImage(
+      boardId,
+      file,
+      file.name || 'paste.png',
+    );
+    if (!result) return;
 
-      const zoom = this.mainBoardService.zoom;
-      const worldW = sw / zoom;
-      const worldH = sh / zoom;
+    const MAX_SCREEN = 600;
+    let sw = result.width || 400;
+    let sh = result.height || 300;
+    if (sw > MAX_SCREEN || sh > MAX_SCREEN) {
+      const k = Math.min(MAX_SCREEN / sw, MAX_SCREEN / sh);
+      sw *= k;
+      sh *= k;
+    }
 
-      const board = this.boardRef.nativeElement as HTMLElement;
-      const rect = board.getBoundingClientRect();
-      const center = this.screenToWorld(
-        rect.left + rect.width / 2,
-        rect.top + rect.height / 2,
-      );
+    const zoom = this.mainBoardService.zoom;
+    const worldW = sw / zoom;
+    const worldH = sh / zoom;
 
-      const image = BoardImage.newImage(
-        center.x - worldW / 2,
-        center.y - worldH / 2,
-        worldW,
-        worldH,
-        src,
-      );
-      image.setNatural(probe.naturalWidth, probe.naturalHeight);
+    const board = this.boardRef.nativeElement as HTMLElement;
+    const rect = board.getBoundingClientRect();
+    const center = this.screenToWorld(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    );
 
-      this.images.push(image);
-      this.bringToFront(image);
-      this.recordCreate(image, this.images);
-      this.cdr.detectChanges();
-    };
-    probe.src = src;
+    const image = BoardImage.newImage(
+      center.x - worldW / 2,
+      center.y - worldH / 2,
+      worldW,
+      worldH,
+      result.url,
+    );
+    image.setNatural(result.width, result.height);
+
+    this.images.push(image);
+    this.bringToFront(image);
+    this.recordCreate(image, this.images);
+    this.cdr.detectChanges();
   }
 
   async onDeleteNote(tile: BoardItem): Promise<void> {
     if (tile.serverId) {
       try {
-        await this.boardSearchService.deleteTopic(tile.serverId);
+        await this.boardSearchService.deleteElement(tile);
       } catch {
         return;
       }
@@ -885,33 +1004,336 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.selectedBoard) return;
 
     const boardId = this.selectedBoard.id;
-    const allItems: BoardItem[] = [...this.notes, ...this.sections, ...this.images];
+    const allItems: BoardItem[] = [
+      ...this.notes,
+      ...this.sections,
+      ...this.images,
+      ...this.drawings,
+    ];
     const tilesToCreate = allItems.filter((t) => !t.serverId);
 
     if (tilesToCreate.length > 0) {
-      const createdTopics = await Promise.all(
+      const createdElements = await Promise.all(
         tilesToCreate.map((t) =>
-          this.boardSearchService.createTopic(
-            t,
-            boardId,
-            t instanceof BoardSection
-              ? SECTION_MARKER
-              : t instanceof BoardImage
-                ? IMAGE_MARKER
-                : '__note__',
-          ),
+          this.boardSearchService.createElement(t, boardId),
         ),
       );
-      for (let i = 0; i < createdTopics.length; i++) {
-        const created = createdTopics[i];
+      for (let i = 0; i < createdElements.length; i++) {
+        const created = createdElements[i];
         if (!created) continue;
         tilesToCreate[i].serverId = created.id;
       }
     }
 
     await Promise.all(
-      allItems.filter(t => Boolean(t.serverId)).map(t => this.boardSearchService.saveTopic(t)),
+      allItems.filter(t => Boolean(t.serverId)).map(t => this.boardSearchService.saveElement(t)),
     );
+  }
+
+  // ── Draw mode ──────────────────────────────────────────────────────────────
+
+  toggleDrawMode(): void {
+    this.drawMode = !this.drawMode;
+    this.spaceHeld = false;
+    this.cursorInside = false;
+    // Suppress board pan/context-menu while drawing (see BoardMainService).
+    this.mainBoardService.drawMode = this.drawMode;
+    if (this.drawMode) {
+      // Selection is a no-draw-mode concept; clear it so the draw bar owns the navbar.
+      this.selection.clear();
+      // Show the draw controls in the navbar, like the note editing menu.
+      this.navBarService.setTemplate(this.drawNavbarTemplate);
+    } else {
+      this.drawing = false;
+      this.activePoints = [];
+      this.activeStrokeD = '';
+      this.eraserBefore = null;
+      this.navBarService.setTemplate(
+        this.defaultNavbarTemplate,
+        this.buildDefaultNavbarContext(),
+      );
+    }
+    this.cdr.detectChanges();
+  }
+
+  onDrawColorChange(color: string | null): void {
+    if (color) this.drawColor = color;
+    // Picking a color implies you want to paint.
+    this.drawTool = 'pen';
+  }
+
+  setDrawTool(tool: 'pen' | 'eraser'): void {
+    this.drawTool = tool;
+  }
+
+  toggleEraser(): void {
+    this.drawTool = this.drawTool === 'eraser' ? 'pen' : 'eraser';
+  }
+
+  private updateCursor(event: PointerEvent): void {
+    const rect = (this.boardRef.nativeElement as HTMLElement).getBoundingClientRect();
+    this.cursorX = event.clientX - rect.left;
+    this.cursorY = event.clientY - rect.top;
+    this.cursorInside = true;
+  }
+
+  onDrawPointerDown(event: PointerEvent): void {
+    if (!this.drawMode || this.spaceHeld || event.button !== 0) return;
+    event.preventDefault();
+    event.stopPropagation();
+    (event.target as Element).setPointerCapture?.(event.pointerId);
+    this.updateCursor(event);
+
+    this.drawing = true;
+
+    if (this.drawTool === 'eraser') {
+      this.eraserBefore = this.drawings.slice();
+      this.eraseAt(event.clientX, event.clientY);
+      return;
+    }
+
+    const p = this.screenToWorld(event.clientX, event.clientY);
+    this.activePoints = [p];
+    this.activeStrokeD = buildStrokePath(this.activePoints);
+  }
+
+  onDrawPointerMove(event: PointerEvent): void {
+    this.updateCursor(event);
+    if (!this.drawing) return;
+
+    if (this.drawTool === 'eraser') {
+      this.eraseAt(event.clientX, event.clientY);
+      return;
+    }
+
+    const p = this.screenToWorld(event.clientX, event.clientY);
+    const last = this.activePoints[this.activePoints.length - 1];
+    // Drop sub-2px (screen) moves so strokes stay light without visible faceting.
+    const minDist = 2 / this.mainBoardService.zoom;
+    if (last && Math.hypot(p.x - last.x, p.y - last.y) < minDist) return;
+    this.activePoints.push(p);
+    this.activeStrokeD = buildStrokePath(this.activePoints);
+  }
+
+  onDrawPointerUp(): void {
+    if (!this.drawing) return;
+    this.drawing = false;
+
+    if (this.drawTool === 'eraser') {
+      const before = this.eraserBefore;
+      this.eraserBefore = null;
+      if (!before) return;
+      const after = this.drawings.slice();
+      if (sameStrokes(before, after)) return;
+      // Restore/redo by rebuilding the list in place (template binds the array
+      // reference, so it must never be reassigned).
+      const restore = (snapshot: BoardDrawing[]) => {
+        this.drawings.length = 0;
+        this.drawings.push(...snapshot);
+        this.cdr.detectChanges();
+      };
+      this.history.push({
+        undo: () => restore(before),
+        redo: () => restore(after),
+      });
+      return;
+    }
+
+    const pts = this.activePoints;
+    this.activePoints = [];
+    this.activeStrokeD = '';
+    if (!pts.length) return;
+
+    // Commit the transient stroke to a positioned, movable BoardDrawing element.
+    const stroke = BoardDrawing.newDrawing(
+      pts,
+      this.drawColor,
+      this.drawWidth / this.mainBoardService.zoom,
+    );
+    this.drawings.push(stroke);
+    this.recordCreate(stroke, this.drawings);
+  }
+
+  /** Whole-stroke eraser: remove every stroke whose painted line sits under the
+   *  cursor (sampled with a small radius so thin lines are easy to hit). */
+  private eraseAt(clientX: number, clientY: number): void {
+    const radius = 6;
+    const samples: Array<[number, number]> = [
+      [clientX, clientY],
+      [clientX - radius, clientY],
+      [clientX + radius, clientY],
+      [clientX, clientY - radius],
+      [clientX, clientY + radius],
+    ];
+    const hitIds = new Set<string>();
+    for (const [x, y] of samples) {
+      for (const el of document.elementsFromPoint(x, y)) {
+        const id = el.getAttribute?.('data-stroke-id');
+        if (id) hitIds.add(id);
+      }
+    }
+    if (!hitIds.size) return;
+
+    let changed = false;
+    for (const id of hitIds) {
+      const i = this.drawings.findIndex((d) => d.id === id);
+      if (i >= 0) {
+        this.drawings.splice(i, 1);
+        changed = true;
+      }
+    }
+    if (changed) this.cdr.detectChanges();
+  }
+
+  /** Remove every stroke that has not yet been persisted to the server, with a
+   *  single undo step. Already-saved strokes are left to the delete flow. */
+  clearDrawing(): void {
+    if (!this.drawings.length) return;
+    const removed = this.drawings.slice();
+    this.drawings.length = 0;
+    this.history.push({
+      undo: () => {
+        this.drawings.push(...removed);
+        this.cdr.detectChanges();
+      },
+      redo: () => {
+        this.drawings.length = 0;
+        this.cdr.detectChanges();
+      },
+    });
+    this.cdr.detectChanges();
+  }
+
+  // ── Selection (Ctrl+click) & drawing merge ──────────────────────────────────
+
+  /** Map a host element's data-item-id back to its board item. */
+  private itemById(id: string | null): BoardItem | null {
+    if (!id) return null;
+    return (
+      this.notes.find((n) => n.id === id) ??
+      this.sections.find((s) => s.id === id) ??
+      this.images.find((i) => i.id === id) ??
+      this.drawings.find((d) => d.id === id) ??
+      null
+    );
+  }
+
+  /** Nearest ancestor in the event path that is a board element host. */
+  private findItemHost(ev: Event): HTMLElement | null {
+    const path = (ev.composedPath?.() ?? []) as EventTarget[];
+    for (const t of path) {
+      if (t instanceof HTMLElement && t.hasAttribute('data-item-id')) return t;
+    }
+    return null;
+  }
+
+  private onBoardPointerDownCapture = (ev: PointerEvent): void => {
+    if (ev.button !== 0 || this.drawMode) return;
+    const item = this.itemById(this.findItemHost(ev)?.getAttribute('data-item-id') ?? null);
+
+    if (ev.ctrlKey || ev.metaKey) {
+      if (!item) return;
+      // Take over the gesture so the element doesn't move/focus on a Ctrl+click.
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.selection.toggle(item, true);
+      return;
+    }
+    // Plain press clears the selection unless you're grabbing a selected item
+    // (which begins a group move).
+    if (!item || !this.selection.isSelected(item)) {
+      this.selection.clear();
+    }
+  };
+
+  private onBoardClickCapture = (ev: MouseEvent): void => {
+    if (this.drawMode) return;
+    if (!(ev.ctrlKey || ev.metaKey)) return;
+    if (!this.findItemHost(ev)) return;
+    // Swallow the click that follows a Ctrl+press so nothing focuses.
+    ev.preventDefault();
+    ev.stopPropagation();
+  };
+
+  get selectionCount(): number {
+    return this.selection.size;
+  }
+
+  private get selectedDrawings(): BoardDrawing[] {
+    return this.selection.items.filter((i): i is BoardDrawing => i instanceof BoardDrawing);
+  }
+
+  get canMergeDrawings(): boolean {
+    const sel = this.selection.items;
+    return sel.length >= 2 && sel.every((i) => i instanceof BoardDrawing);
+  }
+
+  get canUnmergeDrawing(): boolean {
+    return (
+      this.selection.size === 1 &&
+      this.selection.items[0] instanceof BoardDrawing &&
+      (this.selection.items[0] as BoardDrawing).isMerged
+    );
+  }
+
+  mergeSelectedDrawings(): void {
+    const sel = this.selectedDrawings;
+    if (sel.length < 2 || !this.canMergeDrawings) return;
+
+    const before = this.drawings.slice();
+    const merged = BoardDrawing.fromAbsolute(sel.flatMap((d) => d.toAbsolute()));
+    for (const d of sel) {
+      const i = this.drawings.indexOf(d);
+      if (i >= 0) this.drawings.splice(i, 1);
+    }
+    this.drawings.push(merged);
+    this.bringToFront(merged);
+    this.selection.set([merged]);
+    this.pushDrawingsSnapshot(before, this.drawings.slice());
+    this.cdr.detectChanges();
+  }
+
+  unmergeSelectedDrawing(): void {
+    const d = this.selection.items[0];
+    if (!(d instanceof BoardDrawing) || !d.isMerged) return;
+    const i = this.drawings.indexOf(d);
+    if (i < 0) return;
+
+    const before = this.drawings.slice();
+    const singles = d.toAbsolute().map((s) => BoardDrawing.fromAbsolute([s]));
+    this.drawings.splice(i, 1, ...singles);
+    this.selection.set(singles);
+    this.pushDrawingsSnapshot(before, this.drawings.slice());
+    this.cdr.detectChanges();
+  }
+
+  /** One undo step that swaps the whole drawing list between two snapshots,
+   *  rebuilt in place (the template binds the array reference). */
+  private pushDrawingsSnapshot(before: BoardDrawing[], after: BoardDrawing[]): void {
+    const restore = (snap: BoardDrawing[]) => {
+      this.drawings.length = 0;
+      this.drawings.push(...snap);
+      this.selection.clear();
+      this.cdr.detectChanges();
+    };
+    this.history.push({
+      undo: () => restore(before),
+      redo: () => restore(after),
+    });
+  }
+
+  /** Show the merge/unmerge bar while drawings are selected; otherwise restore
+   *  the default navbar. No-op while draw mode owns the navbar. */
+  private updateSelectionNavbar(): void {
+    if (this.drawMode) return;
+    if (this.selection.size) {
+      this.navBarService.setTemplate(this.selectionNavbarTemplate);
+    } else {
+      this.navBarService.setTemplate(
+        this.defaultNavbarTemplate,
+        this.buildDefaultNavbarContext(),
+      );
+    }
   }
 
   closeContextMenu() {
@@ -936,6 +1358,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         return;
     }
   }
+}
+
+/** Shallow reference-equality of two stroke lists (same items, same order). */
+function sameStrokes(a: BoardDrawing[], b: BoardDrawing[]): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) {
+    if (a[i] !== b[i]) return false;
+  }
+  return true;
 }
 
 /** True when focus is in a text field / rich-text editor, so Ctrl+Z/Y should be

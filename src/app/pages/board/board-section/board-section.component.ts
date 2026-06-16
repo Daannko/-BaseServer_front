@@ -23,6 +23,7 @@ import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
 import { TiptapService } from '../board-item/tiptap.service';
 import { BoardSnapService } from '../board-snap.service';
 import { BoardHistoryService } from '../board-history.service';
+import { BoardSelectionService } from '../board-selection.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
 import { QuerySelectComponent } from '../../common/query-select/query-select.component';
 import { ColorPaletteComponent } from '../../common/color-palette/color-palette.component';
@@ -58,6 +59,9 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
   @HostBinding('style.--board-zoom') get boardZoomVar() { return String(this.zoom); }
   @HostBinding('style.--tile-w') get tileWVar() { return (this.tile?.width ?? 0) + 'px'; }
   @HostBinding('style.--tile-h') get tileHVar() { return (this.tile?.height ?? 0) + 'px'; }
+  @HostBinding('attr.data-item-id') get itemIdAttr() { return this.tile?.id ?? null; }
+
+  get isSelected(): boolean { return this.selection.isSelected(this.tile); }
 
   isFocused = false;
   isOptionsPanelOpen = false;
@@ -73,6 +77,7 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
     public tiptap: TiptapService,
     private snap: BoardSnapService,
     private history: BoardHistoryService,
+    private selection: BoardSelectionService,
   ) {}
 
   // Rect snapshot at the start of a move/resize gesture, for history.
@@ -251,6 +256,10 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
   }
 
   onPosChange(p: Position) {
+    if (this.selection.isGroupMoving(this.tile)) {
+      this.selection.moveGroupTo(this.tile, p.x, p.y);
+      return;
+    }
     const s = this.snap.snapMove(
       { x: p.x, y: p.y, width: this.tile.width, height: this.tile.height },
       this.tile.id,
@@ -259,14 +268,21 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
   }
 
   onMoveStart() {
+    this.selection.beginGroupMove(this.tile);
     this.isDraggingTile = true;
     this.tile.forceToRender = true;
     this.gestureBefore = this.rectSnapshot();
   }
   onMoveEnd() {
+    const wasGroup = this.selection.isGroupMoving(this.tile);
     this.isDraggingTile = false;
     if (!this.navbarPinned) this.tile.forceToRender = false;
     this.snap.clearGuides();
+    if (wasGroup) {
+      this.selection.endGroupMove();
+      this.gestureBefore = null;
+      return;
+    }
     if (this.gestureBefore) { this.history.pushRect(this.tile, this.gestureBefore); this.gestureBefore = null; }
   }
 

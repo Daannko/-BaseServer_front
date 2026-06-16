@@ -1,19 +1,12 @@
 import type { JSONContent } from '@tiptap/core';
 import { BoardItem } from '../board-item/board-item.data';
-import { Topic } from '../models/topic.model';
+import type { Image } from '../models/element.model';
 import { emptyDoc } from '../../../helpers/rich-text.util';
 
-/** Marker stored in Topic.note to distinguish images from notes/sections. */
-export const IMAGE_MARKER = '__image__';
-
-/** The image src (data URL or remote URL) is persisted inside Topic.content. */
+/** The image src (a URL into the blob store) is persisted as `src` on the API Image object.
+ *  BoardImage keeps a legacy `content` doc for internal compatibility but the API field is `src`. */
 function imageDoc(src: string): JSONContent {
   return { type: 'image', attrs: { src } } as JSONContent;
-}
-
-function srcFromContent(content: unknown): string {
-  const c = content as any;
-  return c?.attrs?.src ?? c?.src ?? '';
 }
 
 export class BoardImage extends BoardItem {
@@ -22,8 +15,7 @@ export class BoardImage extends BoardItem {
   bgColor: string | null = null;
   borderColor: string | null = null;
   borderWidth: number = 1;
-  /** Original width/height ratio of the source image; used by "Reset ratio".
-   *  Set once the image's natural size is known (on paste or on <img> load). */
+  /** Original dimensions of the source image; used by "Reset ratio". */
   naturalRatio: number = 1;
   naturalWidth: number = 0;
   naturalHeight: number = 0;
@@ -58,18 +50,13 @@ export class BoardImage extends BoardItem {
     return new BoardImage(globalThis.crypto.randomUUID(), x, y, width, height, src);
   }
 
-  static fromImageTopic(topic: Topic): BoardImage {
+  static fromImageElement(el: Image): BoardImage {
     const image = new BoardImage(
-      topic.id,
-      topic.x,
-      topic.y,
-      topic.width,
-      topic.height,
-      srcFromContent(topic.content),
+      el.id, el.x, el.y, el.width, el.height,
+      el.src ?? '',
     );
-    image.serverId = topic.id;
-    // Content/name came from the server — clear dirty flags so saveBoard()
-    // doesn't re-PATCH the (potentially large) data URL on every save.
+    image.hydrateBase(el);
+    image.setNatural(el.naturalWidth ?? 0, el.naturalHeight ?? 0);
     image.saved();
     return image;
   }

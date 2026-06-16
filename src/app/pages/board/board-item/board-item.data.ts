@@ -1,5 +1,6 @@
 import type { JSONContent } from '@tiptap/core';
 import { docFromText } from '../../../helpers/rich-text.util';
+import type { ElementBase } from '../models/element.model';
 
 export class BoardItem {
   readonly id: string;
@@ -56,8 +57,23 @@ export class BoardItem {
   updatePosition(x: number, y: number) { this.positionUpdated = true; this.x = x; this.y = y; }
   updateSize(width: number, height: number) { this.sizeUpdated = true; this.width = width; this.height = height; }
 
+  /** Hydrate shared fields from a persisted element response. Call from
+   *  subclass `from*Element` factories, then set subclass-specific fields. */
+  protected hydrateBase(el: ElementBase): void {
+    this.serverId = el.id;
+    this.zIndex = el.zIndex ?? 1;
+    (this as any).bgColor = el.bgColor;
+    (this as any).borderColor = el.borderColor;
+    (this as any).borderWidth = el.borderWidth ?? 1;
+  }
+
   toBeUpdated(): boolean {
-    return this.contentUpdated || this.nameUpdated || this.positionUpdated || this.sizeUpdated;
+    return (
+      this.contentUpdated ||
+      this.nameUpdated ||
+      this.positionUpdated ||
+      this.sizeUpdated
+    );
   }
 
   saved() {

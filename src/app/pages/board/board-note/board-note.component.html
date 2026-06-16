@@ -18,6 +18,8 @@
     (tile.width > tile.height ? tile.width : tile.height) + 'px'
   "
 >
+  <div class="selection-outline" *ngIf="isSelected"></div>
+
   <!-- controls bar: appears when focused, sits above the note -->
   <div class="note-controls-bar" [class.is-visible]="isFocused">
     <button

@@ -24,6 +24,7 @@ import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
 import { TiptapService } from '../board-item/tiptap.service';
 import { BoardSnapService } from '../board-snap.service';
 import { BoardHistoryService } from '../board-history.service';
+import { BoardSelectionService } from '../board-selection.service';
 
 @Component({
   selector: 'app-board-note',
@@ -57,6 +58,9 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   @HostBinding('style.--tile-min') get hostTileMin() {
     return Math.max(this.tile?.width ?? 0, this.tile?.height ?? 0) + 'px';
   }
+  @HostBinding('attr.data-item-id') get itemIdAttr() { return this.tile?.id ?? null; }
+
+  get isSelected(): boolean { return this.selection.isSelected(this.tile); }
 
   isColorPaletteVisible = false;
   isBgPaletteVisible = false;
@@ -193,6 +197,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     public tiptap: TiptapService,
     private snap: BoardSnapService,
     private history: BoardHistoryService,
+    private selection: BoardSelectionService,
   ) {}
 
   // Rect snapshot at the start of a move/resize gesture, for history.
@@ -296,6 +301,10 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   }
 
   onTileWorldPosChange(p: Position) {
+    if (this.selection.isGroupMoving(this.tile)) {
+      this.selection.moveGroupTo(this.tile, p.x, p.y);
+      return;
+    }
     const s = this.snap.snapMove(
       { x: p.x, y: p.y, width: this.tile.width, height: this.tile.height },
       this.tile.id,
@@ -346,14 +355,22 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   }
 
   onMoveStart() {
+    this.selection.beginGroupMove(this.tile);
     this.isDraggingTile = true;
     this.tile.forceToRender = true;
     this.gestureBefore = this.rectSnapshot();
   }
   onMoveEnd() {
+    const wasGroup = this.selection.isGroupMoving(this.tile);
     this.isDraggingTile = false;
     if (!this.navbarPinned) this.tile.forceToRender = false;
     this.snap.clearGuides();
+    if (wasGroup) {
+      // The selection service records one undo step for the whole group.
+      this.selection.endGroupMove();
+      this.gestureBefore = null;
+      return;
+    }
     if (this.gestureBefore) { this.history.pushRect(this.tile, this.gestureBefore); this.gestureBefore = null; }
   }
 

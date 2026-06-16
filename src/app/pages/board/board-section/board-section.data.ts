@@ -1,14 +1,10 @@
 import { BoardItem } from '../board-item/board-item.data';
-import { Topic } from '../models/topic.model';
+import type { Section } from '../models/element.model';
 import { docFromText, emptyDoc } from '../../../helpers/rich-text.util';
 import { Theme } from '../../../theme';
 
-/** Marker stored in Topic.note to distinguish sections from regular notes. */
-export const SECTION_MARKER = '__section__';
-
 export class BoardSection extends BoardItem {
   readonly isSection = true as const;
-  // Sections default to the global translucent whitish fill.
   bgColor: string | null = Theme.defaultBg;
   borderColor: string | null = null;
   borderWidth: number = 1;
@@ -21,15 +17,14 @@ export class BoardSection extends BoardItem {
     );
   }
 
-  static fromSectionTopic(topic: Topic): BoardSection {
+  static fromSectionElement(el: Section): BoardSection {
     const section = new BoardSection(
-      topic.id,
-      topic.x, topic.y,
-      topic.width, topic.height,
-      topic.title ?? docFromText('Section'),
+      el.id, el.x, el.y, el.width, el.height,
+      el.title ?? docFromText('Section'),
       emptyDoc(),
     );
-    section.serverId = topic.id;
+    section.hydrateBase(el);
+    section.saved();
     return section;
   }
 }

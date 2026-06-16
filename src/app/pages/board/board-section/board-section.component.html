@@ -13,6 +13,8 @@
   (rectChange)="onRectChange($event)"
   (resizeEnd)="onResizeEnd()"
 >
+  <div class="selection-outline" *ngIf="isSelected"></div>
+
   <!-- everything above the frame: name row on top, controls bar below it -->
   <div class="section-stack">
   <!-- name: top-left, above the controls -->

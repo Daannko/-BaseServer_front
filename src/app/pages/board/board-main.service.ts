@@ -63,6 +63,9 @@ export class BoardMainService {
   isDragging: boolean = false;
   startX: number = 0;
   startY: number = 0;
+  /** When true the board ignores background pan / context-menu so the draw
+   *  overlay can capture strokes. Set by BoardComponent.toggleDrawMode(). */
+  drawMode = false;
 
   initialize(options: {
     boardRef: ElementRef;
@@ -228,6 +231,8 @@ export class BoardMainService {
     board.addEventListener('mousedown', (event: MouseEvent) => {
       // stop right click
       if (event.button !== 0) return;
+      // Draw mode owns the canvas — never start a pan.
+      if (this.drawMode) return;
 
       const path = (event.composedPath?.() ?? []) as EventTarget[];
       const hasClass = (cls: string) =>
@@ -237,7 +242,9 @@ export class BoardMainService {
 
       const tileEl = path.find(
         (p): p is HTMLElement => p instanceof HTMLElement &&
-          (p.tagName === 'APP-BOARD-NOTE' || p.tagName === 'APP-BOARD-IMAGE'),
+          (p.tagName === 'APP-BOARD-NOTE' ||
+            p.tagName === 'APP-BOARD-IMAGE' ||
+            p.tagName === 'APP-BOARD-DRAWING'),
       ) as HTMLElement | undefined;
       const isInsideTileBounds = tileEl
         ? (() => {
@@ -309,6 +316,7 @@ export class BoardMainService {
 
   showContextMenu(ev: MouseEvent) {
     if (!this.boardRef) return;
+    if (this.drawMode) return;
     ev.preventDefault();
 
     const path = (ev.composedPath?.() ?? []) as EventTarget[];
@@ -321,7 +329,7 @@ export class BoardMainService {
     const tileEl = path.find(
       (p): p is HTMLElement => p instanceof HTMLElement &&
         (p.tagName === 'APP-BOARD-TILE' || p.tagName === 'APP-BOARD-NOTE' ||
-         p.tagName === 'APP-BOARD-IMAGE'),
+         p.tagName === 'APP-BOARD-IMAGE' || p.tagName === 'APP-BOARD-DRAWING'),
     ) as HTMLElement | undefined;
     const isInsideTileBounds = tileEl
       ? (() => {

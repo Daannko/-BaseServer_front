@@ -9,30 +9,30 @@ import {
   Output,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { BoardImage } from './board-image.data';
-import { ItemRect, ItemResizeDirective } from '../board-item/item.resize.directive';
+import { BoardDrawing, SubStroke } from '../board-draw.data';
 import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
 import { BoardSnapService } from '../board-snap.service';
 import { BoardHistoryService } from '../board-history.service';
 import { BoardSelectionService } from '../board-selection.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
 
+/**
+ * A freehand stroke as a movable/deletable board element. Positioned at the
+ * stroke's bounding box; the path is drawn in local coordinates so moving the
+ * element only updates x/y (the vector data never changes). No resize — a
+ * stroke is its own intrinsic size.
+ */
 @Component({
-  selector: 'app-board-image',
+  selector: 'app-board-drawing',
   standalone: true,
-  imports: [
-    CommonModule,
-    ItemResizeDirective,
-    ItemMoveDirective,
-    SvgIconComponent,
-  ],
-  templateUrl: './board-image.component.html',
-  styleUrl: './board-image.component.scss',
+  imports: [CommonModule, ItemMoveDirective, SvgIconComponent],
+  templateUrl: './board-drawing.component.html',
+  styleUrl: './board-drawing.component.scss',
 })
-export class BoardImageComponent implements OnDestroy {
-  @Input() tile!: BoardImage;
+export class BoardDrawingComponent implements OnDestroy {
+  @Input() tile!: BoardDrawing;
   @Input() zoom = 1;
-  @Output() deleteImage = new EventEmitter<void>();
+  @Output() deleteDrawing = new EventEmitter<void>();
 
   @HostBinding('style.zIndex') get hostZIndex() { return this.tile?.zIndex ?? 1; }
   @HostBinding('style.left.px') get hostLeft() { return this.tile?.x ?? 0; }
@@ -40,18 +40,16 @@ export class BoardImageComponent implements OnDestroy {
   @HostBinding('style.width.px') get hostWidth() { return this.tile?.width ?? 0; }
   @HostBinding('style.height.px') get hostHeight() { return this.tile?.height ?? 0; }
   @HostBinding('style.--board-zoom') get boardZoomVar() { return String(this.zoom); }
-  @HostBinding('style.--tile-w') get tileWVar() { return (this.tile?.width ?? 0) + 'px'; }
-  @HostBinding('style.--tile-h') get tileHVar() { return (this.tile?.height ?? 0) + 'px'; }
   @HostBinding('attr.data-item-id') get itemIdAttr() { return this.tile?.id ?? null; }
 
   get isSelected(): boolean { return this.selection.isSelected(this.tile); }
 
   isFocused = false;
-  isOptionsPanelOpen = false;
   deleteConfirmPending = false;
 
   private deleteConfirmTimeout?: ReturnType<typeof setTimeout>;
   private isDraggingTile = false;
+  private gestureBefore: { x: number; y: number; width: number; height: number } | null = null;
 
   constructor(
     private host: ElementRef<HTMLElement>,
@@ -60,8 +58,6 @@ export class BoardImageComponent implements OnDestroy {
     private selection: BoardSelectionService,
   ) {}
 
-  // Rect snapshot at the start of a move/resize gesture, for history.
-  private gestureBefore: { x: number; y: number; width: number; height: number } | null = null;
   private rectSnapshot() {
     return { x: this.tile.x, y: this.tile.y, width: this.tile.width, height: this.tile.height };
   }
@@ -75,51 +71,24 @@ export class BoardImageComponent implements OnDestroy {
     const path = (ev.composedPath?.() ?? []) as EventTarget[];
     if (path.includes(this.host.nativeElement)) return;
     this.isFocused = false;
-    this.isOptionsPanelOpen = false;
     if (!this.isDraggingTile) {
       this.tile.forceToRender = false;
     }
   }
 
-  onSurfaceClick() { this.isFocused = true; }
-
-  /** Record the source image's true aspect ratio once it loads (covers images
-   *  restored from the server, where natural size isn't known up front). */
-  onImgLoad(ev: Event) {
-    const el = ev.target as HTMLImageElement;
-    this.tile.setNatural(el.naturalWidth, el.naturalHeight);
+  onSurfaceClick() {
+    // Ctrl+click selection is handled centrally by BoardComponent; a plain click
+    // just focuses (shows the controls bar).
+    this.isFocused = true;
   }
 
-  /** Restore the element height to match the original image aspect ratio,
-   *  keeping the current width. */
-  resetRatio() {
-    const before = this.rectSnapshot();
-    const ratio = this.tile.naturalRatio || 1;
-    this.tile.height = Math.round(this.tile.width / ratio);
-    this.history.pushRect(this.tile, before);
-    this.isOptionsPanelOpen = false;
+  /** Widened, invisible hit stroke so the thin line is easy to grab — the grab
+   *  zone hugs the stroke shape rather than filling the bounding box. */
+  hitWidth(s: SubStroke): number {
+    return Math.max(s.width + 14, 18);
   }
 
-  // ── Move / resize / delete ───────────────────────────────────────────────
-
-  onRectChange(r: ItemRect) {
-    const prev: ItemRect = {
-      x: this.tile.x,
-      y: this.tile.y,
-      width: this.tile.width,
-      height: this.tile.height,
-    };
-    if (!this.gestureBefore) this.gestureBefore = prev;
-    // Snap free stretches back to the original ratio + show the reference guide.
-    const s = this.snap.snapImageAspect(r, prev, this.tile.naturalRatio, 'original ratio');
-    this.tile.x = s.x; this.tile.y = s.y;
-    this.tile.width = s.width; this.tile.height = s.height;
-  }
-
-  onResizeEnd() {
-    this.snap.clearAspectGuide();
-    if (this.gestureBefore) { this.history.pushRect(this.tile, this.gestureBefore); this.gestureBefore = null; }
-  }
+  // ── Move / delete ──────────────────────────────────────────────────────────
 
   onPosChange(p: Position) {
     if (this.selection.isGroupMoving(this.tile)) {
@@ -162,7 +131,7 @@ export class BoardImageComponent implements OnDestroy {
     if (this.deleteConfirmPending) {
       clearTimeout(this.deleteConfirmTimeout);
       this.deleteConfirmPending = false;
-      this.deleteImage.emit();
+      this.deleteDrawing.emit();
     } else {
       this.deleteConfirmPending = true;
       this.deleteConfirmTimeout = setTimeout(() => { this.deleteConfirmPending = false; }, 2500);

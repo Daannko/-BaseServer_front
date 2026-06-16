@@ -277,6 +277,16 @@
   }
 }
 
+// ── Multi-selection outline (Ctrl+click) ───────────────────────────────────
+.selection-outline {
+  position: absolute;
+  inset: calc(-6px / var(--board-zoom, 1));
+  border: calc(1.5px / var(--board-zoom, 1)) dashed var(--bp-amber);
+  border-radius: calc(4px / var(--board-zoom, 1));
+  pointer-events: none;
+  z-index: 40;
+}
+
 // ── Resize handles (created by ItemResizeDirective) ────────────────────────
 .resize-handle {
   position: absolute;

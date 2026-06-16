@@ -262,6 +262,35 @@
         </ng-container>
       </div>
 
+      <!-- Drawings: each freehand stroke is a movable/deletable element. -->
+      <div class="drawings-layer">
+        <ng-container *ngFor="let drawing of drawings">
+          <app-board-drawing
+            [tile]="drawing"
+            [zoom]="zoom"
+            (mousedown)="bringToFront(drawing)"
+            (deleteDrawing)="onDeleteDrawing(drawing)"
+            *ngIf="isItemVisible(drawing)"
+          >
+          </app-board-drawing>
+        </ng-container>
+      </div>
+
+      <!-- In-progress stroke, rendered in world space (visual only). The actual
+           pointer capture is a screen-space overlay below, so it isn't limited
+           by the (collapsed) viewport box. -->
+      <svg class="draw-active" *ngIf="drawMode">
+        <path
+          *ngIf="drawing && drawTool === 'pen' && activeStrokeD"
+          [attr.d]="activeStrokeD"
+          [attr.stroke]="drawColor"
+          [attr.stroke-width]="activeStrokeWidth"
+          fill="none"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        />
+      </svg>
+
       <!-- Snap alignment guides (world coordinates, drawn during drag/resize) -->
       <ng-container *ngIf="snapGuides$ | async as guides">
         <div
@@ -314,6 +343,32 @@
         >{{ ag.label }}</div>
       </ng-container>
     </div>
+
+    <!-- Screen-space draw capture: covers the whole board so strokes can start
+         anywhere. Passes through while Space is held (to pan). -->
+    <div
+      class="draw-capture"
+      *ngIf="drawMode"
+      [class.draw-capture--panning]="spaceHeld"
+      (pointerdown)="onDrawPointerDown($event)"
+      (pointermove)="onDrawPointerMove($event)"
+      (pointerup)="onDrawPointerUp()"
+      (pointercancel)="onDrawPointerUp()"
+      (pointerleave)="cursorInside = false"
+    ></div>
+
+    <!-- Brush/eraser cursor preview (follows the mouse in draw mode). -->
+    <div
+      class="brush-cursor"
+      *ngIf="drawMode && !spaceHeld && cursorInside"
+      [class.brush-cursor--eraser]="drawTool === 'eraser'"
+      [style.left.px]="cursorX"
+      [style.top.px]="cursorY"
+      [style.width.px]="brushCursorSize"
+      [style.height.px]="brushCursorSize"
+      [style.background]="drawTool === 'pen' ? drawColor : 'transparent'"
+      [style.borderColor]="drawTool === 'pen' ? drawColor : 'rgba(255,255,255,0.8)'"
+    ></div>
   </div>
 
   <!-- Delete board confirmation modal -->
@@ -346,6 +401,102 @@
       </div>
     </div>
   </div>
+
+  <!-- Draw-mode navbar (injected via NavbarService, mirrors the note menu) -->
+  <ng-template #drawNavbarTemplate>
+    <div class="bar draw-bar">
+      <div class="navbar-tile-controls">
+        <div
+          class="color-picker-container"
+          (mouseenter)="isDrawPaletteVisible = true"
+          (mouseleave)="isDrawPaletteVisible = false"
+        >
+          <button
+            class="draw-paint-button"
+            [class.active]="drawTool === 'pen'"
+            (click)="setDrawTool('pen')"
+            title="Brush color"
+          >
+            <app-svg-icon
+              icon="paint-brush"
+              [style.color]="drawColor"
+            ></app-svg-icon>
+          </button>
+          <div class="color-palette" [class.open]="isDrawPaletteVisible">
+            <div class="temp"></div>
+            <app-color-palette
+              variant="dropdown"
+              [rows]="2"
+              [swatchCount]="10"
+              [swatchSize]="28"
+              [selected]="drawColor"
+              [history]="true"
+              [allowCustom]="true"
+              (colorChange)="onDrawColorChange($event)"
+            ></app-color-palette>
+          </div>
+        </div>
+        <button
+          class="draw-eraser-button"
+          [class.active]="drawTool === 'eraser'"
+          (click)="toggleEraser()"
+          title="Eraser"
+        >
+          <app-svg-icon icon="eraser"></app-svg-icon>
+        </button>
+        <div class="navbar-spacer"></div>
+        <input
+          type="range"
+          class="draw-width-slider"
+          min="1"
+          max="60"
+          step="1"
+          [(ngModel)]="drawWidth"
+          title="Line thickness"
+        />
+        <input
+          type="number"
+          class="note-option-input draw-width-num"
+          min="1"
+          step="1"
+          [(ngModel)]="drawWidth"
+          title="Line thickness (px)"
+        />
+        <span class="draw-width-unit">px</span>
+        <div class="navbar-spacer"></div>
+        <button class="draw-bar-clear" type="button" (click)="clearDrawing()">
+          Clear
+        </button>
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- Drawing selection navbar (merge / unmerge) -->
+  <ng-template #selectionNavbarTemplate>
+    <div class="bar draw-bar">
+      <div class="navbar-tile-controls">
+        <strong>{{ selectionCount }} selected</strong>
+        <div class="navbar-spacer"></div>
+        <button
+          *ngIf="canMergeDrawings"
+          class="draw-bar-clear"
+          type="button"
+          (click)="mergeSelectedDrawings()"
+        >
+          Merge
+        </button>
+        <button
+          *ngIf="canUnmergeDrawing"
+          class="draw-bar-clear"
+          type="button"
+          (click)="unmergeSelectedDrawing()"
+        >
+          Unmerge
+        </button>
+        <span class="draw-bar-hint">Ctrl+click to select more</span>
+      </div>
+    </div>
+  </ng-template>
 
   <app-context-menu
     [visible]="ctxMenu.visible"

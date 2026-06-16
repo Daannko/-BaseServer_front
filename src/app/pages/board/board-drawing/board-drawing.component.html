@@ -1,0 +1,61 @@
+<div class="board-item">
+  <!-- controls bar: move grip + delete, appears when focused -->
+  <div class="note-controls-bar" [class.is-visible]="isFocused">
+    <div
+      class="note-controls-move"
+      boardItemMove=""
+      [pos]="{ x: tile.x, y: tile.y }"
+      [zoom]="zoom"
+      (posChange)="onPosChange($event)"
+      (moveStart)="onMoveStart()"
+      (moveEnd)="onMoveEnd()"
+      (pointerdown)="$event.stopPropagation()"
+      (mousedown)="$event.stopPropagation()"
+    >
+      <span class="note-controls-grip"></span>
+    </div>
+    <button
+      class="note-controls-delete"
+      [class.confirm]="deleteConfirmPending"
+      (mousedown)="$event.stopPropagation()"
+      (pointerdown)="$event.stopPropagation()"
+      (click)="onDeleteClick($event)"
+      title="Delete drawing"
+    >
+      <span class="note-controls-delete-label">Delete?</span>
+      <app-svg-icon icon="close-x"></app-svg-icon>
+    </button>
+  </div>
+
+  <!-- selection outline (Ctrl+click) -->
+  <div class="selection-outline" *ngIf="isSelected"></div>
+
+  <!-- stroke surface; only the (widened) stroke is grabbable, not the box -->
+  <div
+    class="drawing-surface"
+    boardItemMove=""
+    [pos]="{ x: tile.x, y: tile.y }"
+    [zoom]="zoom"
+    (posChange)="onPosChange($event)"
+    (moveStart)="onMoveStart()"
+    (moveEnd)="onMoveEnd()"
+    (click)="onSurfaceClick()"
+  >
+    <svg class="drawing-svg">
+      <ng-container *ngFor="let s of tile.strokes">
+        <path
+          class="drawing-hit"
+          [attr.data-stroke-id]="tile.id"
+          [attr.d]="s.d"
+          [attr.stroke-width]="hitWidth(s)"
+        />
+        <path
+          class="drawing-line"
+          [attr.d]="s.d"
+          [attr.stroke]="s.color"
+          [attr.stroke-width]="s.width"
+        />
+      </ng-container>
+    </svg>
+  </div>
+</div>

@@ -1,5 +1,5 @@
 import { BoardItem } from '../board-item/board-item.data';
-import { Topic } from '../models/topic.model';
+import type { Note } from '../models/element.model';
 import { emptyDoc } from '../../../helpers/rich-text.util';
 
 export interface NoteOptions {
@@ -15,16 +15,12 @@ export class BoardNote extends BoardItem {
   borderWidth: number = 1;
   options: NoteOptions = { ...DEFAULT_NOTE_OPTIONS };
 
-  // Slightly superlinear (EXP > 1) so bigger notes start with proportionally
-  // bigger text. Anchored to FONT_REF_PX at a FONT_REF_SIZE-unit note.
   private static readonly FONT_REF_SIZE = 450;
   private static readonly FONT_REF_PX = 25;
   private static readonly FONT_EXP = 1.2;
 
-  /**
-   * Default text size, computed once from the note's size at creation. Frozen
-   * after that — resizing the note does NOT rescale the text.
-   */
+  /** Default text size, computed once from the note's size at creation. Frozen
+   *  after that — resizing the note does NOT rescale the text. */
   fontSize: number = BoardNote.FONT_REF_PX;
 
   static computeFontSize(width: number, height: number): number {
@@ -42,16 +38,16 @@ export class BoardNote extends BoardItem {
     return note;
   }
 
-  static fromNoteTopic(topic: Topic): BoardNote {
+  static fromNoteElement(el: Note): BoardNote {
     const note = new BoardNote(
-      topic.id,
-      topic.x, topic.y,
-      topic.width, topic.height,
+      el.id, el.x, el.y, el.width, el.height,
       emptyDoc(),
-      topic.content ?? emptyDoc(),
+      el.content ?? emptyDoc(),
     );
-    note.serverId = topic.id;
-    note.fontSize = BoardNote.computeFontSize(topic.width, topic.height);
+    note.hydrateBase(el);
+    note.fontSize = el.fontSize ?? BoardNote.FONT_REF_PX;
+    note.options.padding = el.padding ?? null;
+    note.saved();
     return note;
   }
 }
