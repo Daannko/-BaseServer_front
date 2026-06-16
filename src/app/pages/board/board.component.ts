@@ -466,6 +466,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         notes: this.notes,
         sections: this.sections,
         images: this.images,
+        drawings: this.drawings,
         noteComponents: this.noteComponents?.toArray() ?? [],
         cdr: this.cdr,
         onBackgroundMouseDown: () =>
@@ -876,6 +877,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const boardEl = this.boardRef?.nativeElement;
     boardEl?.removeEventListener('pointerdown', this.onBoardPointerDownCapture as EventListener, true);
     boardEl?.removeEventListener('click', this.onBoardClickCapture as EventListener, true);
+    window.removeEventListener('mousemove', this.trackMouse);
     this.destroy$.next();
     this.destroy$.complete();
   }
@@ -891,6 +893,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       notes: this.notes,
       sections: this.sections,
       images: this.images,
+      drawings: this.drawings,
       noteComponents: this.noteComponents?.toArray() ?? [],
       cdr: this.cdr,
       zoom: this.zoom,
@@ -910,6 +913,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const boardEl = this.boardRef.nativeElement;
     boardEl.addEventListener('pointerdown', this.onBoardPointerDownCapture as EventListener, true);
     boardEl.addEventListener('click', this.onBoardClickCapture as EventListener, true);
+    window.addEventListener('mousemove', this.trackMouse, { passive: true });
 
     if (this.notes.length > 0) {
       this.mainBoardService.centerOnItem(this.notes[0]);
@@ -1029,7 +1033,16 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  /** Upload an image blob and place the element at viewport center. */
+  /** Last known mouse position (screen px), so a pasted image drops under the
+   *  cursor instead of viewport center. */
+  private lastMouseClientX = 0;
+  private lastMouseClientY = 0;
+  private trackMouse = (e: MouseEvent): void => {
+    this.lastMouseClientX = e.clientX;
+    this.lastMouseClientY = e.clientY;
+  };
+
+  /** Upload an image blob and place it centered on the cursor. */
   private async addImageFromFile(file: File): Promise<void> {
     if (!this.selectedBoard) return;
     const boardId = this.selectedBoard.id;
@@ -1056,10 +1069,16 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const board = this.boardRef.nativeElement as HTMLElement;
     const rect = board.getBoundingClientRect();
-    const center = this.screenToWorld(
-      rect.left + rect.width / 2,
-      rect.top + rect.height / 2,
-    );
+    // Drop at the cursor when its position is known and inside the board;
+    // otherwise fall back to viewport center.
+    const mouseInside =
+      this.lastMouseClientX >= rect.left &&
+      this.lastMouseClientX <= rect.right &&
+      this.lastMouseClientY >= rect.top &&
+      this.lastMouseClientY <= rect.bottom;
+    const center = mouseInside
+      ? this.screenToWorld(this.lastMouseClientX, this.lastMouseClientY)
+      : this.screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
 
     const image = BoardImage.newImage(
       center.x - worldW / 2,

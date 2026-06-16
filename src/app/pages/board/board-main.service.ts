@@ -57,6 +57,7 @@ export class BoardMainService {
   notes: Array<BoardItem> = [];
   sections: Array<BoardItem> = [];
   images: Array<BoardItem> = [];
+  drawings: Array<BoardItem> = [];
   noteComponents: any[] = [];
   cdr: any = null; // optional ChangeDetectorRef
   onBackgroundMouseDown: (() => void) | null = null;
@@ -73,6 +74,7 @@ export class BoardMainService {
     notes?: Array<BoardItem>;
     sections?: Array<BoardItem>;
     images?: Array<BoardItem>;
+    drawings?: Array<BoardItem>;
     noteComponents?: any[];
     cdr?: any;
     zoom?: number;
@@ -85,6 +87,7 @@ export class BoardMainService {
     this.notes = options.notes || this.notes;
     this.sections = options.sections || this.sections;
     this.images = options.images || this.images;
+    this.drawings = options.drawings || this.drawings;
     this.noteComponents = options.noteComponents || this.noteComponents;
     this.cdr = options.cdr || this.cdr;
     if (typeof options.zoom === 'number') {
@@ -158,7 +161,7 @@ export class BoardMainService {
    *  (stable across reloads), then the client id (for not-yet-saved targets). */
   findItemById(id: string): BoardItem | undefined {
     if (!id) return undefined;
-    const all = [...this.notes, ...this.sections, ...this.images];
+    const all = [...this.notes, ...this.sections, ...this.images, ...this.drawings];
     return (
       all.find((i) => i.serverId === id) ?? all.find((i) => i.id === id)
     );

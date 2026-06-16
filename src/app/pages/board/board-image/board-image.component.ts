@@ -16,6 +16,7 @@ import { BoardSnapService } from '../board-snap.service';
 import { BoardHistoryService } from '../board-history.service';
 import { BoardSelectionService } from '../board-selection.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
+import { environment } from '../../../../environments/environment';
 
 @Component({
   selector: 'app-board-image',
@@ -45,6 +46,16 @@ export class BoardImageComponent implements OnDestroy {
   @HostBinding('attr.data-item-id') get itemIdAttr() { return this.tile?.id ?? null; }
 
   get isSelected(): boolean { return this.selection.isSelected(this.tile); }
+
+  /** Stored src is a relative media path (e.g. /media/boards/...); resolve it
+   *  against the API host so the <img> doesn't 404 against the dev origin.
+   *  Already-absolute (http/data/blob) srcs pass through unchanged. */
+  get imgSrc(): string {
+    const s = this.tile?.src ?? '';
+    if (!s || /^(https?:|data:|blob:)/i.test(s)) return s;
+    const base = environment.apiUrl.replace(/\/$/, '');
+    return base + (s.startsWith('/') ? s : '/' + s);
+  }
 
   isFocused = false;
   isOptionsPanelOpen = false;
