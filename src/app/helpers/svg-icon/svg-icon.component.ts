@@ -58,6 +58,7 @@ export class SvgIconComponent {
       'font-size-up': 'board_icons/arrow-up-alt2-svgrepo-com.svg',
       'font-size-down': 'board_icons/arrow-down-alt2-svgrepo-com.svg',
       table: 'board_icons/table/table.svg',
+      'ai-sparkle': 'board_icons/ai-sparkle.svg',
     };
 
     const filename = iconMap[icon] || `${icon}.svg`;

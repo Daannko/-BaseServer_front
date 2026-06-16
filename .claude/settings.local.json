@@ -34,7 +34,8 @@
       "PowerShell(npx tsc --noEmit -p tsconfig.app.json 2>&1 | Select-Object -First 40)",
       "PowerShell(Get-NetTCPConnection *)",
       "mcp__playwright__browser_network_requests",
-      "mcp__playwright__browser_network_request"
+      "mcp__playwright__browser_network_request",
+      "Read(//tmp/**)"
     ]
   }
 }

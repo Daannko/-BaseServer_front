@@ -106,9 +106,14 @@ export class BoardSelectionService {
     this.starts.clear();
     if (!moves.length) return;
 
-    this.history.push({
-      undo: () => moves.forEach((m) => { m.item.x = m.before.x; m.item.y = m.before.y; }),
-      redo: () => moves.forEach((m) => { m.item.x = m.after.x; m.item.y = m.after.y; }),
-    });
+    this.history.pushGroupMove(
+      moves.map((m) => ({
+        id: m.item.id,
+        bx: m.before.x,
+        by: m.before.y,
+        ax: m.after.x,
+        ay: m.after.y,
+      })),
+    );
   }
 }

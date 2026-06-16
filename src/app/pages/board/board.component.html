@@ -246,6 +246,33 @@
             *ngIf="isItemVisible(item)"
           >
           </app-board-note>
+          <!-- Fact-check overlay on this note -->
+          <ng-container *ngIf="factCheckResults.get(item.serverId ?? item.id) as fc">
+            <div
+              class="fact-check-tag"
+              [class.fc-expanded]="factCheckExpanded === (item.serverId ?? item.id)"
+              (click)="factCheckExpanded = factCheckExpanded === (item.serverId ?? item.id) ? null : (item.serverId ?? item.id); $event.stopPropagation()"
+            >
+              <span class="fc-score fc-score--{{ fc.verdict.score }}">
+                {{ fc.verdict.score === 'VERIFIED' ? '✓' : fc.verdict.score === 'MOSTLY_VERIFIED' ? '~✓' : fc.verdict.score === 'MIXED' ? '±' : fc.verdict.score === 'MOSTLY_INCORRECT' ? '~✗' : '✗' }}
+              </span>
+              <span class="fc-summary">{{ fc.verdict.summary }}</span>
+            </div>
+            <div
+              class="fact-check-details"
+              *ngIf="factCheckExpanded === (item.serverId ?? item.id)"
+            >
+              <div class="fc-claim" *ngFor="let d of fc.verdict.details">
+                <span class="fc-assessment fc-assessment--{{ d.assessment }}">
+                  {{ d.assessment === 'TRUE' ? '✓' : d.assessment === 'FALSE' ? '✗' : d.assessment === 'OPINION' ? '💬' : '?' }}
+                </span>
+                <div class="fc-claim-body">
+                  <q class="fc-claim-text">{{ d.claim }}</q>
+                  <span class="fc-claim-expl">{{ d.explanation }}</span>
+                </div>
+              </div>
+            </div>
+          </ng-container>
         </ng-container>
       </div>
 
@@ -371,6 +398,27 @@
     ></div>
   </div>
 
+  <!-- Board info (top-left, under navbar, fixed overlay) -->
+  <div class="board-info">
+    <!-- Zoom -->
+    <span [class.board-info--visible]="cameraZoomVisible">Zoom {{ cameraZoomPct }}%</span>
+    <!-- Position -->
+    <span [class.board-info--visible]="cameraPosVisible">X {{ cameraPosVal?.x | number:'1.0-1' }} · Y {{ cameraPosVal?.y | number:'1.0-1' }}</span>
+  </div>
+
+  <!-- Save indicator (fixed overlay, unaffected by pan/zoom) -->
+  <div
+    class="save-indicator"
+    *ngIf="saveStatus !== 'idle'"
+    [class.save-indicator--saving]="saveStatus === 'saving'"
+    [class.save-indicator--saved]="saveStatus === 'saved'"
+    [class.save-indicator--failed]="saveStatus === 'failed'"
+  >
+    <span *ngIf="saveStatus === 'saving'">Saving{{ saveDotsText }}</span>
+    <span *ngIf="saveStatus === 'saved'">Saved!</span>
+    <span *ngIf="saveStatus === 'failed'">Failed to save</span>
+  </div>
+
   <!-- Delete board confirmation modal -->
   <div class="delete-modal-backdrop" *ngIf="deleteBoardPending" (click)="cancelDeleteBoard()">
     <div class="delete-modal" (click)="$event.stopPropagation()">
@@ -471,7 +519,7 @@
     </div>
   </ng-template>
 
-  <!-- Drawing selection navbar (merge / unmerge) -->
+  <!-- Selection navbar (drawing ops for drawings, delete for all) -->
   <ng-template #selectionNavbarTemplate>
     <div class="bar draw-bar">
       <div class="navbar-tile-controls">
@@ -497,6 +545,139 @@
       </div>
     </div>
   </ng-template>
+
+  <!-- Delete hold progress bar (top-center under navbar) -->
+  <div
+    class="delete-hold-bar"
+    *ngIf="deleteHolding"
+  >
+    <div
+      class="delete-hold-fill"
+      [style.width.%]="deleteHoldProgress * 100"
+    ></div>
+  </div>
+
+  <!-- AI navbar (notes selected) -->
+  <ng-template #aiNavbarTemplate>
+    <div class="bar ai-bar">
+      <div class="navbar-tile-controls">
+        <app-svg-icon icon="ai-sparkle" class="ai-bar-icon"></app-svg-icon>
+        <strong>{{ selectionCount }} note{{ selectionCount === 1 ? '' : 's' }}</strong>
+        <div class="navbar-spacer"></div>
+        <!-- Coverage slider for quiz -->
+        <label class="quiz-coverage-label" title="How much of the quiz should come from the selected notes vs. related topics">
+          <span>Coverage</span>
+          <input
+            type="range"
+            class="quiz-coverage-slider"
+            min="0"
+            max="1"
+            step="0.05"
+            [(ngModel)]="quizCoverage"
+          />
+          <span class="quiz-coverage-val">{{ (quizCoverage * 100) | number:'1.0-0' }}%</span>
+        </label>
+        <div class="navbar-spacer"></div>
+        <button
+          class="ai-bar-btn"
+          type="button"
+          [disabled]="!canFactCheck"
+          (click)="runFactCheck()"
+        >
+          Fact check
+        </button>
+        <button
+          class="ai-bar-btn ai-bar-btn--primary"
+          type="button"
+          [disabled]="!canGenerateQuiz"
+          (click)="startQuiz()"
+        >
+          Quiz
+        </button>
+        <span class="draw-bar-hint" *ngIf="aiLoading">AI thinking…</span>
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- Quiz navbar (quiz active) -->
+  <ng-template #quizNavbarTemplate>
+    <div class="bar quiz-bar">
+      <div class="navbar-tile-controls">
+        <app-svg-icon icon="ai-sparkle" class="ai-bar-icon"></app-svg-icon>
+        <strong *ngIf="quiz">{{ quiz.title || 'Quiz' }}</strong>
+        <span class="quiz-progress" *ngIf="quiz">{{ quizProgress }}</span>
+        <div class="navbar-spacer"></div>
+        <span class="quiz-answered" *ngIf="quiz">{{ quizAnswers.size }} / {{ quiz.questions.length }} answered</span>
+        <div class="navbar-spacer"></div>
+        <button class="ai-bar-btn" type="button" (click)="closeQuiz()">Close</button>
+      </div>
+    </div>
+  </ng-template>
+
+  <!-- Quiz panel -->
+  <div class="quiz-panel" *ngIf="quiz && !quizSubmitted">
+    <div class="quiz-card">
+      <div
+        class="quiz-question"
+        *ngIf="quizCurrentQuestion as q"
+      >
+        <div class="quiz-q-num">{{ quizProgress }}</div>
+        <div class="quiz-q-text">{{ q.question }}</div>
+        <!-- Multiple choice -->
+        <div class="quiz-options" *ngIf="q.type === 'MULTIPLE_CHOICE' && q.options">
+          <button
+            class="quiz-option"
+            *ngFor="let opt of q.options"
+            [class.selected]="quizAnswers.get(q.id) === opt.key"
+            (click)="quizSelectAnswer(opt.key)"
+          >{{ opt.key }}. {{ opt.text }}</button>
+        </div>
+        <!-- True/false -->
+        <div class="quiz-options" *ngIf="q.type === 'TRUE_FALSE'">
+          <button
+            class="quiz-option"
+            [class.selected]="quizAnswers.get(q.id) === 'TRUE'"
+            (click)="quizSelectAnswer('TRUE')"
+          >True</button>
+          <button
+            class="quiz-option"
+            [class.selected]="quizAnswers.get(q.id) === 'FALSE'"
+            (click)="quizSelectAnswer('FALSE')"
+          >False</button>
+        </div>
+      </div>
+      <div class="quiz-nav">
+        <button class="ai-bar-btn" type="button" [disabled]="quizIndex === 0" (click)="quizPrev()">← Prev</button>
+        <span class="quiz-answered">{{ quizAnswers.size }} / {{ quiz.questions.length }} answered</span>
+        <button
+          class="ai-bar-btn"
+          type="button"
+          *ngIf="quiz && quizIndex < quiz.questions.length - 1"
+          (click)="quizNext()"
+        >Next →</button>
+        <button
+          class="ai-bar-btn ai-bar-btn--primary"
+          type="button"
+          *ngIf="quiz && quizAnswers.size >= quiz.questions.length"
+          (click)="submitQuiz()"
+        >Submit</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Quiz results panel -->
+  <div class="quiz-panel" *ngIf="quizSubmitted && quizScore">
+    <div class="quiz-card">
+      <h3>Results</h3>
+      <div class="quiz-score">
+        <span class="quiz-score-num">{{ quizScore!.score }}</span>
+        <span class="quiz-score-pct">{{ quizScore!.percentage }}%</span>
+      </div>
+      <div class="quiz-nav">
+        <button class="ai-bar-btn ai-bar-btn--primary" type="button" (click)="closeQuiz()">Done</button>
+      </div>
+    </div>
+  </div>
 
   <app-context-menu
     [visible]="ctxMenu.visible"

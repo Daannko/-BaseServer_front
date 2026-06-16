@@ -43,6 +43,12 @@ import {
 } from './board-draw.data';
 import { ColorPaletteComponent } from '../common/color-palette/color-palette.component';
 import { BoardDrawingComponent } from './board-drawing/board-drawing.component';
+import { BoardAiService } from './board-ai.service';
+import type {
+  FactCheckResult,
+  QuizQuestion,
+  QuizGenerateResponse,
+} from './models/ai.model';
 
 @Component({
   selector: 'app-board',
@@ -75,6 +81,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   drawNavbarTemplate!: TemplateRef<any>;
   @ViewChild('selectionNavbarTemplate', { static: true })
   selectionNavbarTemplate!: TemplateRef<any>;
+  @ViewChild('aiNavbarTemplate', { static: true })
+  aiNavbarTemplate!: TemplateRef<any>;
+  @ViewChild('quizNavbarTemplate', { static: true })
+  quizNavbarTemplate!: TemplateRef<any>;
   @ViewChildren(BoardNoteComponent)
   noteComponents!: QueryList<BoardNoteComponent>;
   @ViewChild('newBoardNameInput', { static: false })
@@ -98,6 +108,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   notesMap: Map<string, BoardItem> = new Map();
   sections: BoardSection[] = [];
   images: BoardImage[] = [];
+  /** Elements marked for deletion — sent to server on next save. */
+  pendingDeletes: BoardItem[] = [];
 
   // ── Draw mode (toggle with B) ──────────────────────────────────────────────
   drawMode = false;
@@ -231,6 +243,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.sections.length = 0;
     this.images.length = 0;
     this.drawings.length = 0;
+    this.pendingDeletes.length = 0;
     this.selection.clear();
     this.history.clear();
   }
@@ -248,11 +261,64 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private snapService: BoardSnapService,
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
+    private aiService: BoardAiService,
   ) {
     this.boards$ = this.boardSearchService.boards$;
     this.snapGuides$ = this.snapService.guides$;
     this.aspectGuide$ = this.snapService.aspectGuide$;
     this.history.onChange = () => this.cdr.detectChanges();
+
+    // Wire serializable history callbacks
+    this.history.getItemById = (id: string) => this.itemByIdMap(id);
+    this.history.onRestoreDelete = (id) => this.restoreDeletedItem(id);
+    this.history.onRedoDelete = (id) => this.redoDeletedItem(id);
+    this.history.onUndoCreate = (id) => this.undoCreateItem(id);
+    this.history.onRedoCreate = (id) => this.redoCreateItem(id);
+  }
+
+  /** Look up any element by id across all arrays. */
+  private itemByIdMap(id: string): BoardItem | null {
+    return (
+      this.notesMap.get(id) ??
+      this.sections.find((s) => s.id === id) ??
+      this.images.find((i) => i.id === id) ??
+      this.drawings.find((d) => d.id === id) ??
+      null
+    ) as BoardItem | null;
+  }
+
+  // ── History callbacks (undo/redo restore/delete/create) ──────────────────
+
+  /** Find item in pendingDeletes by id and restore it to the correct list. */
+  private restoreDeletedItem(id: string): void {
+    const item = this.pendingDeletes.find((el) => el.id === id);
+    if (!item) return;
+    this.pendingDeletes.splice(this.pendingDeletes.indexOf(item), 1);
+    if (item instanceof BoardNote) this.addToList(item, this.notes, this.notesMap);
+    else if (item instanceof BoardSection) this.addToList(item, this.sections);
+    else if (item instanceof BoardImage) this.addToList(item, this.images);
+    else if (item instanceof BoardDrawing) this.addToList(item, this.drawings);
+  }
+
+  /** Move item from active list to pendingDeletes. */
+  private redoDeletedItem(id: string): void {
+    const item = this.itemByIdMap(id);
+    if (!item) return;
+    this.pendingDeletes.push(item);
+    if (item instanceof BoardNote) this.removeFromList(item, this.notes, this.notesMap);
+    else if (item instanceof BoardSection) this.removeFromList(item, this.sections);
+    else if (item instanceof BoardImage) this.removeFromList(item, this.images);
+    else if (item instanceof BoardDrawing) this.removeFromList(item, this.drawings);
+  }
+
+  /** Move created item to pendingDeletes. */
+  private undoCreateItem(id: string): void {
+    this.redoDeletedItem(id);
+  }
+
+  /** Restore a created item from pendingDeletes. */
+  private redoCreateItem(id: string): void {
+    this.restoreDeletedItem(id);
   }
 
   // ── Element list mutation helpers (used by history commands) ───────────────
@@ -270,11 +336,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  private recordCreate(item: BoardItem, list: BoardItem[], map?: Map<string, BoardItem>): void {
-    this.history.push({
-      undo: () => this.removeFromList(item, list, map),
-      redo: () => this.addToList(item, list, map),
-    });
+  private recordCreate(item: BoardItem, _list?: BoardItem[], _map?: Map<string, BoardItem>): void {
+    this.history.pushCreate([item.id]);
   }
 
   resetNewBoardForm() {
@@ -359,6 +422,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       const defaultNavbarContext = this.buildDefaultNavbarContext();
 
+      // Drop history from previous board, then reset local state
+      if (this.selectedBoard) this.history.dropStored();
       this.resetState();
 
       const elements = await this.boardSearchService.getBoardElements(board.id);
@@ -374,6 +439,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       for (const drawing of elements.drawings) {
         this.addBoardDrawing(drawing);
       }
+
+      // Restore undo/redo history from browser storage (survives page refresh)
+      this.history.restore();
 
       await Promise.resolve();
       this.cdr.detectChanges();
@@ -569,6 +637,12 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       event.preventDefault();
       this.history.redo();
     }
+    // Delete key — delete selected elements
+    if (event.key === 'Delete' || event.key === 'Del') {
+      if (isTextEditingActive()) return;
+      event.preventDefault();
+      this.deleteSelectedPress();
+    }
   }
 
   @HostListener('window:keyup', ['$event'])
@@ -577,6 +651,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.spaceHeld = false;
       if (this.drawMode) this.mainBoardService.drawMode = true;
       this.cdr.detectChanges();
+    }
+    // Release delete hold
+    if (event.key === 'Delete' || event.key === 'Del') {
+      this.deleteSelectedRelease();
     }
   }
 
@@ -697,6 +775,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe((z) => {
         this.zoom = z;
+        this.showCameraZoom(this.zoom);
         this.cdr.detectChanges();
       });
 
@@ -705,6 +784,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.mainBoardService.camera$
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
+        this.showCameraPos(
+          this.mainBoardService.cameraX,
+          this.mainBoardService.cameraY,
+        );
         this.cdr.detectChanges();
       });
 
@@ -740,6 +823,14 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.stopSaveDots();
+    this.stopDeleteHold();
+    if (this.cameraZoomTimer !== null) { clearTimeout(this.cameraZoomTimer); this.cameraZoomTimer = null; }
+    if (this.cameraPosTimer !== null) { clearTimeout(this.cameraPosTimer); this.cameraPosTimer = null; }
+    // Clean up group drag listeners if mid-drag
+    window.removeEventListener('pointermove', this.onGroupDragMove);
+    window.removeEventListener('pointerup', this.onGroupDragUp);
+    window.removeEventListener('pointercancel', this.onGroupDragUp);
     const boardEl = this.boardRef?.nativeElement;
     boardEl?.removeEventListener('pointerdown', this.onBoardPointerDownCapture as EventListener, true);
     boardEl?.removeEventListener('click', this.onBoardClickCapture as EventListener, true);
@@ -825,15 +916,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  async onDeleteSection(section: BoardSection): Promise<void> {
-    if (section.serverId) {
-      try {
-        await this.boardSearchService.deleteElement(section);
-      } catch {
-        return;
-      }
-    }
-
+  onDeleteSection(section: BoardSection): void {
+    this.pendingDeletes.push(section);
     this.recordDelete(section, this.sections);
     this.removeFromList(section, this.sections);
   }
@@ -863,48 +947,24 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
   }
 
-  async onDeleteImage(image: BoardImage): Promise<void> {
-    if (image.serverId) {
-      try {
-        await this.boardSearchService.deleteElement(image);
-      } catch {
-        return;
-      }
-    }
+  onDeleteImage(image: BoardImage): void {
+    this.pendingDeletes.push(image);
     this.recordDelete(image, this.images);
     this.removeFromList(image, this.images);
   }
 
-  async onDeleteDrawing(drawing: BoardDrawing): Promise<void> {
-    if (drawing.serverId) {
-      try {
-        await this.boardSearchService.deleteElement(drawing);
-      } catch {
-        return;
-      }
-    }
+  onDeleteDrawing(drawing: BoardDrawing): void {
     if (this.selection.isSelected(drawing)) {
       this.selection.set(this.selection.items.filter((i) => i !== drawing));
     }
+    this.pendingDeletes.push(drawing);
     this.recordDelete(drawing, this.drawings);
     this.removeFromList(drawing, this.drawings);
   }
 
-  /** Records an element removal so Ctrl+Z restores it. The restored item loses
-   *  its serverId (the topic was already deleted) and is marked dirty so the
-   *  next save re-creates it. */
-  private recordDelete(item: BoardItem, list: BoardItem[], map?: Map<string, BoardItem>): void {
-    this.history.push({
-      undo: () => {
-        item.serverId = undefined;
-        item.positionUpdated = true;
-        item.sizeUpdated = true;
-        item.contentUpdated = true;
-        item.nameUpdated = true;
-        this.addToList(item, list, map);
-      },
-      redo: () => this.removeFromList(item, list, map),
-    });
+  /** Records an element removal so Ctrl+Z restores it. */
+  private recordDelete(item: BoardItem, _list?: BoardItem[], _map?: Map<string, BoardItem>): void {
+    this.history.pushDelete([item.id]);
   }
 
   // ── Paste image (Ctrl+V) ──────────────────────────────────────────────────
@@ -974,15 +1034,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
-  async onDeleteNote(tile: BoardItem): Promise<void> {
-    if (tile.serverId) {
-      try {
-        await this.boardSearchService.deleteElement(tile);
-      } catch {
-        return;
-      }
-    }
-
+  onDeleteNote(tile: BoardItem): void {
+    this.pendingDeletes.push(tile);
     this.recordDelete(tile, this.notes, this.notesMap);
     this.removeFromList(tile, this.notes, this.notesMap);
   }
@@ -1000,8 +1053,12 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
+  /** Sync all local changes to the server. Called only on Ctrl+S.
+   *  All mutations are local-only until this runs. */
   async saveBoard(): Promise<void> {
     if (!this.selectedBoard) return;
+
+    this.setSaveStatus('saving');
 
     const boardId = this.selectedBoard.id;
     const allItems: BoardItem[] = [
@@ -1010,24 +1067,122 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       ...this.images,
       ...this.drawings,
     ];
-    const tilesToCreate = allItems.filter((t) => !t.serverId);
 
-    if (tilesToCreate.length > 0) {
-      const createdElements = await Promise.all(
-        tilesToCreate.map((t) =>
-          this.boardSearchService.createElement(t, boardId),
-        ),
-      );
-      for (let i = 0; i < createdElements.length; i++) {
-        const created = createdElements[i];
-        if (!created) continue;
-        tilesToCreate[i].serverId = created.id;
+    try {
+      // 1. Delete elements marked for removal (sent to server, then dropped)
+      if (this.pendingDeletes.length > 0) {
+        const toDelete = this.pendingDeletes.filter((d) => d.serverId);
+        if (toDelete.length > 0) {
+          await Promise.all(
+            toDelete.map((d) =>
+              this.boardSearchService.deleteElement(d).catch(() => {}),
+            ),
+          );
+        }
+        this.pendingDeletes.length = 0;
       }
-    }
 
-    await Promise.all(
-      allItems.filter(t => Boolean(t.serverId)).map(t => this.boardSearchService.saveElement(t)),
-    );
+      // 2. Create new elements (no serverId yet)
+      const toCreate = allItems.filter((t) => !t.serverId);
+      if (toCreate.length > 0) {
+        const created = await Promise.all(
+          toCreate.map((t) =>
+            this.boardSearchService.createElement(t, boardId),
+          ),
+        );
+        for (let i = 0; i < created.length; i++) {
+          if (created[i]) toCreate[i].serverId = created[i]!.id;
+        }
+      }
+
+      // 3. Update dirty existing elements
+      const toUpdate = allItems.filter(
+        (t) => t.serverId && t.toBeUpdated(),
+      );
+      if (toUpdate.length > 0) {
+        await Promise.all(
+          toUpdate.map((t) => this.boardSearchService.saveElement(t)),
+        );
+      }
+
+      this.setSaveStatus('saved');
+    } catch {
+      this.setSaveStatus('failed');
+    }
+  }
+
+  // ── Save indicator helpers ────────────────────────────────────────────────
+
+  private setSaveStatus(s: typeof this.saveStatus): void {
+    this.saveStatus = s;
+    this.stopSaveDots();
+
+    if (s === 'saving') {
+      this.saveDots = 1;
+      this.saveDotsTimer = setInterval(() => {
+        this.saveDots = (this.saveDots % 3) + 1;
+        this.cdr.detectChanges();
+      }, 400);
+    } else {
+      // Auto-hide success/failure after 2.5 s
+      setTimeout(() => {
+        if (this.saveStatus === s) this.saveStatus = 'idle';
+        this.cdr.detectChanges();
+      }, 2500);
+    }
+    this.cdr.detectChanges();
+  }
+
+  private stopSaveDots(): void {
+    if (this.saveDotsTimer !== null) {
+      clearInterval(this.saveDotsTimer);
+      this.saveDotsTimer = null;
+    }
+  }
+
+  get saveDotsText(): string {
+    return '.'.repeat(this.saveDots);
+  }
+
+  // ── Camera info (top-left, fades after 1s) ───────────────────────────────
+
+  /** Separate timers so zoom and position fade independently. */
+  cameraZoomVisible = false;
+  cameraPosVisible = false;
+  cameraZoomVal: number | null = null;
+  cameraPosVal: { x: number; y: number } | null = null;
+  private cameraZoomTimer: ReturnType<typeof setTimeout> | null = null;
+  private cameraPosTimer: ReturnType<typeof setTimeout> | null = null;
+
+  /** Zoom % with one decimal when below 1×, integer otherwise. */
+  get cameraZoomPct(): string {
+    if (this.cameraZoomVal === null) return '';
+    const pct = this.cameraZoomVal * 100;
+    return pct >= 1 ? pct.toFixed(0) : pct.toFixed(1);
+  }
+
+  private showCameraZoom(zoom: number): void {
+    this.cameraZoomVal = zoom;
+    this.cameraZoomVisible = true;
+    if (this.cameraZoomTimer !== null) clearTimeout(this.cameraZoomTimer);
+    this.cameraZoomTimer = setTimeout(() => {
+      this.cameraZoomVisible = false;
+      this.cameraZoomTimer = null;
+      this.cdr.detectChanges();
+    }, 1500);
+    this.cdr.detectChanges();
+  }
+
+  private showCameraPos(camX: number, camY: number): void {
+    this.cameraPosVal = { x: camX, y: camY };
+    this.cameraPosVisible = true;
+    if (this.cameraPosTimer !== null) clearTimeout(this.cameraPosTimer);
+    this.cameraPosTimer = setTimeout(() => {
+      this.cameraPosVisible = false;
+      this.cameraPosTimer = null;
+      this.cdr.detectChanges();
+    }, 1500);
+    this.cdr.detectChanges();
   }
 
   // ── Draw mode ──────────────────────────────────────────────────────────────
@@ -1125,17 +1280,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (!before) return;
       const after = this.drawings.slice();
       if (sameStrokes(before, after)) return;
-      // Restore/redo by rebuilding the list in place (template binds the array
-      // reference, so it must never be reassigned).
-      const restore = (snapshot: BoardDrawing[]) => {
-        this.drawings.length = 0;
-        this.drawings.push(...snapshot);
-        this.cdr.detectChanges();
-      };
-      this.history.push({
-        undo: () => restore(before),
-        redo: () => restore(after),
-      });
+      const deletedIds = before.filter((d) => !after.includes(d)).map((d) => d.id);
+      if (deletedIds.length) this.history.pushDelete(deletedIds);
       return;
     }
 
@@ -1190,17 +1336,11 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   clearDrawing(): void {
     if (!this.drawings.length) return;
     const removed = this.drawings.slice();
+    for (const d of removed) {
+      this.pendingDeletes.push(d);
+    }
     this.drawings.length = 0;
-    this.history.push({
-      undo: () => {
-        this.drawings.push(...removed);
-        this.cdr.detectChanges();
-      },
-      redo: () => {
-        this.drawings.length = 0;
-        this.cdr.detectChanges();
-      },
-    });
+    this.history.pushDelete(removed.map((d) => d.id));
     this.cdr.detectChanges();
   }
 
@@ -1233,18 +1373,152 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     if (ev.ctrlKey || ev.metaKey) {
       if (!item) return;
-      // Take over the gesture so the element doesn't move/focus on a Ctrl+click.
       ev.preventDefault();
       ev.stopPropagation();
-      this.selection.toggle(item, true);
+      this.toggleSelection(item);
       return;
     }
-    // Plain press clears the selection unless you're grabbing a selected item
-    // (which begins a group move).
+
+    // Clicking a selected item → start group drag (no pan, no focus)
+    if (item && this.selection.isSelected(item)) {
+      ev.preventDefault();
+      ev.stopPropagation();
+      this.startGroupDrag(item, ev);
+      return;
+    }
+
+    // Plain press on unselected item / empty space → clear selection
     if (!item || !this.selection.isSelected(item)) {
       this.selection.clear();
     }
   };
+
+  // ── Group drag (selected items move together) ────────────────────────────
+
+  private groupDragActive = false;
+  private groupDragAnchor: BoardItem | null = null;
+  private groupDragStartX = 0;
+  private groupDragStartY = 0;
+  private groupDragStarts = new Map<BoardItem, { x: number; y: number }>();
+
+  private startGroupDrag(anchor: BoardItem, ev: PointerEvent): void {
+    const sel = this.selection.items;
+    this.groupDragActive = true;
+    this.groupDragAnchor = anchor;
+    this.groupDragStartX = ev.clientX;
+    this.groupDragStartY = ev.clientY;
+    this.groupDragStarts.clear();
+    for (const it of sel) {
+      this.groupDragStarts.set(it, { x: it.x, y: it.y });
+    }
+
+    const board = this.boardRef.nativeElement as HTMLElement;
+    try { board.setPointerCapture(ev.pointerId); } catch {}
+
+    window.addEventListener('pointermove', this.onGroupDragMove, { passive: false });
+    window.addEventListener('pointerup', this.onGroupDragUp);
+    window.addEventListener('pointercancel', this.onGroupDragUp);
+  }
+
+  private onGroupDragMove = (ev: PointerEvent): void => {
+    if (!this.groupDragActive) return;
+    ev.preventDefault();
+
+    const dxPx = ev.clientX - this.groupDragStartX;
+    const dyPx = ev.clientY - this.groupDragStartY;
+    const z = this.zoom || 1;
+    const dxW = dxPx / z;
+    const dyW = dyPx / z;
+
+    for (const it of this.groupDragStarts.keys()) {
+      const s = this.groupDragStarts.get(it);
+      if (!s) continue;
+      it.x = Math.round(s.x + dxW);
+      it.y = Math.round(s.y + dyW);
+    }
+    this.cdr.detectChanges();
+  };
+
+  private onGroupDragUp = (): void => {
+    if (!this.groupDragActive) return;
+    this.groupDragActive = false;
+
+    try {
+      const board = this.boardRef.nativeElement as HTMLElement;
+      board.releasePointerCapture?.(1);
+    } catch {}
+
+    window.removeEventListener('pointermove', this.onGroupDragMove);
+    window.removeEventListener('pointerup', this.onGroupDragUp);
+    window.removeEventListener('pointercancel', this.onGroupDragUp);
+
+    // Record one undo step (positionUpdated is set by the x/y setters during drag)
+    this.pushGroupDragUndo();
+    this.groupDragStarts.clear();
+    this.groupDragAnchor = null;
+    this.cdr.detectChanges();
+  };
+
+  private pushGroupDragUndo(): void {
+    const moves: Array<{ id: string; bx: number; by: number; ax: number; ay: number }> = [];
+    for (const [it, before] of this.groupDragStarts) {
+      if (before.x !== it.x || before.y !== it.y) {
+        moves.push({ id: it.id, bx: before.x, by: before.y, ax: it.x, ay: it.y });
+      }
+    }
+    if (moves.length === 0) return;
+    this.history.pushGroupMove(moves);
+  }
+
+  /** Toggle an item in/out of the selection. When toggling a section in, also
+   *  select every element fully contained inside it; when toggling out, deselect
+   *  its contained elements. Works recursively for nested sections. */
+  private toggleSelection(item: BoardItem): void {
+    const adding = !this.selection.isSelected(item);
+    this.selection.toggle(item, true);
+
+    if (item instanceof BoardSection) {
+      this.toggleSectionContents(item, adding);
+    }
+  }
+
+  /** Recursively toggle all elements (notes, images, drawings, sections) that
+   *  are fully inside `section`. */
+  private toggleSectionContents(section: BoardSection, adding: boolean): void {
+    const candidates: BoardItem[] = [
+      ...this.notes,
+      ...this.images,
+      ...this.drawings,
+      ...this.sections,
+    ];
+
+    for (const el of candidates) {
+      if (el === section) continue;
+      if (!this.isInside(el, section)) continue;
+
+      const selected = this.selection.isSelected(el);
+      if (adding && !selected) {
+        this.selection.toggle(el, true);
+      } else if (!adding && selected) {
+        this.selection.toggle(el, true);
+      }
+
+      // Recurse into nested sections
+      if (el instanceof BoardSection) {
+        this.toggleSectionContents(el, adding);
+      }
+    }
+  }
+
+  /** True when `el` is fully inside `section`. */
+  private isInside(el: BoardItem, section: BoardSection): boolean {
+    return (
+      el.x >= section.x &&
+      el.y >= section.y &&
+      (el.x + el.width) <= (section.x + section.width) &&
+      (el.y + el.height) <= (section.y + section.height)
+    );
+  }
 
   private onBoardClickCapture = (ev: MouseEvent): void => {
     if (this.drawMode) return;
@@ -1258,6 +1532,131 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   get selectionCount(): number {
     return this.selection.size;
   }
+
+  // ── Delete selected elements ──────────────────────────────────────────────
+
+  deleteHolding = false;
+  deleteHoldStart = 0;
+  deleteHoldProgress = 0; // 0-1
+  private deleteHoldTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly DELETE_HOLD_MS = 3000; // hold duration for >3 items
+
+  get canDeleteSelected(): boolean {
+    return this.selection.size > 0;
+  }
+
+  get deleteRequiresHold(): boolean {
+    return this.selection.size > 3;
+  }
+
+  deleteSelectedPress(): void {
+    if (!this.canDeleteSelected) return;
+
+    if (!this.deleteRequiresHold) {
+      // ≤3 items — immediate delete
+      this.deleteSelectedNow();
+      return;
+    }
+
+    // >3 items — start hold
+    this.deleteHolding = true;
+    this.deleteHoldStart = Date.now();
+    this.deleteHoldProgress = 0;
+    this.deleteHoldTimer = setInterval(() => {
+      const elapsed = Date.now() - this.deleteHoldStart;
+      this.deleteHoldProgress = Math.min(1, elapsed / this.DELETE_HOLD_MS);
+      if (this.deleteHoldProgress >= 1) {
+        this.stopDeleteHold();
+        this.deleteSelectedNow();
+      }
+      this.cdr.detectChanges();
+    }, 50);
+  }
+
+  deleteSelectedRelease(): void {
+    this.stopDeleteHold();
+  }
+
+  private stopDeleteHold(): void {
+    if (this.deleteHoldTimer !== null) {
+      clearInterval(this.deleteHoldTimer);
+      this.deleteHoldTimer = null;
+    }
+    this.deleteHolding = false;
+    this.deleteHoldProgress = 0;
+  }
+
+  private async deleteSelectedNow(): Promise<void> {
+    const items = this.selection.items.slice();
+    this.selection.clear();
+
+    // Remove from local arrays only — no server call yet.
+    // Items are collected in pendingDeletes; saveBoard() sends the DELETEs.
+    for (const item of items) {
+      this.pendingDeletes.push(item);
+      if (item instanceof BoardNote) this.removeFromList(item, this.notes, this.notesMap);
+      else if (item instanceof BoardSection) this.removeFromList(item, this.sections);
+      else if (item instanceof BoardImage) this.removeFromList(item, this.images);
+      else if (item instanceof BoardDrawing) this.removeFromList(item, this.drawings);
+    }
+
+    // Single undo step to restore all
+    this.history.pushDelete(items.map((it) => it.id));
+
+    this.cdr.detectChanges();
+  }
+
+  // ── AI state ──────────────────────────────────────────────────────────────
+
+  /** True while an AI request is in flight. */
+  aiLoading = false;
+  /** Fact-check results keyed by noteId. */
+  factCheckResults = new Map<string, FactCheckResult>();
+  /** Show fact-check details for this noteId. */
+  factCheckExpanded: string | null = null;
+
+  /** Quiz generation result. */
+  quiz: QuizGenerateResponse | null = null;
+  /** Current question index. */
+  quizIndex = 0;
+  /** Coverage slider value (0–1). */
+  quizCoverage = 0.75;
+  /** User's answers keyed by question id. */
+  quizAnswers = new Map<string, string>();
+  /** True once the quiz is submitted and scored. */
+  quizSubmitted = false;
+  /** Score summary after evaluation. */
+  quizScore: { score: string; percentage: number } | null = null;
+
+  /** True when all selected items are notes. */
+  get selectedNotes(): BoardNote[] {
+    return this.selection.items.filter(
+      (i): i is BoardNote => i instanceof BoardNote,
+    );
+  }
+
+  get canFactCheck(): boolean {
+    return !this.aiLoading && this.selectedNotes.length >= 1;
+  }
+
+  get canGenerateQuiz(): boolean {
+    return !this.aiLoading && this.selectedNotes.length >= 1;
+  }
+
+  get quizCurrentQuestion(): QuizQuestion | null {
+    return this.quiz?.questions[this.quizIndex] ?? null;
+  }
+
+  get quizProgress(): string {
+    if (!this.quiz) return '';
+    return `${this.quizIndex + 1} / ${this.quiz.questions.length}`;
+  }
+
+  // ── Save indicator ────────────────────────────────────────────────────────
+
+  saveStatus: 'idle' | 'saving' | 'saved' | 'failed' = 'idle';
+  private saveDots = 0;
+  private saveDotsTimer: ReturnType<typeof setInterval> | null = null;
 
   private get selectedDrawings(): BoardDrawing[] {
     return this.selection.items.filter((i): i is BoardDrawing => i instanceof BoardDrawing);
@@ -1285,6 +1684,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     for (const d of sel) {
       const i = this.drawings.indexOf(d);
       if (i >= 0) this.drawings.splice(i, 1);
+      this.pendingDeletes.push(d);
     }
     this.drawings.push(merged);
     this.bringToFront(merged);
@@ -1301,32 +1701,35 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     const before = this.drawings.slice();
     const singles = d.toAbsolute().map((s) => BoardDrawing.fromAbsolute([s]));
-    this.drawings.splice(i, 1, ...singles);
+    this.drawings.splice(i, 1);
+    this.pendingDeletes.push(d);
+    for (const s of singles) this.drawings.push(s);
     this.selection.set(singles);
     this.pushDrawingsSnapshot(before, this.drawings.slice());
     this.cdr.detectChanges();
   }
 
-  /** One undo step that swaps the whole drawing list between two snapshots,
-   *  rebuilt in place (the template binds the array reference). */
+  /** One undo step that swaps the whole drawing list between two snapshots. */
   private pushDrawingsSnapshot(before: BoardDrawing[], after: BoardDrawing[]): void {
-    const restore = (snap: BoardDrawing[]) => {
-      this.drawings.length = 0;
-      this.drawings.push(...snap);
-      this.selection.clear();
-      this.cdr.detectChanges();
-    };
-    this.history.push({
-      undo: () => restore(before),
-      redo: () => restore(after),
-    });
+    const deleted = before.filter((d) => !after.includes(d));
+    const created = after.filter((d) => !before.includes(d));
+    if (deleted.length) {
+      this.history.pushDelete(deleted.map((d) => d.id));
+    }
+    if (created.length) {
+      this.history.pushCreate(created.map((d) => d.id));
+    }
   }
 
-  /** Show the merge/unmerge bar while drawings are selected; otherwise restore
-   *  the default navbar. No-op while draw mode owns the navbar. */
+  /** Show AI controls for note selections, merge/unmerge for drawings,
+   *  otherwise the default navbar. No-op while draw mode owns the navbar. */
   private updateSelectionNavbar(): void {
     if (this.drawMode) return;
-    if (this.selection.size) {
+    if (this.quiz) {
+      this.navBarService.setTemplate(this.quizNavbarTemplate);
+    } else if (this.selectedNotes.length === this.selection.size && this.selection.size > 0) {
+      this.navBarService.setTemplate(this.aiNavbarTemplate);
+    } else if (this.selection.size) {
       this.navBarService.setTemplate(this.selectionNavbarTemplate);
     } else {
       this.navBarService.setTemplate(
@@ -1334,6 +1737,107 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.buildDefaultNavbarContext(),
       );
     }
+  }
+
+  // ── AI actions ───────────────────────────────────────────────────────────
+
+  private selectedNoteInputs() {
+    return this.selectedNotes.map((n) => ({
+      id: n.serverId ?? n.id,
+      content: n.content,
+    }));
+  }
+
+  async runFactCheck(): Promise<void> {
+    if (!this.canFactCheck) return;
+    this.aiLoading = true;
+    this.factCheckResults.clear();
+    this.cdr.detectChanges();
+
+    const req = { notes: this.selectedNoteInputs() };
+    const res = await this.aiService.factCheck(req);
+    this.aiLoading = false;
+
+    if (res) {
+      for (const r of res.results) {
+        this.factCheckResults.set(r.noteId, r);
+      }
+    }
+    this.cdr.detectChanges();
+  }
+
+  clearFactChecks(): void {
+    this.factCheckResults.clear();
+    this.factCheckExpanded = null;
+    this.cdr.detectChanges();
+  }
+
+  async startQuiz(): Promise<void> {
+    if (!this.canGenerateQuiz) return;
+    this.aiLoading = true;
+    this.quiz = null;
+    this.quizIndex = 0;
+    this.quizAnswers.clear();
+    this.quizSubmitted = false;
+    this.quizScore = null;
+    this.cdr.detectChanges();
+
+    const req = {
+      notes: this.selectedNoteInputs(),
+      coverage: this.quizCoverage,
+    };
+    const res = await this.aiService.generateQuiz(req);
+    this.aiLoading = false;
+
+    if (res?.questions?.length) {
+      this.quiz = res;
+      this.updateSelectionNavbar();
+    }
+    this.cdr.detectChanges();
+  }
+
+  quizPrev(): void {
+    if (this.quizIndex > 0) this.quizIndex--;
+  }
+
+  quizNext(): void {
+    if (this.quiz && this.quizIndex < this.quiz.questions.length - 1) {
+      this.quizIndex++;
+    }
+  }
+
+  quizSelectAnswer(answer: string): void {
+    const q = this.quizCurrentQuestion;
+    if (!q) return;
+    this.quizAnswers.set(q.id, answer);
+    // Auto-advance on multiple-choice selection
+    if (q.type === 'MULTIPLE_CHOICE' && this.quizIndex < (this.quiz?.questions.length ?? 0) - 1) {
+      setTimeout(() => this.quizNext(), 300);
+    }
+  }
+
+  async submitQuiz(): Promise<void> {
+    if (!this.quiz) return;
+    const questions = Array.from(this.quizAnswers.entries()).map(
+      ([id, answer]) => ({ id, answer }),
+    );
+    const res = await this.aiService.evaluateQuiz({ questions });
+    if (res) {
+      this.quizScore = { score: res.score, percentage: res.percentage };
+      this.quizSubmitted = true;
+    }
+    this.cdr.detectChanges();
+  }
+
+  closeQuiz(): void {
+    this.quiz = null;
+    this.quizIndex = 0;
+    this.quizAnswers.clear();
+    this.quizSubmitted = false;
+    this.quizScore = null;
+    // Restore selection navbar
+    this.updateSelectionNavbar();
+    this.cdr.detectChanges();
   }
 
   closeContextMenu() {

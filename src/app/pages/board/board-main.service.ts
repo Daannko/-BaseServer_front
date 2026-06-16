@@ -244,7 +244,8 @@ export class BoardMainService {
         (p): p is HTMLElement => p instanceof HTMLElement &&
           (p.tagName === 'APP-BOARD-NOTE' ||
             p.tagName === 'APP-BOARD-IMAGE' ||
-            p.tagName === 'APP-BOARD-DRAWING'),
+            p.tagName === 'APP-BOARD-DRAWING' ||
+            p.tagName === 'APP-BOARD-SECTION'),
       ) as HTMLElement | undefined;
       const isInsideTileBounds = tileEl
         ? (() => {
