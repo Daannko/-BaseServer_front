@@ -1,5 +1,5 @@
 import type { JSONContent } from '@tiptap/core';
-import { BoardItem } from './board-item/board-item.data';
+import { BoardItem, BoardItemSnapshot } from './board-item/board-item.data';
 import type { Drawing, DrawingStroke } from './models/element.model';
 import { emptyDoc } from '../../helpers/rich-text.util';
 
@@ -97,6 +97,23 @@ export class BoardDrawing extends BoardItem {
     return BoardDrawing.fromAbsolute([{ color, width: strokeWidth, points: absPoints }]);
   }
 
+  /** Deep copy with a fresh id, offset by (dx, dy). Used by copy/paste. */
+  clone(dx = 0, dy = 0): BoardDrawing {
+    const strokes: SubStroke[] = this.strokes.map((s) => ({
+      color: s.color,
+      width: s.width,
+      points: s.points.map((p) => ({ x: p.x, y: p.y })),
+      d: s.d,
+    }));
+    const d = new BoardDrawing(
+      globalThis.crypto.randomUUID(),
+      this.x + dx, this.y + dy, this.width, this.height,
+      strokes,
+    );
+    d.zIndex = this.zIndex;
+    return d;
+  }
+
   static fromDrawingElement(el: Drawing): BoardDrawing {
     const strokes: SubStroke[] = (el.strokes ?? []).map((s) => {
       const points: DrawPoint[] = [];
@@ -116,6 +133,32 @@ export class BoardDrawing extends BoardItem {
     );
     drawing.hydrateBase(el);
     drawing.saved();
+    return drawing;
+  }
+
+  override toSnapshot(): BoardItemSnapshot {
+    return {
+      ...this.baseSnapshot(),
+      type: 'drawing',
+      strokes: this.strokes.map((st) => ({
+        color: st.color,
+        width: st.width,
+        points: st.points.map((p) => ({ x: p.x, y: p.y })),
+      })),
+    };
+  }
+
+  static fromSnapshot(s: BoardItemSnapshot): BoardDrawing {
+    const strokes: SubStroke[] = (s.strokes ?? []).map((st) => ({
+      color: st.color,
+      width: st.width,
+      points: st.points.map((p) => ({ x: p.x, y: p.y })),
+      d: buildStrokePath(st.points),
+    }));
+    const drawing = new BoardDrawing(
+      s.id, s.x, s.y, s.width, s.height, strokes,
+    );
+    drawing.hydrateFromSnapshot(s);
     return drawing;
   }
 }

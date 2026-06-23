@@ -150,28 +150,43 @@ export class BoardSnapService {
     );
   }
 
+  /** Same as candidates(), but excludes a whole set of ids (used for group moves
+   *  so the dragged selection never snaps to its own members). */
+  private candidatesExcluding(excludeIds: Set<string>): BoardItem[] {
+    return [...this.main.notes, ...this.main.sections, ...this.main.images].filter(
+      (n) => !excludeIds.has(n.id) && n.inView,
+    );
+  }
+
   /**
-   * Snap a dragged note so its edges/centers align with nearby notes.
-   * Each axis snaps independently to the closest candidate within threshold.
-   * Emits guide lines for whatever was snapped to.
+   * Closest edge/center alignment for `rect` on each axis independently, among
+   * `others`. Shared by single-item and group moves.
    */
-  snapMove(rect: ItemRect, excludeId: string): { x: number; y: number } {
+  private bestAxisSnaps(
+    rect: ItemRect,
+    others: BoardItem[],
+  ): { bestX: AxisCandidate | null; bestY: AxisCandidate | null } {
     const t = this.threshold();
     let bestX: AxisCandidate | null = null;
     let bestY: AxisCandidate | null = null;
     let bestDx = Infinity;
     let bestDy = Infinity;
 
-    for (const o of this.candidates(excludeId)) {
-      // x values the note's left edge could take so that left/center/right
-      // aligns with the other note's left/center/right. `line` is where the
+    for (const o of others) {
+      // x values the rect's left edge could take so that left/center/right
+      // aligns with the other's left/center/right. `line` is where the
       // alignment actually happens (for drawing the guide).
+      const oCenterX = o.getCenterX();
       const xCandidates: Array<[number, number]> = [
         [o.x, o.x], // left ↔ left
         [o.x + o.width, o.x + o.width], // left ↔ right
         [o.x - rect.width, o.x], // right ↔ left
         [o.x + o.width - rect.width, o.x + o.width], // right ↔ right
-        [o.getCenterX() - rect.width / 2, o.getCenterX()], // center ↔ center
+        [oCenterX - rect.width / 2, oCenterX], // center ↔ center
+        [oCenterX, oCenterX], // left ↔ center
+        [oCenterX - rect.width, oCenterX], // right ↔ center
+        [o.x - rect.width / 2, o.x], // center ↔ left
+        [o.x + o.width - rect.width / 2, o.x + o.width], // center ↔ right
       ];
       for (const [value, line] of xCandidates) {
         const d = Math.abs(value - rect.x);
@@ -181,12 +196,17 @@ export class BoardSnapService {
         }
       }
 
+      const oCenterY = o.getCenterY();
       const yCandidates: Array<[number, number]> = [
-        [o.y, o.y],
-        [o.y + o.height, o.y + o.height],
-        [o.y - rect.height, o.y],
-        [o.y + o.height - rect.height, o.y + o.height],
-        [o.getCenterY() - rect.height / 2, o.getCenterY()],
+        [o.y, o.y], // top ↔ top
+        [o.y + o.height, o.y + o.height], // top ↔ bottom
+        [o.y - rect.height, o.y], // bottom ↔ top
+        [o.y + o.height - rect.height, o.y + o.height], // bottom ↔ bottom
+        [oCenterY - rect.height / 2, oCenterY], // center ↔ center
+        [oCenterY, oCenterY], // top ↔ center
+        [oCenterY - rect.height, oCenterY], // bottom ↔ center
+        [o.y - rect.height / 2, o.y], // center ↔ top
+        [o.y + o.height - rect.height / 2, o.y + o.height], // center ↔ bottom
       ];
       for (const [value, line] of yCandidates) {
         const d = Math.abs(value - rect.y);
@@ -197,9 +217,18 @@ export class BoardSnapService {
       }
     }
 
-    const x = Math.round(bestX ? bestX.value : rect.x);
-    const y = Math.round(bestY ? bestY.value : rect.y);
+    return { bestX, bestY };
+  }
 
+  /** Publish the alignment guide lines for a snapped move of `rect` (already at
+   *  the snapped x/y). */
+  private emitMoveGuides(
+    bestX: AxisCandidate | null,
+    bestY: AxisCandidate | null,
+    rect: ItemRect,
+    x: number,
+    y: number,
+  ): void {
     const lines: SnapGuideLine[] = [];
     if (bestX) {
       const o = bestX.other;
@@ -220,8 +249,59 @@ export class BoardSnapService {
       });
     }
     this.guidesSubject.next(lines.length ? { lines, rects: [] } : NO_GUIDES);
+  }
 
+  /**
+   * Snap a dragged note so its edges/centers align with nearby notes.
+   * Each axis snaps independently to the closest candidate within threshold.
+   * Emits guide lines for whatever was snapped to.
+   */
+  snapMove(rect: ItemRect, excludeId: string): { x: number; y: number } {
+    const { bestX, bestY } = this.bestAxisSnaps(rect, this.candidates(excludeId));
+    const x = Math.round(bestX ? bestX.value : rect.x);
+    const y = Math.round(bestY ? bestY.value : rect.y);
+    this.emitMoveGuides(bestX, bestY, rect, x, y);
     return { x, y };
+  }
+
+  /**
+   * Snap a dragged *multi-selection* as one block. `items` are the selected
+   * elements (at their current positions) and (dx, dy) is the intended
+   * translation this frame. The group's bounding box is snapped against
+   * everything outside the selection; returns the adjusted translation and
+   * emits guide lines spanning the group + matched element.
+   */
+  snapGroupMove(
+    items: BoardItem[],
+    dx: number,
+    dy: number,
+  ): { dx: number; dy: number } {
+    if (!items.length) return { dx, dy };
+
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const it of items) {
+      minX = Math.min(minX, it.x);
+      minY = Math.min(minY, it.y);
+      maxX = Math.max(maxX, it.x + it.width);
+      maxY = Math.max(maxY, it.y + it.height);
+    }
+
+    // Prospective group bounding box after applying the intended translation.
+    const rect: ItemRect = {
+      x: minX + dx,
+      y: minY + dy,
+      width: maxX - minX,
+      height: maxY - minY,
+    };
+
+    const ids = new Set(items.map((i) => i.id));
+    const { bestX, bestY } = this.bestAxisSnaps(rect, this.candidatesExcluding(ids));
+
+    const x = bestX ? bestX.value : rect.x;
+    const y = bestY ? bestY.value : rect.y;
+    this.emitMoveGuides(bestX, bestY, rect, Math.round(x), Math.round(y));
+
+    return { dx: dx + (x - rect.x), dy: dy + (y - rect.y) };
   }
 
   /**
@@ -250,11 +330,12 @@ export class BoardSnapService {
       let best = Infinity;
       for (const o of others) {
         // Match the other note's width, or align the moving edge with its edges.
+        const oCenterX = o.getCenterX();
         const wCandidates: Array<[number, number | null]> = [[o.width, null]];
         if (westMoving) {
-          wCandidates.push([right - o.x, o.x], [right - (o.x + o.width), o.x + o.width]);
+          wCandidates.push([right - o.x, o.x], [right - (o.x + o.width), o.x + o.width], [right - oCenterX, oCenterX]);
         } else {
-          wCandidates.push([o.x - rect.x, o.x], [o.x + o.width - rect.x, o.x + o.width]);
+          wCandidates.push([o.x - rect.x, o.x], [o.x + o.width - rect.x, o.x + o.width], [oCenterX - rect.x, oCenterX]);
         }
         for (const [value, line] of wCandidates) {
           if (value < 1) continue;
@@ -275,11 +356,12 @@ export class BoardSnapService {
       const bottom = rect.y + rect.height;
       let best = Infinity;
       for (const o of others) {
+        const oCenterY = o.getCenterY();
         const hCandidates: Array<[number, number | null]> = [[o.height, null]];
         if (northMoving) {
-          hCandidates.push([bottom - o.y, o.y], [bottom - (o.y + o.height), o.y + o.height]);
+          hCandidates.push([bottom - o.y, o.y], [bottom - (o.y + o.height), o.y + o.height], [bottom - oCenterY, oCenterY]);
         } else {
-          hCandidates.push([o.y - rect.y, o.y], [o.y + o.height - rect.y, o.y + o.height]);
+          hCandidates.push([o.y - rect.y, o.y], [o.y + o.height - rect.y, o.y + o.height], [oCenterY - rect.y, oCenterY]);
         }
         for (const [value, line] of hCandidates) {
           if (value < 1) continue;

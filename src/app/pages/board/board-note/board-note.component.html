@@ -124,6 +124,7 @@
     class="note-surface"
     [class.is-focused]="isFocused"
     [class.is-clear]="isClear"
+    [style.border-radius]="noteRadius"
     [style.background]="noteBgColor"
     [style.--note-border-color]="noteBorderColor"
     [style.--note-border-width]="noteBorderWidth + 'px'"
@@ -197,10 +198,12 @@
             <div class="temp"></div>
             <app-color-palette
               variant="dropdown"
+              [colors]="recentTextColors"
               [rows]="2"
               [swatchCount]="9"
               [swatchSize]="28"
               (colorChange)="onTextColorPick($event)"
+              (colorCommit)="rememberTextColor($event)"
             ></app-color-palette>
           </div>
         </div>
@@ -251,9 +254,26 @@
         <button (click)="tiptap.toggleQuote(contentEditor)" title="Quote">
           <app-svg-icon icon="editor-quote"></app-svg-icon>
         </button>
-        <button (click)="tiptap.toggleCodeBlock(contentEditor)" title="Code block">
+        <button
+          (click)="tiptap.toggleCodeBlock(contentEditor)"
+          [class.active]="tiptap.isCodeBlockActive"
+          title="Code block"
+        >
           <app-svg-icon icon="editor-code-duplicate"></app-svg-icon>
         </button>
+        <app-query-select
+          *ngIf="tiptap.isCodeBlockActive"
+          class="code-lang-select"
+          [options]="tiptap.codeLanguages"
+          labelKey="name"
+          valueKey="value"
+          placeholder="Language"
+          title="Code language"
+          variant="text"
+          [displayValue]="tiptap.currentCodeLanguageName"
+          (commit)="tiptap.applyCodeLanguage($event, contentEditor)"
+          style="--qs-width: 124px"
+        ></app-query-select>
         <div class="navbar-spacer"></div>
         <button (click)="tiptap.toggleBulletList(contentEditor)" title="Bullet list">
           <app-svg-icon icon="editor-ul"></app-svg-icon>

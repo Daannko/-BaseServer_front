@@ -10,6 +10,8 @@ import type {
   QuizGenerateResponse,
   QuizEvaluateRequest,
   QuizEvaluateResponse,
+  ChatRequest,
+  ChatResponse,
 } from './models/ai.model';
 
 @Injectable({ providedIn: 'root' })
@@ -64,6 +66,19 @@ export class BoardAiService {
       );
     } catch (e: unknown) {
       this.handleError('quiz evaluation', e);
+      return null;
+    }
+  }
+
+  // ── Chat ──────────────────────────────────────────────────────────────────
+
+  async chat(req: ChatRequest): Promise<ChatResponse | null> {
+    try {
+      return await firstValueFrom(
+        this.http.post<ChatResponse>(`${this.apiUrl}/ai/chat`, req),
+      );
+    } catch (e: unknown) {
+      this.handleError('chat', e);
       return null;
     }
   }

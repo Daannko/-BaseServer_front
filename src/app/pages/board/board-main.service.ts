@@ -111,9 +111,21 @@ export class BoardMainService {
       viewport.style.transform = `scale(${this.zoom}) translate(${-this.cameraX}px, ${-this.cameraY}px)`;
     }
 
-    // Keep background "stuck" to world coordinates.
-    // (Background moves in screen px, so multiply camera by zoom.)
-    board.style.backgroundPosition = `${-this.cameraX * this.zoom}px ${-this.cameraY * this.zoom}px`;
+    // Infinite grid: lines are CSS gradients (see board.component.scss). The
+    // cell size scales with zoom; an adaptive factor keeps the on-screen cell
+    // in a sane range so the grid never turns to noise when zoomed far out/in.
+    // Major lines sit every 5 fine cells. Background moves in screen px, so the
+    // camera offset is multiplied by zoom (same as the viewport transform).
+    const BASE = 50; // world px per fine cell at zoom 1
+    let cell = BASE * this.zoom;
+    while (cell < 24) cell *= 5;
+    while (cell >= 120) cell /= 5;
+    const major = cell * 5;
+    const px = -this.cameraX * this.zoom;
+    const py = -this.cameraY * this.zoom;
+    board.style.backgroundSize =
+      `${cell}px ${cell}px, ${cell}px ${cell}px, ${major}px ${major}px, ${major}px ${major}px`;
+    board.style.backgroundPosition = `${px}px ${py}px`;
   }
 
   // Promote the viewport to its own compositor layer only while a zoom gesture

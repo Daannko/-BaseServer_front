@@ -19,6 +19,20 @@ export class BoardItem {
   contentUpdated = false;
   nameUpdated = false;
 
+  /** Where this item stands relative to the server:
+   *  - `local`  : has unsaved changes (or never saved)
+   *  - `syncing`: a save request is in flight
+   *  - `synced` : matches what's in the DB
+   *  - `error`  : last save attempt failed (see `lastSyncError`) */
+  syncState: 'local' | 'syncing' | 'synced' | 'error' = 'local';
+  lastSyncError: string | null = null;
+
+  /** Called by every dirty setter: a synced item that changes has diverged
+   *  from the DB and is once again local-only. */
+  private markDiverged() {
+    if (this.syncState === 'synced') this.syncState = 'local';
+  }
+
   constructor(
     id: string,
     realX: number,
@@ -37,10 +51,10 @@ export class BoardItem {
     this.content = content;
   }
 
-  set x(x: number) { if (x === this._x) return; this.positionUpdated = true; this._x = x; }
-  set y(y: number) { if (y === this._y) return; this.positionUpdated = true; this._y = y; }
-  set width(w: number) { if (w === this._width) return; this.sizeUpdated = true; this._width = w; }
-  set height(h: number) { if (h === this._height) return; this.sizeUpdated = true; this._height = h; }
+  set x(x: number) { if (x === this._x) return; this.positionUpdated = true; this._x = x; this.markDiverged(); }
+  set y(y: number) { if (y === this._y) return; this.positionUpdated = true; this._y = y; this.markDiverged(); }
+  set width(w: number) { if (w === this._width) return; this.sizeUpdated = true; this._width = w; this.markDiverged(); }
+  set height(h: number) { if (h === this._height) return; this.sizeUpdated = true; this._height = h; this.markDiverged(); }
   get x() { return this._x; }
   get y() { return this._y; }
   get width() { return this._width; }
@@ -49,8 +63,8 @@ export class BoardItem {
   getCenterX() { return this.x + this._width / 2; }
   getCenterY() { return this.y + this.height / 2; }
 
-  set content(value: JSONContent) { if (value === this._content) return; this.contentUpdated = true; this._content = value; }
-  set name(value: JSONContent) { if (value === this._name) return; this.nameUpdated = true; this._name = value; }
+  set content(value: JSONContent) { if (value === this._content) return; this.contentUpdated = true; this._content = value; this.markDiverged(); }
+  set name(value: JSONContent) { if (value === this._name) return; this.nameUpdated = true; this._name = value; this.markDiverged(); }
   get content() { return this._content; }
   get name() { return this._name; }
 
@@ -65,6 +79,50 @@ export class BoardItem {
     (this as any).bgColor = el.bgColor;
     (this as any).borderColor = el.borderColor;
     (this as any).borderWidth = el.borderWidth ?? 1;
+    this.syncState = 'synced';
+  }
+
+  /** Shared fields for the local-persistence snapshot. Subclasses spread this
+   *  and add their own type-specific fields in `toSnapshot()`. */
+  protected baseSnapshot(): BoardItemSnapshot {
+    const s = this as any;
+    return {
+      type: 'item',
+      id: this.id,
+      serverId: this.serverId,
+      x: this._x, y: this._y, width: this._width, height: this._height,
+      zIndex: this.zIndex,
+      bgColor: s.bgColor ?? null,
+      borderColor: s.borderColor ?? null,
+      borderWidth: s.borderWidth ?? 1,
+      name: this._name,
+      content: this._content,
+      positionUpdated: this.positionUpdated,
+      sizeUpdated: this.sizeUpdated,
+      contentUpdated: this.contentUpdated,
+      nameUpdated: this.nameUpdated,
+      syncState: this.syncState,
+    };
+  }
+
+  /** Restore the shared fields persisted by `baseSnapshot()` onto an item that
+   *  a subclass `fromSnapshot()` has already constructed. */
+  protected hydrateFromSnapshot(s: BoardItemSnapshot): void {
+    this.serverId = s.serverId;
+    this.zIndex = s.zIndex;
+    (this as any).bgColor = s.bgColor;
+    (this as any).borderColor = s.borderColor;
+    (this as any).borderWidth = s.borderWidth;
+    this.positionUpdated = s.positionUpdated;
+    this.sizeUpdated = s.sizeUpdated;
+    this.contentUpdated = s.contentUpdated;
+    this.nameUpdated = s.nameUpdated;
+    this.syncState = s.syncState;
+  }
+
+  /** Each subclass overrides this to emit a fully serializable snapshot. */
+  toSnapshot(): BoardItemSnapshot {
+    return this.baseSnapshot();
   }
 
   toBeUpdated(): boolean {
@@ -81,5 +139,34 @@ export class BoardItem {
     this.sizeUpdated = false;
     this.contentUpdated = false;
     this.nameUpdated = false;
+    this.syncState = 'synced';
+    this.lastSyncError = null;
   }
+}
+
+/** Serializable snapshot of a BoardItem written to localStorage so unsaved
+ *  work survives refresh / browser close. `type` discriminates the subclass. */
+export interface BoardItemSnapshot {
+  type: 'item' | 'note' | 'section' | 'image' | 'drawing';
+  id: string;
+  serverId?: string;
+  x: number; y: number; width: number; height: number;
+  zIndex: number;
+  bgColor: string | null;
+  borderColor: string | null;
+  borderWidth: number;
+  name: JSONContent;
+  content: JSONContent;
+  positionUpdated: boolean;
+  sizeUpdated: boolean;
+  contentUpdated: boolean;
+  nameUpdated: boolean;
+  syncState: 'local' | 'syncing' | 'synced' | 'error';
+  // ── type-specific (present on the matching `type`) ──
+  fontSize?: number;
+  padding?: number | null;
+  src?: string;
+  naturalWidth?: number;
+  naturalHeight?: number;
+  strokes?: Array<{ color: string; width: number; points: { x: number; y: number }[] }>;
 }

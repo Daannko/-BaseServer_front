@@ -18,7 +18,7 @@ import { FormsModule } from '@angular/forms';
 import type { Editor } from '@tiptap/core';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
 import { QuerySelectComponent } from '../../common/query-select/query-select.component';
-import { ColorPaletteComponent } from '../../common/color-palette/color-palette.component';
+import { ColorPaletteComponent, DEFAULT_PALETTE_COLORS } from '../../common/color-palette/color-palette.component';
 import { ItemRect, ItemResizeDirective } from '../board-item/item.resize.directive';
 import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
 import { TiptapService } from '../board-item/tiptap.service';
@@ -93,16 +93,43 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   }
 
   @HostBinding('style.--note-pad-v') get notePadV() {
-    const p = this.noteOptions.padding;
-    if (p != null) return `${p}px`;
-    const m = Math.min(this.tile?.width ?? 0, this.tile?.height ?? 0);
-    return `${m / 25}px`;
+    return `${this.noteOptions.padding ?? 0}px`;
   }
   @HostBinding('style.--note-pad-h') get notePadH() {
-    const p = this.noteOptions.padding;
-    if (p != null) return `${p}px`;
-    const m = Math.min(this.tile?.width ?? 0, this.tile?.height ?? 0);
-    return `${m / 19}px`;
+    return `${this.noteOptions.padding ?? 0}px`;
+  }
+
+  /** Per-corner border-radius (TL TR BR BL). A corner that sits flush against
+   *  an aligned neighbour is squared off so touching items read as one block;
+   *  every free corner keeps the normal radius. Recomputed live, so it updates
+   *  while dragging/snapping. */
+  get noteRadius(): string {
+    const a = this.tile;
+    const R = (a?.width ?? 0) * 0.02;
+    if (!a) return `${R}px`;
+    const px = (square: boolean) => (square ? '0px' : `${R}px`);
+
+    const aL = a.x, aR = a.x + a.width, aT = a.y, aB = a.y + a.height;
+    const eps = 1; // world-px tolerance (snapped edges are equal after rounding)
+
+    let tl = false, tr = false, br = false, bl = false;
+    const items = [...this.main.notes, ...this.main.sections, ...this.main.images];
+    for (const o of items) {
+      if (o.id === a.id) continue;
+      const oL = o.x, oR = o.x + o.width, oT = o.y, oB = o.y + o.height;
+      const coversY = (y: number) => oT <= y + eps && oB >= y - eps;
+      const coversX = (x: number) => oL <= x + eps && oR >= x - eps;
+      const onRight = Math.abs(oL - aR) <= eps;
+      const onLeft = Math.abs(oR - aL) <= eps;
+      const onTop = Math.abs(oB - aT) <= eps;
+      const onBottom = Math.abs(oT - aB) <= eps;
+
+      if ((onLeft && coversY(aT)) || (onTop && coversX(aL))) tl = true;
+      if ((onRight && coversY(aT)) || (onTop && coversX(aR))) tr = true;
+      if ((onRight && coversY(aB)) || (onBottom && coversX(aR))) br = true;
+      if ((onLeft && coversY(aB)) || (onBottom && coversX(aL))) bl = true;
+    }
+    return `${px(tl)} ${px(tr)} ${px(br)} ${px(bl)}`;
   }
 
   private static readonly DEFAULT_RECENT_BG_COLORS: string[] = [
@@ -121,6 +148,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
 
   recentBgColors: string[] = [...BoardNoteComponent.DEFAULT_RECENT_BG_COLORS];
   recentBorderColors: string[] = [...BoardNoteComponent.DEFAULT_RECENT_BORDER_COLORS];
+  recentTextColors: string[] = [...DEFAULT_PALETTE_COLORS];
 
   get noteBgColor(): string | null {
     return (this.tile as BoardNote).bgColor ?? null;
@@ -154,6 +182,15 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
 
   onTextColorPick(color: string | null): void {
     if (color !== null) this.tiptap.setTextColor(color, this.contentEditor);
+  }
+
+  /** Final pick — prepend to the text-color recents (mirrors bg/border). */
+  rememberTextColor(color: string | null): void {
+    if (color === null) return;
+    this.recentTextColors = [
+      color,
+      ...this.recentTextColors.filter(c => c !== color),
+    ].slice(0, 9);
   }
 
   onHighlightPick(color: string | null): void {
@@ -225,15 +262,26 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     this.isFocused = false;
     this.isOptionsPanelOpen = false;
     this.navbarPinned = false;
-    // Clear any text selection anchored in this note. Background panning
-    // calls preventDefault(), so the browser never clears it on its own —
-    // and a lingering selection would re-pin the note navbar on mouseup.
-    const selection = window.getSelection();
-    if (
-      selection &&
-      this.contentElement?.nativeElement?.contains(selection.anchorNode)
-    ) {
-      selection.removeAllRanges();
+    // Keep the selection highlight alive only while interacting with this
+    // note's toolbar — the font/color pickers live in the shared navbar
+    // (outside the host), and the persistent decoration is what keeps the
+    // selection visible there. Any other outside click drops the highlight.
+    const onToolbar = path.some(
+      (t) =>
+        t instanceof HTMLElement &&
+        !!t.closest('.navbar-tile-controls, .table-controls, .color-palette'),
+    );
+    if (!onToolbar) {
+      // Background panning calls preventDefault(), so the browser never clears
+      // the DOM selection on its own; drop it together with the persistent
+      // highlight decoration (which survives blur until told otherwise).
+      const selection = window.getSelection();
+      if (
+        selection &&
+        this.contentElement?.nativeElement?.contains(selection.anchorNode)
+      ) {
+        selection.removeAllRanges();
+      }
       this.tiptap.clearSelectionHighlight();
     }
     if (!this.isDraggingTile && !this.tiptap.hasActiveSelection) {
@@ -245,7 +293,6 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     this.tiptap.initEditors({
       tile: this.tile,
       contentElement: this.contentElement.nativeElement,
-      defaultFontSize: (this.tile as BoardNote).fontSize,
     });
 
     const contentRoot = this.contentElement.nativeElement as HTMLElement;
@@ -317,7 +364,12 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
 
   onTileWorldPosChange(p: Position) {
     if (this.selection.isGroupMoving(this.tile)) {
-      this.selection.moveGroupTo(this.tile, p.x, p.y);
+      const c = this.snap.snapGroupMove(
+        this.selection.items,
+        p.x - this.tile.x,
+        p.y - this.tile.y,
+      );
+      this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy);
       return;
     }
     const s = this.snap.snapMove(

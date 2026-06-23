@@ -13,8 +13,9 @@ import {
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
+import { Router } from '@angular/router';
 import { NavbarComponent } from '../../helpers/navbar/navbar.component';
-import { BoardItem } from './board-item/board-item.data';
+import { BoardItem, BoardItemSnapshot } from './board-item/board-item.data';
 import { BoardNote } from './board-note/board-note.data';
 import { BoardNoteComponent } from './board-note/board-note.component';
 import { NavbarService } from '../../helpers/navbar/navbar.service';
@@ -45,11 +46,32 @@ import { ColorPaletteComponent } from '../common/color-palette/color-palette.com
 import { BoardDrawingComponent } from './board-drawing/board-drawing.component';
 import { BoardAiService } from './board-ai.service';
 import { BoardLinkService } from './board-link.service';
+import { BoardPersistenceService } from './board-persistence.service';
+import { EditorPrefsService } from './board-editor-prefs.service';
 import type {
   FactCheckResult,
   QuizQuestion,
   QuizGenerateResponse,
+  ChatMessage,
+  NoteContextInput,
+  BoardAiAction,
 } from './models/ai.model';
+import type { JSONContent } from '@tiptap/core';
+
+/** One AI-proposed action plus its approval state in the chat thread. */
+interface ProposedAction {
+  action: BoardAiAction;
+  status: 'pending' | 'applied' | 'rejected';
+  /** Previous body, captured on apply of an update so it can be reverted. */
+  prevContent?: JSONContent;
+}
+
+/** One entry in the chat thread (user turn or assistant turn + its actions). */
+interface ChatThreadEntry {
+  role: 'user' | 'assistant';
+  content: string;
+  actions?: ProposedAction[];
+}
 
 @Component({
   selector: 'app-board',
@@ -92,12 +114,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   nameInputRef?: ElementRef<HTMLInputElement>;
   @ViewChild('searchInput', { static: false })
   searchInputRef?: ElementRef<HTMLInputElement>;
+  @ViewChild('importFileInput', { static: false })
+  importFileInputRef?: ElementRef<HTMLInputElement>;
 
   boards$!: Observable<Board[] | null>;
   snapGuides$!: Observable<SnapGuides>;
   aspectGuide$!: Observable<AspectGuide | null>;
   isSearchOpen = true;
   isCreateOpen = false;
+  optionsOpen = false;
   newBoardName = '';
   newBoardNameTouched = false;
   newBoardDescription = '';
@@ -276,6 +301,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private selection: BoardSelectionService,
     private aiService: BoardAiService,
     private linkService: BoardLinkService,
+    private persistence: BoardPersistenceService,
+    private editorPrefs: EditorPrefsService,
+    private router: Router,
   ) {
     this.boards$ = this.boardSearchService.boards$;
     this.snapGuides$ = this.snapService.guides$;
@@ -354,9 +382,201 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.history.pushCreate([item.id]);
   }
 
+  // ── Copy / paste of board elements ─────────────────────────────────────────
+
+  /** Buffer of elements captured on Ctrl+C. Cloned (not referenced) on paste. */
+  private clipboard: BoardItem[] = [];
+
+  /** Ctrl+C — snapshot the current selection into the clipboard. */
+  copySelection(): void {
+    const items = this.selection.items;
+    if (!items.length) return;
+    this.clipboard = items.slice();
+  }
+
+  /** Ctrl+V — clone the buffered elements onto the board centered on the mouse
+   *  (relative layout preserved), and select the freshly pasted copies. */
+  pasteClipboard(): void {
+    if (!this.selectedBoard || !this.clipboard.length) return;
+
+    // Bounding-box center of the buffered group, in world units.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    for (const s of this.clipboard) {
+      minX = Math.min(minX, s.x);
+      minY = Math.min(minY, s.y);
+      maxX = Math.max(maxX, s.x + s.width);
+      maxY = Math.max(maxY, s.y + s.height);
+    }
+    const groupCx = (minX + maxX) / 2;
+    const groupCy = (minY + maxY) / 2;
+
+    // Target: the world point under the cursor when it's over the board,
+    // otherwise the viewport center.
+    const board = this.boardRef.nativeElement as HTMLElement;
+    const rect = board.getBoundingClientRect();
+    const mouseInside =
+      this.lastMouseClientX >= rect.left &&
+      this.lastMouseClientX <= rect.right &&
+      this.lastMouseClientY >= rect.top &&
+      this.lastMouseClientY <= rect.bottom;
+    const target = mouseInside
+      ? this.screenToWorld(this.lastMouseClientX, this.lastMouseClientY)
+      : this.screenToWorld(rect.left + rect.width / 2, rect.top + rect.height / 2);
+
+    const dx = target.x - groupCx;
+    const dy = target.y - groupCy;
+
+    const pasted: BoardItem[] = [];
+    for (const src of this.clipboard) {
+      let copy: BoardItem | null = null;
+      if (src instanceof BoardNote) {
+        copy = src.clone(dx, dy);
+        this.notes.push(copy as BoardNote);
+        this.notesMap.set(copy.id, copy);
+        this.bringToFront(copy);
+      } else if (src instanceof BoardSection) {
+        copy = src.clone(dx, dy);
+        this.sections.push(copy as BoardSection);
+        this.bringSectionToFront(copy);
+      } else if (src instanceof BoardImage) {
+        copy = src.clone(dx, dy);
+        this.images.push(copy as BoardImage);
+        this.bringToFront(copy);
+      } else if (src instanceof BoardDrawing) {
+        copy = src.clone(dx, dy);
+        this.drawings.push(copy as BoardDrawing);
+        this.bringToFront(copy);
+      }
+      if (copy) pasted.push(copy);
+    }
+
+    if (!pasted.length) return;
+    // One history entry for the whole paste, so a single Ctrl+Z removes them all.
+    this.history.pushCreate(pasted.map((i) => i.id));
+    this.selection.set(pasted);
+    this.cdr.detectChanges();
+    this.mainBoardService.noteComponents = this.noteComponents?.toArray() ?? [];
+  }
+
   resetNewBoardForm() {
     this.newBoardName = '';
     this.newBoardDescription = '';
+  }
+
+  // ── Options popup (export / import / logout) ──────────────────────────────
+
+  openOptions() {
+    this.optionsOpen = true;
+  }
+
+  closeOptions() {
+    this.optionsOpen = false;
+  }
+
+  logoutFromOptions() {
+    this.closeOptions();
+    this.router.navigate(['../logout']);
+  }
+
+  /** Serialize the currently selected board (metadata + every element) to a
+   *  JSON file and trigger a download. JSON keeps the full ProseMirror content
+   *  and all element types losslessly. */
+  exportBoard() {
+    if (!this.selectedBoard) return;
+    const payload = {
+      format: 'baseserver-board',
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      board: {
+        name: this.selectedBoard.name,
+        description: this.selectedBoard.description ?? '',
+      },
+      items: this.allItems().map((i) => i.toSnapshot()),
+    };
+
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${this.safeFileName(this.selectedBoard.name)}.board.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+    this.closeOptions();
+  }
+
+  private safeFileName(name: string): string {
+    const cleaned = (name || 'board').replace(/[^a-z0-9-_ ]/gi, '').trim();
+    return cleaned.length ? cleaned : 'board';
+  }
+
+  /** Open the OS file picker for board import. */
+  triggerImport() {
+    this.importFileInputRef?.nativeElement?.click();
+  }
+
+  onImportFileSelected(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    // Reset so selecting the same file again still fires `change`.
+    input.value = '';
+    if (file) this.importBoardFromFile(file);
+  }
+
+  /** Parse an exported board file, create a fresh board from it, recreate its
+   *  elements with new ids, and persist them to the server. */
+  private async importBoardFromFile(file: File) {
+    let data: any;
+    try {
+      data = JSON.parse(await file.text());
+    } catch {
+      console.error('Import failed: file is not valid JSON');
+      return;
+    }
+    if (!data || data.format !== 'baseserver-board' || !Array.isArray(data.items)) {
+      console.error('Import failed: unrecognized board file');
+      return;
+    }
+
+    const name = String(data.board?.name ?? 'Imported board');
+    const description = String(data.board?.description ?? '');
+
+    const board = await this.boardSearchService.createBoard(
+      name,
+      description,
+      null,
+      null,
+    );
+    if (!board) return;
+
+    // Load the (empty) new board into view, then drop the imported elements in.
+    await this.selectBoard(board.id);
+
+    for (const snap of data.items as BoardItemSnapshot[]) {
+      // Fresh id + no serverId so saveBoard() creates them as new elements.
+      const fresh: BoardItemSnapshot = {
+        ...snap,
+        id: globalThis.crypto.randomUUID(),
+        serverId: undefined,
+        syncState: 'local',
+        positionUpdated: true,
+        sizeUpdated: true,
+        contentUpdated: true,
+        nameUpdated: true,
+      };
+      const item = this.itemFromSnapshot(fresh);
+      if (item) this.addRecreated(item);
+    }
+
+    this.cdr.detectChanges();
+    this.mainBoardService.noteComponents = this.noteComponents?.toArray() ?? [];
+    await this.saveBoard();
+    if (this.notes.length > 0) {
+      this.mainBoardService.centerOnItem(this.notes[0]);
+    }
   }
 
   toggleSearchState() {
@@ -456,6 +676,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // Restore undo/redo history from browser storage (survives page refresh)
       this.history.restore();
+
+      // Offer to recover any local changes that never reached the DB.
+      this.maybeOfferRestore(board.id);
 
       await Promise.resolve();
       this.cdr.detectChanges();
@@ -665,6 +888,27 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       event.preventDefault();
       this.history.redo();
     }
+    // Copy / paste selected elements. While a text editor is focused, let the
+    // browser handle Ctrl+C/V for the text itself.
+    if (mod && (event.key === 'c' || event.key === 'C')) {
+      // Only defer to the browser when there's actual highlighted text to copy.
+      // A selected note keeps a *collapsed* caret in its contentEditable body,
+      // which made isTextEditingActive() true and silently swallowed Ctrl+C —
+      // so the element never reached the clipboard until you blurred the editor.
+      if (isTextEditingActive() && hasActiveTextSelection()) return;
+      this.copySelection();
+      return;
+    }
+    if (mod && (event.key === 'v' || event.key === 'V')) {
+      if (isTextEditingActive()) return;
+      // Only intercept when we have board elements buffered; otherwise fall
+      // through so the window:paste handler can still paste images.
+      if (this.clipboard.length) {
+        event.preventDefault();
+        this.pasteClipboard();
+      }
+      return;
+    }
     // Delete key — delete selected elements
     if (event.key === 'Delete' || event.key === 'Del') {
       if (isTextEditingActive()) return;
@@ -868,6 +1112,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.stopSaveDots();
     this.stopDeleteHold();
     this.stopLinkEnterHold();
+    // Persist a final snapshot, then stop the background timers.
+    if (this.selectedBoard) {
+      this.persistence.save(
+        this.selectedBoard.id,
+        this.allItems().map((i) => i.toSnapshot()),
+      );
+      this.persistence.flush();
+    }
+    this.stopDurableSaving();
     if (this.cameraZoomTimer !== null) { clearTimeout(this.cameraZoomTimer); this.cameraZoomTimer = null; }
     if (this.cameraPosTimer !== null) { clearTimeout(this.cameraPosTimer); this.cameraPosTimer = null; }
     // Clean up group drag listeners if mid-drag
@@ -918,6 +1171,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (this.notes.length > 0) {
       this.mainBoardService.centerOnItem(this.notes[0]);
     }
+
+    this.startDurableSaving();
 
     Promise.resolve().then(() => this.mainBoardService.updateBoard());
   }
@@ -978,12 +1233,12 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       worldY - size / 2,
       size,
       size,
+      this.editorPrefs.lastFontSize,
     );
 
     this.notes.push(note);
     this.notesMap.set(note.id, note);
     this.recordCreate(note, this.notes, this.notesMap);
-    this.centerOnItem(note);
 
     Promise.resolve().then(() => {
       this.cdr.detectChanges();
@@ -1114,23 +1369,23 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     };
   }
 
-  /** Sync all local changes to the server. Called only on Ctrl+S.
-   *  All mutations are local-only until this runs. */
+  /** Sync all local changes to the server. Triggered by Ctrl+S and the 5-min
+   *  auto-save. Each element saves independently — one failure never blocks the
+   *  others (Promise.allSettled), and an element's dirty flags are cleared only
+   *  on its own confirmed success (see BoardApiService.patchIfDirty). */
   async saveBoard(): Promise<void> {
     if (!this.selectedBoard) return;
-
+    // Never overlap two save cycles (manual press during an auto-save, etc.).
+    if (this.saveInFlight) return;
+    this.saveInFlight = true;
     this.setSaveStatus('saving');
 
     const boardId = this.selectedBoard.id;
-    const allItems: BoardItem[] = [
-      ...this.notes,
-      ...this.sections,
-      ...this.images,
-      ...this.drawings,
-    ];
+    const allItems = this.allItems();
+    let anyFailed = false;
 
     try {
-      // 1. Delete elements marked for removal (sent to server, then dropped)
+      // 1. Delete elements marked for removal (sent to server, then dropped).
       if (this.pendingDeletes.length > 0) {
         const toDelete = this.pendingDeletes.filter((d) => d.serverId);
         if (toDelete.length > 0) {
@@ -1143,32 +1398,65 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.pendingDeletes.length = 0;
       }
 
-      // 2. Create new elements (no serverId yet)
+      // 2. Create new elements (no serverId yet). Each is isolated.
       const toCreate = allItems.filter((t) => !t.serverId);
+      for (const t of toCreate) t.syncState = 'syncing';
       if (toCreate.length > 0) {
-        const created = await Promise.all(
+        const created = await Promise.allSettled(
           toCreate.map((t) =>
             this.boardSearchService.createElement(t, boardId),
           ),
         );
         for (let i = 0; i < created.length; i++) {
-          if (created[i]) toCreate[i].serverId = created[i]!.id;
+          const res = created[i];
+          const item = toCreate[i];
+          if (res.status === 'fulfilled' && res.value) {
+            item.serverId = res.value.id;
+            item.saved();
+          } else {
+            anyFailed = true;
+            item.syncState = 'error';
+            item.lastSyncError =
+              res.status === 'rejected'
+                ? String((res.reason as any)?.message ?? res.reason)
+                : 'Server did not return an id';
+          }
         }
       }
 
-      // 3. Update dirty existing elements
-      const toUpdate = allItems.filter(
-        (t) => t.serverId && t.toBeUpdated(),
-      );
+      // 3. Update dirty existing elements. Each is isolated.
+      const toUpdate = allItems.filter((t) => t.serverId && t.toBeUpdated());
+      for (const t of toUpdate) t.syncState = 'syncing';
       if (toUpdate.length > 0) {
-        await Promise.all(
+        const updated = await Promise.allSettled(
           toUpdate.map((t) => this.boardSearchService.saveElement(t)),
         );
+        for (let i = 0; i < updated.length; i++) {
+          const res = updated[i];
+          const item = toUpdate[i];
+          // saveElement → patchIfDirty already called item.saved() on success.
+          if (res.status === 'rejected') {
+            anyFailed = true;
+            item.syncState = 'error';
+            item.lastSyncError = String((res.reason as any)?.message ?? res.reason);
+          }
+        }
       }
 
-      this.setSaveStatus('saved');
+      this.setSaveStatus(anyFailed ? 'partial' : 'saved');
+
+      // Only drop the local safety net once the DB truly holds everything.
+      if (!anyFailed) {
+        this.persistence.clear(boardId);
+      } else {
+        this.scheduleLocalSave();
+      }
     } catch {
       this.setSaveStatus('failed');
+      this.scheduleLocalSave();
+    } finally {
+      this.saveInFlight = false;
+      this.cdr.detectChanges();
     }
   }
 
@@ -1203,6 +1491,209 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   get saveDotsText(): string {
     return '.'.repeat(this.saveDots);
+  }
+
+  // ── Local persistence (survives refresh / browser close) ─────────────────
+
+  /** Start the background timers: a frequent localStorage snapshot and a
+   *  5-min push of dirty elements to the server. Idempotent. */
+  private startDurableSaving(): void {
+    if (this.snapshotTimer === null) {
+      this.snapshotTimer = setInterval(
+        () => this.scheduleLocalSave(),
+        this.SNAPSHOT_MS,
+      );
+    }
+    if (this.autoSaveTimer === null) {
+      this.autoSaveTimer = setInterval(() => {
+        if (
+          this.selectedBoard &&
+          this.allItems().some((i) => i.syncState !== 'synced')
+        ) {
+          this.saveBoard();
+        }
+      }, this.AUTO_SAVE_MS);
+    }
+  }
+
+  private stopDurableSaving(): void {
+    if (this.autoSaveTimer !== null) {
+      clearInterval(this.autoSaveTimer);
+      this.autoSaveTimer = null;
+    }
+    if (this.snapshotTimer !== null) {
+      clearInterval(this.snapshotTimer);
+      this.snapshotTimer = null;
+    }
+  }
+
+  /** Mirror the whole board to localStorage (debounced inside the service). */
+  private scheduleLocalSave(): void {
+    if (!this.selectedBoard) return;
+    const items = this.allItems().map((i) => i.toSnapshot());
+    this.persistence.save(this.selectedBoard.id, items);
+  }
+
+  @HostListener('window:beforeunload')
+  onBeforeUnload(): void {
+    if (!this.selectedBoard) return;
+    // Synchronous write so nothing is lost when the tab/window closes.
+    this.persistence.save(
+      this.selectedBoard.id,
+      this.allItems().map((i) => i.toSnapshot()),
+    );
+    this.persistence.flush();
+  }
+
+  /** After server elements load, offer to restore any newer local changes that
+   *  never reached the DB (e.g. saves that failed on an expired token). */
+  private maybeOfferRestore(boardId: string): void {
+    const local = this.persistence.load(boardId);
+    if (!local) return;
+    const hasUnsynced = local.items.some((i) => i.syncState !== 'synced');
+    if (!hasUnsynced) {
+      this.persistence.clear(boardId);
+      return;
+    }
+    this.restorePrompt = local;
+    this.cdr.detectChanges();
+  }
+
+  /** Accept the restore: overlay local snapshots onto the loaded board. */
+  restoreLocal(): void {
+    const local = this.restorePrompt;
+    this.restorePrompt = null;
+    if (!local || !this.selectedBoard) return;
+
+    for (const snap of local.items) {
+      if (snap.syncState === 'synced') continue; // DB copy already loaded
+      const existing = this.itemByIdMap(snap.id);
+      if (existing) {
+        this.applySnapshot(existing, snap);
+      } else {
+        const recreated = this.itemFromSnapshot(snap);
+        if (recreated) this.addRecreated(recreated);
+      }
+    }
+    this.cdr.detectChanges();
+    this.mainBoardService.noteComponents = this.noteComponents?.toArray() ?? [];
+  }
+
+  /** Decline the restore: drop the local copy and keep the DB version. */
+  discardLocal(): void {
+    const id = this.selectedBoard?.id;
+    this.restorePrompt = null;
+    if (id) this.persistence.clear(id);
+  }
+
+  /** Relative "x minutes ago" label for the restore prompt. */
+  get restoreAgeLabel(): string {
+    if (!this.restorePrompt) return '';
+    const mins = Math.round((Date.now() - this.restorePrompt.savedAt) / 60000);
+    if (mins < 1) return 'less than a minute ago';
+    if (mins === 1) return '1 minute ago';
+    if (mins < 60) return `${mins} minutes ago`;
+    const hrs = Math.round(mins / 60);
+    return hrs === 1 ? '1 hour ago' : `${hrs} hours ago`;
+  }
+
+  /** Overlay a local snapshot's fields + dirty flags onto a loaded DB item. */
+  private applySnapshot(item: BoardItem, s: BoardItemSnapshot): void {
+    item.x = s.x; item.y = s.y; item.width = s.width; item.height = s.height;
+    (item as any).zIndex = s.zIndex;
+    (item as any).bgColor = s.bgColor;
+    (item as any).borderColor = s.borderColor;
+    (item as any).borderWidth = s.borderWidth;
+    item.name = s.name;
+    item.content = s.content;
+    if (item instanceof BoardNote) {
+      item.fontSize = s.fontSize ?? item.fontSize;
+      item.options.padding = s.padding ?? null;
+    }
+    // Restore the exact dirty state captured locally — these were unsaved.
+    item.positionUpdated = s.positionUpdated;
+    item.sizeUpdated = s.sizeUpdated;
+    item.contentUpdated = s.contentUpdated;
+    item.nameUpdated = s.nameUpdated;
+    item.syncState = s.syncState;
+  }
+
+  private itemFromSnapshot(s: BoardItemSnapshot): BoardItem | null {
+    switch (s.type) {
+      case 'note': return BoardNote.fromSnapshot(s);
+      case 'section': return BoardSection.fromSnapshot(s);
+      case 'image': return BoardImage.fromSnapshot(s);
+      case 'drawing': return BoardDrawing.fromSnapshot(s);
+      default: return null;
+    }
+  }
+
+  private addRecreated(item: BoardItem): void {
+    if (item instanceof BoardNote) { this.notes.push(item); this.notesMap.set(item.id, item); }
+    else if (item instanceof BoardSection) this.sections.push(item);
+    else if (item instanceof BoardImage) this.images.push(item);
+    else if (item instanceof BoardDrawing) this.drawings.push(item);
+  }
+
+  // ── Sync-status panel (what's in the DB vs. only local) ──────────────────
+
+  toggleSyncPanel(): void {
+    this.syncPanelOpen = !this.syncPanelOpen;
+  }
+
+  /** Count of elements not confirmed in the DB — drives the button badge. */
+  get unsyncedCount(): number {
+    return this.allItems().filter((i) => i.syncState !== 'synced').length;
+  }
+
+  /** In the DB and unchanged since. */
+  get syncedItems(): BoardItem[] {
+    return this.allItems().filter((i) => i.syncState === 'synced');
+  }
+
+  /** Never saved to the DB (no serverId). */
+  get localOnlyItems(): BoardItem[] {
+    return this.allItems().filter(
+      (i) => i.syncState !== 'error' && !i.serverId,
+    );
+  }
+
+  /** In the DB but changed locally since the last successful save. */
+  get modifiedItems(): BoardItem[] {
+    return this.allItems().filter(
+      (i) => i.syncState !== 'synced' && i.syncState !== 'error' && !!i.serverId,
+    );
+  }
+
+  /** Last save attempt for these failed. */
+  get erroredItems(): BoardItem[] {
+    return this.allItems().filter((i) => i.syncState === 'error');
+  }
+
+  jumpToSyncItem(item: BoardItem): void {
+    item.forceToRender = true;
+    this.mainBoardService.centerOnItem(item);
+    Promise.resolve().then(() => (item.forceToRender = false));
+  }
+
+  itemKindLabel(item: BoardItem): string {
+    if (item instanceof BoardNote) return 'Note';
+    if (item instanceof BoardSection) return 'Section';
+    if (item instanceof BoardImage) return 'Image';
+    if (item instanceof BoardDrawing) return 'Drawing';
+    return 'Item';
+  }
+
+  itemPreview(item: BoardItem): string {
+    if (item instanceof BoardNote) {
+      return extractPlainText(item.content as any).slice(0, 40) || '(empty note)';
+    }
+    if (item instanceof BoardSection) {
+      return extractPlainText(item.name as any).slice(0, 40) || '(section)';
+    }
+    if (item instanceof BoardImage) return 'image';
+    if (item instanceof BoardDrawing) return 'drawing';
+    return '';
   }
 
   // ── Camera info (top-left, fades after 1s) ───────────────────────────────
@@ -1783,9 +2274,30 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   // ── Save indicator ────────────────────────────────────────────────────────
 
-  saveStatus: 'idle' | 'saving' | 'saved' | 'failed' = 'idle';
+  // 'partial' = some elements saved, some failed — never reported as 'saved'.
+  saveStatus: 'idle' | 'saving' | 'saved' | 'partial' | 'failed' = 'idle';
   private saveDots = 0;
   private saveDotsTimer: ReturnType<typeof setInterval> | null = null;
+
+  // ── Durable saving (auto-save + local persistence) ─────────────────────────
+  /** Guards against a save cycle overlapping itself (timer vs. manual). */
+  private saveInFlight = false;
+  /** Pushes dirty elements to the server every 5 min. */
+  private autoSaveTimer: ReturnType<typeof setInterval> | null = null;
+  /** Mirrors board state to localStorage every few seconds. */
+  private snapshotTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly AUTO_SAVE_MS = 5 * 60 * 1000;
+  private readonly SNAPSHOT_MS = 5 * 1000;
+
+  /** Pending local-restore offer surfaced on board load. */
+  restorePrompt: { savedAt: number; items: BoardItemSnapshot[] } | null = null;
+  /** Whether the sync-status panel is expanded. */
+  syncPanelOpen = false;
+
+  /** Every element across all four layers, in one array. */
+  private allItems(): BoardItem[] {
+    return [...this.notes, ...this.sections, ...this.images, ...this.drawings];
+  }
 
   private get selectedDrawings(): BoardDrawing[] {
     return this.selection.items.filter((i): i is BoardDrawing => i instanceof BoardDrawing);
@@ -1874,6 +2386,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.selectedNotes.map((n) => ({
       id: n.serverId ?? n.id,
       content: n.content,
+      x: n.x,
+      y: n.y,
+      width: n.width,
+      height: n.height,
     }));
   }
 
@@ -1969,6 +2485,231 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+  // ── AI chat (conversational assistant) ────────────────────────────────────
+
+  /** Whether the chat panel is open. */
+  chatOpen = false;
+  /** What the user is typing. */
+  chatInput = '';
+  /** True while a chat request is in flight. */
+  chatLoading = false;
+  /** The full conversation (user + assistant turns, with proposed actions). */
+  chatThread: ChatThreadEntry[] = [];
+  /** Maps a response's create_note tempIds → the freshly created note, so a
+   *  sibling action in the same response can reference it. Reset per send. */
+  private chatTempIdMap = new Map<string, BoardNote>();
+
+  toggleChat(): void {
+    this.chatOpen = !this.chatOpen;
+    this.cdr.detectChanges();
+    if (this.chatOpen) {
+      setTimeout(() =>
+        (document.querySelector('.ai-chat-input') as HTMLTextAreaElement | null)?.focus(),
+      );
+    }
+  }
+
+  closeChat(): void {
+    this.chatOpen = false;
+    this.cdr.detectChanges();
+  }
+
+  /** Notes currently attached as context (chips above the input). */
+  get chatContextNotes(): BoardNote[] {
+    return this.selectedNotes;
+  }
+
+  /** Build the enriched selection context (notes only, with geometry). */
+  private buildChatSelection(): NoteContextInput[] {
+    return this.selectedNotes.map((n) => ({
+      id: n.serverId ?? n.id,
+      type: 'note' as const,
+      content: n.content,
+      x: n.x,
+      y: n.y,
+      width: n.width,
+      height: n.height,
+    }));
+  }
+
+  async sendChat(): Promise<void> {
+    const text = this.chatInput.trim();
+    if (!text || this.chatLoading || !this.selectedBoard) return;
+
+    this.chatThread.push({ role: 'user', content: text });
+    this.chatInput = '';
+    this.chatLoading = true;
+    this.cdr.detectChanges();
+    this.scrollChatToBottom();
+
+    const messages: ChatMessage[] = this.chatThread.map((m) => ({
+      role: m.role,
+      content: m.content,
+    }));
+
+    this.chatTempIdMap.clear();
+    const res = await this.aiService.chat({
+      boardId: this.selectedBoard.id,
+      messages,
+      selection: this.buildChatSelection(),
+    });
+    this.chatLoading = false;
+
+    if (res) {
+      this.chatThread.push({
+        role: 'assistant',
+        content: res.message,
+        actions: (res.actions ?? []).map((action) => ({
+          action,
+          status: 'pending' as const,
+        })),
+      });
+    }
+    this.cdr.detectChanges();
+    this.scrollChatToBottom();
+  }
+
+  private scrollChatToBottom(): void {
+    setTimeout(() => {
+      const el = document.querySelector('.ai-chat-thread');
+      if (el) el.scrollTop = el.scrollHeight;
+    });
+  }
+
+  /** Resolve a note referenced by an action id (serverId, local id, or a
+   *  tempId minted earlier in the same response). */
+  private resolveNote(ref: string): BoardNote | null {
+    const mapped = this.chatTempIdMap.get(ref);
+    if (mapped) return mapped;
+    return (
+      this.notes.find((n) => n.serverId === ref || n.id === ref) ?? null
+    );
+  }
+
+  /** World-space geometry for a created note, defaulting to viewport center. */
+  private resolveCreateGeometry(a: {
+    x?: number;
+    y?: number;
+    width?: number;
+    height?: number;
+  }): { x: number; y: number; width: number; height: number } {
+    const zoom = this.mainBoardService.zoom;
+    const width = a.width ?? 450 / zoom;
+    const height = a.height ?? 450 / zoom;
+    if (a.x != null && a.y != null) {
+      return { x: a.x, y: a.y, width, height };
+    }
+    const board = this.boardRef.nativeElement as HTMLElement;
+    const rect = board.getBoundingClientRect();
+    const c = this.screenToWorld(
+      rect.left + rect.width / 2,
+      rect.top + rect.height / 2,
+    );
+    return { x: c.x - width / 2, y: c.y - height / 2, width, height };
+  }
+
+  /** Human-readable preview of an action's note body for the approval card. */
+  actionPreview(a: BoardAiAction): string {
+    if (a.type === 'delete_note') return '';
+    if (a.type === 'move_note') {
+      return `→ (${Math.round(a.x)}, ${Math.round(a.y)})`;
+    }
+    return extractPlainText(a.content as any).slice(0, 120);
+  }
+
+  actionLabel(a: BoardAiAction): string {
+    switch (a.type) {
+      case 'create_note': return 'Add note';
+      case 'update_note': return 'Edit note';
+      case 'move_note': return 'Move note';
+      case 'delete_note': return 'Delete note';
+    }
+  }
+
+  /** Apply a single proposed action to the board. Create/move/delete go onto the
+   *  undo history (Ctrl+Z reverts); update captures the previous body so the card
+   *  can revert it (text edits aren't part of the board undo stack). */
+  applyAction(pa: ProposedAction): void {
+    if (pa.status !== 'pending' || !this.selectedBoard) return;
+    const a = pa.action;
+
+    switch (a.type) {
+      case 'create_note': {
+        const g = this.resolveCreateGeometry(a);
+        const note = BoardNote.newNote(
+          g.x, g.y, g.width, g.height, this.editorPrefs.lastFontSize,
+        );
+        note.content = structuredClone(a.content);
+        this.notes.push(note);
+        this.notesMap.set(note.id, note);
+        this.bringToFront(note);
+        this.history.pushCreate([note.id]);
+        this.chatTempIdMap.set(a.tempId, note);
+        Promise.resolve().then(() => {
+          this.cdr.detectChanges();
+          this.mainBoardService.noteComponents =
+            this.noteComponents?.toArray() ?? [];
+        });
+        break;
+      }
+      case 'update_note': {
+        const note = this.resolveNote(a.id);
+        if (!note) { pa.status = 'rejected'; this.cdr.detectChanges(); return; }
+        pa.prevContent = note.content;
+        note.content = structuredClone(a.content);
+        break;
+      }
+      case 'move_note': {
+        const note = this.resolveNote(a.id);
+        if (!note) { pa.status = 'rejected'; this.cdr.detectChanges(); return; }
+        const before = { x: note.x, y: note.y, width: note.width, height: note.height };
+        note.updatePosition(a.x, a.y);
+        this.history.pushRect(note.id, before, {
+          x: a.x, y: a.y, width: note.width, height: note.height,
+        });
+        break;
+      }
+      case 'delete_note': {
+        const note = this.resolveNote(a.id);
+        if (!note) { pa.status = 'rejected'; this.cdr.detectChanges(); return; }
+        this.onDeleteNote(note);
+        break;
+      }
+    }
+
+    pa.status = 'applied';
+    this.cdr.detectChanges();
+  }
+
+  rejectAction(pa: ProposedAction): void {
+    if (pa.status !== 'pending') return;
+    pa.status = 'rejected';
+    this.cdr.detectChanges();
+  }
+
+  /** Revert an applied `update_note` (not tracked by the board undo stack). */
+  revertAction(pa: ProposedAction): void {
+    if (pa.status !== 'applied') return;
+    const a = pa.action;
+    if (a.type === 'update_note' && pa.prevContent !== undefined) {
+      const note = this.resolveNote(a.id);
+      if (note) note.content = pa.prevContent;
+      pa.status = 'pending';
+      this.cdr.detectChanges();
+    }
+  }
+
+  /** Apply every still-pending action in an assistant turn. */
+  applyAllActions(entry: ChatThreadEntry): void {
+    for (const pa of entry.actions ?? []) {
+      if (pa.status === 'pending') this.applyAction(pa);
+    }
+  }
+
+  hasPendingActions(entry: ChatThreadEntry): boolean {
+    return (entry.actions ?? []).some((pa) => pa.status === 'pending');
+  }
+
   closeContextMenu() {
     this.ctxMenu.visible = false;
   }
@@ -2012,4 +2753,13 @@ function isTextEditingActive(): boolean {
       el.tagName === 'INPUT' ||
       el.tagName === 'TEXTAREA')
   );
+}
+
+/** True when there's a non-collapsed text selection in the document — i.e. the
+ *  user has actually highlighted text (so Ctrl+C should copy that text, not the
+ *  selected board element). A bare caret in a note's editor is collapsed and
+ *  returns false. */
+function hasActiveTextSelection(): boolean {
+  const sel = window.getSelection();
+  return !!sel && !sel.isCollapsed && sel.toString().length > 0;
 }

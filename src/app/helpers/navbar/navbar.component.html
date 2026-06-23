@@ -25,6 +25,13 @@
         {{ dateTime | date: "H:mm" }}
       </div>
       <button
+        *ngIf="isOptionsVisible"
+        class="navbar-options-button"
+        (click)="optionsClick.emit()"
+      >
+        Options
+      </button>
+      <button
         *ngIf="isLogoutVisible"
         class="navbar-logout-button"
         (click)="logout()"

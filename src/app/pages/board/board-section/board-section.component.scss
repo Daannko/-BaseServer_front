@@ -1,6 +1,8 @@
 // Controls bar, options side panel, swatches, sliders, delete button and
 // resize handles are shared with board-note:
 @import '../board-item/item-controls';
+// Rich-text toolbar (navbar template) chrome, also shared with board-note:
+@import '../board-item/toolbar';
 
 :host {
   position: absolute;

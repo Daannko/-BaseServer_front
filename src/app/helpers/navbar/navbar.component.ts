@@ -2,6 +2,8 @@ import { CommonModule, DatePipe } from '@angular/common';
 import {
   Component,
   Input,
+  Output,
+  EventEmitter,
   OnInit,
   OnDestroy,
   ChangeDetectorRef,
@@ -22,6 +24,8 @@ export class NavbarComponent implements OnInit, OnDestroy {
   dateTime: Date = new Date();
   @Input() isClockVisible: boolean = false;
   @Input() isLogoutVisible: boolean = false;
+  @Input() isOptionsVisible: boolean = false;
+  @Output() optionsClick = new EventEmitter<void>();
 
   readonly state$: Observable<NavbarState>;
 

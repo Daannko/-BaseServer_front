@@ -1,13 +1,36 @@
 import { Injectable, NgZone } from '@angular/core';
 import { Editor } from '@tiptap/core';
 import type { JSONContent } from '@tiptap/core';
+import { Plugin, TextSelection } from '@tiptap/pm/state';
+import type { EditorState } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
 import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableCell } from '@tiptap/extension-table-cell';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TextAlign } from '@tiptap/extension-text-align';
-import { CodeBlock } from '@tiptap/extension-code-block';
+import { Code } from '@tiptap/extension-code';
+import { CodeBlockLowlight } from '@tiptap/extension-code-block-lowlight';
+import { createLowlight } from 'lowlight';
+import bash from 'highlight.js/lib/languages/bash';
+import c from 'highlight.js/lib/languages/c';
+import cpp from 'highlight.js/lib/languages/cpp';
+import csharp from 'highlight.js/lib/languages/csharp';
+import css from 'highlight.js/lib/languages/css';
+import go from 'highlight.js/lib/languages/go';
+import java from 'highlight.js/lib/languages/java';
+import javascript from 'highlight.js/lib/languages/javascript';
+import json from 'highlight.js/lib/languages/json';
+import kotlin from 'highlight.js/lib/languages/kotlin';
+import markdown from 'highlight.js/lib/languages/markdown';
+import php from 'highlight.js/lib/languages/php';
+import python from 'highlight.js/lib/languages/python';
+import ruby from 'highlight.js/lib/languages/ruby';
+import rust from 'highlight.js/lib/languages/rust';
+import sql from 'highlight.js/lib/languages/sql';
+import typescript from 'highlight.js/lib/languages/typescript';
+import xml from 'highlight.js/lib/languages/xml';
+import yaml from 'highlight.js/lib/languages/yaml';
 import { BackgroundColor, FontSize, TextStyle } from '@tiptap/extension-text-style';
 import { FontFamily } from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
@@ -21,8 +44,139 @@ import {
 import type { BoardItem } from './board-item.data';
 import { BoardLink, ParagraphAttrPlugin, ParagraphWithMarks } from './tiptap.extension';
 import { BoardLinkService } from '../board-link.service';
+import { EditorPrefsService } from '../board-editor-prefs.service';
 
 type SelectionRange = { from: number; to: number };
+
+/** Shared lowlight registry for code-block syntax highlighting. Only the
+ *  languages offered in the picker are registered (keeps the bundle small vs
+ *  highlight.js's full `common` set). Created once — registration is global. */
+const lowlight = createLowlight();
+lowlight.register({
+  bash, c, cpp, csharp, css, go, java, javascript, json, kotlin,
+  markdown, php, python, ruby, rust, sql, typescript, xml, yaml,
+});
+
+/** The font size to give a new code block: the textStyle size active at the
+ *  cursor, else the last size used before it — so the block keeps the size the
+ *  user was working in instead of resetting to the note default. */
+function currentFontSize(state: EditorState): string | null {
+  const marks = state.storedMarks || state.selection.$from.marks();
+  const active = marks.find((m) => m.type.name === 'textStyle');
+  if (active?.attrs?.['fontSize']) return active.attrs['fontSize'] as string;
+
+  // Cursor's own marks had none (e.g. a fresh line) — use the nearest preceding
+  // run that did carry a fontSize.
+  let last: string | null = null;
+  state.doc.nodesBetween(0, state.selection.from, (node) => {
+    if (!node.isText) return true;
+    const ts = node.marks.find((m) => m.type.name === 'textStyle');
+    if (ts?.attrs?.['fontSize']) last = ts.attrs['fontSize'] as string;
+    return true;
+  });
+  return last;
+}
+
+/**
+ * Syntax-highlighted code block (lowlight) with two tweaks:
+ *  - a `fontSize` node attribute (rendered on <pre>) so the block keeps the
+ *    font size that was active when it was created, not the note default;
+ *  - a custom ``` input rule with no leading anchor, so typing ``` mid-line
+ *    breaks to a new line and starts the code block fresh.
+ */
+const HighlightedCodeBlock = CodeBlockLowlight.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      fontSize: {
+        default: null,
+        parseHTML: (el: HTMLElement) =>
+          el.style.fontSize || el.getAttribute('data-font-size') || null,
+        renderHTML: (attrs: Record<string, any>) =>
+          attrs['fontSize']
+            ? {
+                style: `font-size: ${attrs['fontSize']}`,
+                'data-font-size': attrs['fontSize'],
+              }
+            : {},
+      },
+    };
+  },
+
+  // All ``` handling lives in one text-input hook, so it triggers on the 3rd
+  // backtick itself — no trailing space, and any character typed afterwards
+  // lands inside the block:
+  //   - outside a code block: ``` starts one (breaking to a new line if there's
+  //     text before the fence), keeping the current font size;
+  //   - inside a code block: ``` alone on a line exits it.
+  addProseMirrorPlugins() {
+    const parent = this.parent?.() ?? [];
+    const type = this.type;
+    return [
+      ...parent,
+      new Plugin({
+        props: {
+          handleTextInput: (view, from, _to, text) => {
+            if (text !== '`') return false;
+            const { state } = view;
+            const $from = state.selection.$from;
+            const before = $from.parent.textBetween(0, $from.parentOffset);
+            const line = before.slice(before.lastIndexOf('\n') + 1);
+            // The two chars before the cursor must be backticks (this is the 3rd).
+            if (!line.endsWith('``')) return false;
+
+            const paragraph = state.schema.nodes['paragraph'];
+            const tr = state.tr;
+
+            if ($from.parent.type === type) {
+              // ── Inside a code block: exit when the fence is alone on its line ──
+              if (line !== '``') return false;
+              const hasContentBefore = before.length > line.length;
+              const delFrom = hasContentBefore ? from - 3 : from - 2;
+              tr.delete(delFrom, from);
+
+              const $cb = tr.doc.resolve(delFrom);
+              if ($cb.parent.type === type && $cb.parent.content.size === 0) {
+                const at = $cb.start();
+                tr.setBlockType(at, at, paragraph);
+                tr.setSelection(TextSelection.create(tr.doc, at));
+              } else {
+                const after = $cb.after();
+                const para = paragraph.createAndFill();
+                if (!para) return false;
+                tr.insert(after, para);
+                tr.setSelection(TextSelection.create(tr.doc, after + 1));
+              }
+              view.dispatch(tr.scrollIntoView());
+              return true;
+            }
+
+            // ── Outside a code block: start one on the 3rd backtick ──
+            const fontSize = currentFontSize(state);
+            const twoStart = from - 2; // the two existing backticks
+            tr.delete(twoStart, from);
+            if (line.length > 2) {
+              // Text precedes the fence — drop the code block on the next line
+              // (insert a real node rather than split+convert, which is
+              // off-by-one against the split boundary tokens).
+              const codeNode = type.createAndFill({ language: null, fontSize });
+              if (!codeNode) return false;
+              const insertAt = tr.doc.resolve(twoStart).after();
+              tr.insert(insertAt, codeNode);
+              tr.setSelection(TextSelection.create(tr.doc, insertAt + 1));
+            } else {
+              // Fence alone on the line — convert it in place.
+              tr.setBlockType(twoStart, twoStart, type, { language: null, fontSize });
+              tr.setSelection(TextSelection.create(tr.doc, twoStart));
+            }
+            view.dispatch(tr.scrollIntoView());
+            return true;
+          },
+        },
+      }),
+    ];
+  },
+});
 
 @Injectable()
 export class TiptapService {
@@ -30,8 +184,35 @@ export class TiptapService {
 
   disableTextDrag = true;
   isTableActive = false;
+  isCodeBlockActive = false;
+  currentCodeLanguage = 'plaintext';
   currentFont = '';
   currentSize = '';
+
+  /** Languages offered in the code-block language picker. `value` must match a
+   *  highlight.js name registered in the `common` set above. */
+  readonly codeLanguages = [
+    { name: 'Plain text', value: 'plaintext' },
+    { name: 'Bash', value: 'bash' },
+    { name: 'C', value: 'c' },
+    { name: 'C++', value: 'cpp' },
+    { name: 'C#', value: 'csharp' },
+    { name: 'CSS', value: 'css' },
+    { name: 'Go', value: 'go' },
+    { name: 'HTML/XML', value: 'xml' },
+    { name: 'Java', value: 'java' },
+    { name: 'JavaScript', value: 'javascript' },
+    { name: 'JSON', value: 'json' },
+    { name: 'Kotlin', value: 'kotlin' },
+    { name: 'Markdown', value: 'markdown' },
+    { name: 'PHP', value: 'php' },
+    { name: 'Python', value: 'python' },
+    { name: 'Ruby', value: 'ruby' },
+    { name: 'Rust', value: 'rust' },
+    { name: 'SQL', value: 'sql' },
+    { name: 'TypeScript', value: 'typescript' },
+    { name: 'YAML', value: 'yaml' },
+  ];
 
   private lastContentSelection: SelectionRange | null = null;
 
@@ -65,6 +246,7 @@ export class TiptapService {
     private richText: RichTextService,
     private ngZone: NgZone,
     private boardLink: BoardLinkService,
+    private editorPrefs: EditorPrefsService,
   ) {}
 
   /** Begin linking the current selection to a board element. Returns false if
@@ -77,9 +259,8 @@ export class TiptapService {
   initEditors(options: {
     tile: BoardItem;
     contentElement: HTMLElement;
-    defaultFontSize?: number; // px, applied as doc-level mark on empty content
   }) {
-    const { tile, contentElement, defaultFontSize } = options;
+    const { tile, contentElement } = options;
 
     // Destroy any existing editors (can happen if tile is re-rendered)
     this.destroyEditors();
@@ -88,7 +269,20 @@ export class TiptapService {
       element: contentElement,
       extensions: [
         ParagraphWithMarks,
-        StarterKit.configure({ paragraph: false }),
+        StarterKit.configure({ paragraph: false, code: false, codeBlock: false }),
+        // tiptap's default Code mark sets `excludes: '_'`, which strips every
+        // other mark (incl. textStyle carrying fontSize/color) the moment code
+        // is applied — so `code` reset to the note's default font. We still want
+        // code to keep the surrounding font size/color, but excluding *nothing*
+        // also let the bold/italic/strike input rules fire inside inline code:
+        // typing `*x*` inside `code` turned into italic. Exclude only the
+        // formatting marks (not textStyle) — this both blocks those marks inside
+        // code and, because markInputRule bails when a range mark excludes the
+        // new mark, leaves the literal `*`/`_`/`~` characters intact.
+        Code.extend({ excludes: 'bold italic strike' }),
+        // Syntax-highlighted code block (``` fence). Replaces StarterKit's plain
+        // codeBlock so language can be picked and tokens get colored via lowlight.
+        HighlightedCodeBlock.configure({ lowlight, defaultLanguage: 'plaintext' }),
         TextStyle,
         FontSize,
         Color.configure({ types: ['textStyle'] }),
@@ -106,22 +300,26 @@ export class TiptapService {
       ],
       content: tile.content,
       onCreate: ({ editor }) => {
-        // Apply the note's default font size as a doc-level mark, but ONLY
-        // if the content doesn't already carry fontSize marks (e.g. loaded
-        // from server). Otherwise every text run already has its own fontSize
-        // via tiptap's TextStyle extension.
-        if (defaultFontSize != null && !contentHasFontSize(tile.content)) {
-          const sz = `${Math.round(defaultFontSize)}px`;
+        // Empty / un-tagged content (fresh note, or one whose runs carry no
+        // fontSize mark): seed the user's last-used font size so a new note
+        // starts in the size you were just working in — NOT a size-derived
+        // default. Content already carrying per-run fontSize marks (e.g. loaded
+        // from the server) keeps its own sizes.
+        if (!contentHasFontSize(tile.content)) {
+          const sz = `${this.editorPrefs.lastFontSize}px`;
           editor.chain().selectAll().setFontSize(sz).run();
         }
       },
       onFocus: ({ editor }) => {
         this.lastContentSelection = null;
+        this.detectTableContext(editor);
         this.updateCurrentStyles(editor);
         this.onFocusCallback?.();
       },
       onUpdate: ({ editor }) => {
         tile.content = editor.getJSON();
+        this.reseedEmptyFontSize(editor);
+        this.detectTableContext(editor);
         this.updateCurrentStyles(editor);
       },
       onSelectionUpdate: ({ editor }) => {
@@ -167,7 +365,15 @@ export class TiptapService {
     this.lastContentSelection = null;
 
     try {
-      this.contentEditor?.commands?.blur();
+      // Only blur if THIS editor actually holds focus. tiptap's blur() command
+      // schedules `window.getSelection().removeAllRanges()` in a rAF, which wipes
+      // the document-wide selection — not just this editor's. clearSelectionHighlight
+      // runs on every note's editor on each document mousedown, so blurring a note
+      // that isn't focused would erase the caret in the note you just clicked into,
+      // one frame later (a race that made notes randomly un-typeable). Guarding on
+      // isFocused keeps the intended "blur on click-away" while leaving other
+      // editors' selections alone.
+      if (this.contentEditor?.isFocused) this.contentEditor.commands.blur();
     } catch {}
 
     this.clearPersistentSelectionDecoration(this.contentEditor);
@@ -221,6 +427,36 @@ export class TiptapService {
   detectTableContext(editor: Editor) {
     this.isTableActive =
       editor.isActive('tableCell') || editor.isActive('tableHeader');
+
+    this.isCodeBlockActive = editor.isActive('codeBlock');
+    this.currentCodeLanguage = this.isCodeBlockActive
+      ? editor.getAttributes('codeBlock')?.['language'] || 'plaintext'
+      : 'plaintext';
+  }
+
+  /** Friendly label for the active code-block language (for the picker input). */
+  get currentCodeLanguageName(): string {
+    const match = this.codeLanguages.find(
+      (l) => l.value === this.currentCodeLanguage,
+    );
+    return match ? match.name : this.currentCodeLanguage;
+  }
+
+  /** Commit from the searchable picker. Accepts a friendly name (e.g. "Python"),
+   *  a highlight.js id ("python"), or any custom text; resolves to the id. */
+  applyCodeLanguage(input: string, editor: Editor) {
+    const q = (input || '').trim().toLowerCase();
+    if (!q) return;
+    const match = this.codeLanguages.find(
+      (l) => l.name.toLowerCase() === q || l.value.toLowerCase() === q,
+    );
+    this.setCodeBlockLanguage(match ? match.value : q, editor);
+  }
+
+  /** Set the language of the code block under the cursor (drives highlighting). */
+  setCodeBlockLanguage(language: string, editor: Editor) {
+    editor.chain().focus().updateAttributes('codeBlock', { language }).run();
+    this.currentCodeLanguage = language;
   }
 
   private captureLastSelection(editor: Editor) {
@@ -260,7 +496,9 @@ export class TiptapService {
     editor.chain().focus().toggleOrderedList().run();
   }
   toggleCodeBlock(editor: Editor) {
-    editor.chain().focus().toggleCodeBlock().run();
+    // Carry the current font size into the block so it doesn't reset to default.
+    const fontSize = currentFontSize(editor.state);
+    editor.chain().focus().toggleCodeBlock({ fontSize } as any).run();
   }
 
   insertTable(editor: Editor) {
@@ -312,11 +550,27 @@ export class TiptapService {
 
   applyFontSize(size: string, editor: Editor) {
     const normalized = /^\d+$/.test(size.trim()) ? size.trim() + 'px' : size;
-    const chain = editor
-      .chain()
-      .focus()
-      .setMark('textStyle', { fontSize: normalized });
-    chain.run();
+    // Code blocks carry no textStyle marks — their size lives on the <pre> node's
+    // `fontSize` attribute, so set that instead when the cursor is inside one.
+    if (editor.isActive('codeBlock')) {
+      editor.chain().focus().updateAttributes('codeBlock', { fontSize: normalized }).run();
+    } else {
+      editor.chain().focus().setMark('textStyle', { fontSize: normalized }).run();
+    }
+    // Remember this as the size new/empty elements default to.
+    const px = parseInt(normalized, 10);
+    if (Number.isFinite(px)) this.editorPrefs.lastFontSize = px;
+  }
+
+  /** When an editor goes empty (new note, or all text deleted via Ctrl+A), seed
+   *  the caret with the last-used font size so the next character typed uses it
+   *  instead of falling back to the note's base size. Guarded against re-firing:
+   *  the stored mark already matching means no transaction, no onUpdate loop. */
+  private reseedEmptyFontSize(editor: Editor) {
+    if (!editor.isEmpty) return;
+    const want = `${this.editorPrefs.lastFontSize}px`;
+    if (editor.getAttributes('textStyle')['fontSize'] === want) return;
+    editor.chain().setMark('textStyle', { fontSize: want }).run();
   }
 
   private updateCurrentStyles(editor: Editor) {
@@ -380,7 +634,9 @@ export class TiptapService {
   }
 
   adjustFontSize(delta: number, editor: Editor) {
-    const current = editor.getAttributes('textStyle')['fontSize'] as string | undefined;
+    const current = editor.isActive('codeBlock')
+      ? (editor.getAttributes('codeBlock')['fontSize'] as string | undefined)
+      : (editor.getAttributes('textStyle')['fontSize'] as string | undefined);
     // No explicit size → fall back to the note's computed base, which scales
     // with note size (see --note-font-size), not a fixed 21px.
     const base = current ?? this.computedSizeAt(editor, editor.state.selection.from);

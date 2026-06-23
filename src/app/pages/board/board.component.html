@@ -3,8 +3,51 @@
     style="z-index: 1000"
     #navbar
     [isClockVisible]="true"
-    [isLogoutVisible]="true"
+    [isOptionsVisible]="true"
+    (optionsClick)="openOptions()"
   ></app-navbar>
+
+  <!-- Options popup -->
+  <div
+    *ngIf="optionsOpen"
+    class="options-overlay"
+    (click)="closeOptions()"
+  >
+    <div class="options-popup" (click)="$event.stopPropagation()">
+      <div class="options-header">
+        <span class="options-title">Options</span>
+        <button
+          class="options-close"
+          type="button"
+          (click)="closeOptions()"
+          aria-label="Close options"
+        >
+          <app-svg-icon icon="close-x"></app-svg-icon>
+        </button>
+      </div>
+
+      <button
+        class="options-item"
+        type="button"
+        [disabled]="!selectedBoard"
+        (click)="exportBoard()"
+      >
+        <span class="options-item-title">Export board</span>
+        <span class="options-item-subtitle">
+          {{ selectedBoard ? 'Download "' + selectedBoard.name + '" as a file' : 'Open a board first' }}
+        </span>
+      </button>
+
+      <button
+        class="options-item options-logout"
+        type="button"
+        (click)="logoutFromOptions()"
+      >
+        <span class="options-item-title">Log out</span>
+        <span class="options-item-subtitle">End this session</span>
+      </button>
+    </div>
+  </div>
 
   <ng-template
     #defaultNavbarTemplate
@@ -65,6 +108,125 @@
     </div>
   </ng-template>
 
+  <!-- AI chat toggle (floating) -->
+  <button
+    *ngIf="selectedBoard && !chatOpen"
+    class="ai-chat-fab"
+    type="button"
+    title="AI assistant"
+    (click)="toggleChat()"
+  >
+    <app-svg-icon icon="ai-sparkle"></app-svg-icon>
+    <span>AI</span>
+  </button>
+
+  <!-- AI chat panel -->
+  <div class="ai-chat" *ngIf="chatOpen">
+    <div class="ai-chat-header">
+      <app-svg-icon icon="ai-sparkle" class="ai-chat-header-icon"></app-svg-icon>
+      <span class="ai-chat-title">Board assistant</span>
+      <button
+        class="ai-chat-close"
+        type="button"
+        (click)="closeChat()"
+        aria-label="Close chat"
+      >
+        <app-svg-icon icon="close-x"></app-svg-icon>
+      </button>
+    </div>
+
+    <div class="ai-chat-thread">
+      <div class="ai-chat-empty" *ngIf="!chatThread.length">
+        Ask me to summarize, rewrite, or add notes. Selected notes are sent as
+        context — I’ll propose changes for you to approve.
+      </div>
+
+      <div
+        class="ai-chat-msg"
+        *ngFor="let entry of chatThread"
+        [class.is-user]="entry.role === 'user'"
+        [class.is-assistant]="entry.role === 'assistant'"
+      >
+        <div class="ai-chat-bubble">{{ entry.content }}</div>
+
+        <!-- Proposed-change cards -->
+        <div class="ai-actions" *ngIf="entry.actions?.length">
+          <div
+            class="ai-action"
+            *ngFor="let pa of entry.actions"
+            [class.is-applied]="pa.status === 'applied'"
+            [class.is-rejected]="pa.status === 'rejected'"
+            [attr.data-kind]="pa.action.type"
+          >
+            <div class="ai-action-head">
+              <span class="ai-action-label">{{ actionLabel(pa.action) }}</span>
+              <span class="ai-action-status" *ngIf="pa.status === 'applied'">Applied</span>
+              <span class="ai-action-status is-rejected" *ngIf="pa.status === 'rejected'">Rejected</span>
+            </div>
+            <div class="ai-action-reason">{{ pa.action.reason }}</div>
+            <div class="ai-action-preview" *ngIf="actionPreview(pa.action) as prev">
+              {{ prev }}
+            </div>
+            <div class="ai-action-buttons" *ngIf="pa.status === 'pending'">
+              <button class="ai-action-apply" type="button" (click)="applyAction(pa)">
+                Apply
+              </button>
+              <button class="ai-action-reject" type="button" (click)="rejectAction(pa)">
+                Reject
+              </button>
+            </div>
+            <div
+              class="ai-action-buttons"
+              *ngIf="pa.status === 'applied' && pa.action.type === 'update_note'"
+            >
+              <button class="ai-action-revert" type="button" (click)="revertAction(pa)">
+                Revert
+              </button>
+            </div>
+          </div>
+
+          <button
+            class="ai-apply-all"
+            type="button"
+            *ngIf="hasPendingActions(entry)"
+            (click)="applyAllActions(entry)"
+          >
+            Apply all
+          </button>
+        </div>
+      </div>
+
+      <div class="ai-chat-thinking" *ngIf="chatLoading">AI thinking…</div>
+    </div>
+
+    <!-- Context chips -->
+    <div class="ai-chat-context" *ngIf="chatContextNotes.length">
+      <span class="ai-chat-context-label">Context:</span>
+      <span class="ai-chat-chip" *ngFor="let n of chatContextNotes">
+        {{ itemPreview(n) }}
+      </span>
+    </div>
+
+    <div class="ai-chat-input-row">
+      <textarea
+        class="ai-chat-input"
+        rows="1"
+        [(ngModel)]="chatInput"
+        (keydown.enter)="$event.preventDefault(); sendChat()"
+        placeholder="Ask the assistant…  (Enter to send)"
+        [disabled]="chatLoading"
+      ></textarea>
+      <button
+        class="ai-chat-send"
+        type="button"
+        [disabled]="chatLoading || !chatInput.trim()"
+        (click)="sendChat()"
+      >
+        Send
+      </button>
+    </div>
+  </div>
+
   <div class="board-container" #board>
     <div *ngIf="isSearchOpen">
       <div class="search" *ngIf="boards$ | async as boards">
@@ -106,6 +268,23 @@
             <span *ngIf="isCreateOpen" class="command-title">
               Create board
             </span>
+
+            <button
+              *ngIf="!isCreateOpen"
+              class="command-import"
+              type="button"
+              title="Import board from file"
+              (click)="triggerImport()"
+            >
+              Import
+            </button>
+            <input
+              #importFileInput
+              type="file"
+              accept="application/json,.json"
+              hidden
+              (change)="onImportFileSelected($event)"
+            />
 
             <button
               class="command-close"
@@ -225,6 +404,7 @@
           <app-board-section
             [tile]="section"
             [zoom]="zoom"
+            [attr.data-sync]="section.syncState"
             (mousedown)="bringSectionToFront(section)"
             (navbarChange)="onNoteNavbarChange($event)"
             (deleteSection)="onDeleteSection(section)"
@@ -239,6 +419,7 @@
           <app-board-note
             [tile]="item"
             [zoom]="zoom"
+            [attr.data-sync]="item.syncState"
             (mousedown)="bringToFront(item)"
             (dblclick)="onNoteDblClick($event, item)"
             (navbarChange)="onNoteNavbarChange($event)"
@@ -281,6 +462,7 @@
           <app-board-image
             [tile]="image"
             [zoom]="zoom"
+            [attr.data-sync]="image.syncState"
             (mousedown)="bringToFront(image)"
             (deleteImage)="onDeleteImage(image)"
             *ngIf="isItemVisible(image)"
@@ -295,6 +477,7 @@
           <app-board-drawing
             [tile]="drawing"
             [zoom]="zoom"
+            [attr.data-sync]="drawing.syncState"
             (mousedown)="bringToFront(drawing)"
             (deleteDrawing)="onDeleteDrawing(drawing)"
             *ngIf="isItemVisible(drawing)"
@@ -423,11 +606,75 @@
     *ngIf="saveStatus !== 'idle'"
     [class.save-indicator--saving]="saveStatus === 'saving'"
     [class.save-indicator--saved]="saveStatus === 'saved'"
+    [class.save-indicator--partial]="saveStatus === 'partial'"
     [class.save-indicator--failed]="saveStatus === 'failed'"
   >
     <span *ngIf="saveStatus === 'saving'">Saving{{ saveDotsText }}</span>
     <span *ngIf="saveStatus === 'saved'">Saved!</span>
+    <span *ngIf="saveStatus === 'partial'">Some items failed to save</span>
     <span *ngIf="saveStatus === 'failed'">Failed to save</span>
+  </div>
+
+  <!-- Sync-status button + panel: what is in the DB vs. only local -->
+  <div class="sync-status" *ngIf="selectedBoard && unsyncedCount > 0">
+    <button
+      class="sync-status-btn"
+      [class.sync-status-btn--dirty]="unsyncedCount > 0"
+      [class.sync-status-btn--error]="erroredItems.length > 0"
+      (click)="toggleSyncPanel()"
+      title="Show what has not been saved to the server"
+    >
+      <span class="sync-status-dot" [attr.data-sync]="erroredItems.length ? 'error' : 'local'"></span>
+      {{ unsyncedCount }} unsaved
+    </button>
+
+    <div class="sync-panel" *ngIf="syncPanelOpen">
+      <div class="sync-panel-head">
+        <strong>Unsaved changes</strong>
+        <button class="sync-panel-save" (click)="saveBoard()">Save now</button>
+        <button class="sync-panel-close" (click)="toggleSyncPanel()">✕</button>
+      </div>
+
+      <div class="sync-group" *ngIf="erroredItems.length">
+        <div class="sync-group-title sync-group-title--error">Failed ({{ erroredItems.length }})</div>
+        <button class="sync-row" *ngFor="let it of erroredItems" (click)="jumpToSyncItem(it)" [title]="it.lastSyncError || ''">
+          <span class="sync-row-kind">{{ itemKindLabel(it) }}</span>
+          <span class="sync-row-text">{{ itemPreview(it) }}</span>
+          <span class="sync-row-badge sync-row-badge--error">!</span>
+        </button>
+      </div>
+
+      <div class="sync-group" *ngIf="localOnlyItems.length">
+        <div class="sync-group-title sync-group-title--local">Local only — never saved ({{ localOnlyItems.length }})</div>
+        <button class="sync-row" *ngFor="let it of localOnlyItems" (click)="jumpToSyncItem(it)">
+          <span class="sync-row-kind">{{ itemKindLabel(it) }}</span>
+          <span class="sync-row-text">{{ itemPreview(it) }}</span>
+        </button>
+      </div>
+
+      <div class="sync-group" *ngIf="modifiedItems.length">
+        <div class="sync-group-title sync-group-title--modified">Modified since save ({{ modifiedItems.length }})</div>
+        <button class="sync-row" *ngFor="let it of modifiedItems" (click)="jumpToSyncItem(it)">
+          <span class="sync-row-kind">{{ itemKindLabel(it) }}</span>
+          <span class="sync-row-text">{{ itemPreview(it) }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Restore-local prompt: unsaved changes found in browser storage -->
+  <div class="restore-modal-backdrop" *ngIf="restorePrompt">
+    <div class="restore-modal">
+      <h3 class="restore-modal-title">Unsaved changes found</h3>
+      <p class="restore-modal-hint">
+        We found local changes from <strong>{{ restoreAgeLabel }}</strong> that never reached the
+        server. Restore them, or discard and keep the saved version?
+      </p>
+      <div class="restore-modal-actions">
+        <button class="restore-modal-restore" (click)="restoreLocal()">Restore</button>
+        <button class="restore-modal-discard" (click)="discardLocal()">Discard</button>
+      </div>
+    </div>
   </div>
 
   <!-- Delete board confirmation modal -->

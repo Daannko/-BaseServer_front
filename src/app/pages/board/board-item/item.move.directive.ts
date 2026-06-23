@@ -59,6 +59,9 @@ export class ItemMoveDirective implements OnInit, OnDestroy {
         let lastY = pev.clientY;
         let currentX = this.pos.x;
         let currentY = this.pos.y;
+        // World position at gesture start, used to lock an axis when Shift is held.
+        const startPosX = this.pos.x;
+        const startPosY = this.pos.y;
         const DRAG_THRESHOLD_PX = 4;
 
         let dragging = false;
@@ -98,9 +101,23 @@ export class ItemMoveDirective implements OnInit, OnDestroy {
           currentX += dxPx / z;
           currentY += dyPx / z;
 
+          let outX = currentX;
+          let outY = currentY;
+
+          // Shift = axis lock (Photoshop-style): move along one axis only.
+          // Pick the dominant axis from total travel since the gesture start,
+          // then snap the other coord back to where it started.
+          if (moveEv.shiftKey) {
+            if (Math.abs(rawDxFromStart) >= Math.abs(rawDyFromStart)) {
+              outY = startPosY;
+            } else {
+              outX = startPosX;
+            }
+          }
+
           const next: Position = {
-            x: Math.round(currentX),
-            y: Math.round(currentY),
+            x: Math.round(outX),
+            y: Math.round(outY),
           };
 
           // Emit inside Angular so bindings update.

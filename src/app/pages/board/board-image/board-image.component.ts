@@ -134,7 +134,12 @@ export class BoardImageComponent implements OnDestroy {
 
   onPosChange(p: Position) {
     if (this.selection.isGroupMoving(this.tile)) {
-      this.selection.moveGroupTo(this.tile, p.x, p.y);
+      const c = this.snap.snapGroupMove(
+        this.selection.items,
+        p.x - this.tile.x,
+        p.y - this.tile.y,
+      );
+      this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy);
       return;
     }
     const s = this.snap.snapMove(

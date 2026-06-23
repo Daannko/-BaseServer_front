@@ -297,6 +297,9 @@ export class BoardApiService {
         console.error('Failed to save element', { url, error: e });
         this.snackBarService.error(msg || 'Failed to save element');
       }
+      // Rethrow so the caller never clears dirty flags on a failed save — that
+      // bug silently dropped data when the token expired mid-session.
+      throw e;
     }
   }
 
