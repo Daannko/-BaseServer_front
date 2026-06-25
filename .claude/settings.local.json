@@ -39,7 +39,9 @@
       "PowerShell(npm run *)",
       "PowerShell($r = Invoke-WebRequest -Uri http://localhost:49191 -UseBasicParsing -TimeoutSec 3 -ErrorAction SilentlyContinue; if \\($r\\) { \"UP $\\($r.StatusCode\\)\" } else { \"DOWN\" })",
       "mcp__playwright__browser_press_key",
-      "PowerShell(git --no-pager log -L 166,177:src/app/pages/board/board-item/tiptap.service.ts --no-patch 2>$null; Write-Output \"----- blame -----\"; git --no-pager blame -L 166,177 src/app/pages/board/board-item/tiptap.service.ts)"
+      "PowerShell(git --no-pager log -L 166,177:src/app/pages/board/board-item/tiptap.service.ts --no-patch 2>$null; Write-Output \"----- blame -----\"; git --no-pager blame -L 166,177 src/app/pages/board/board-item/tiptap.service.ts)",
+      "mcp__playwright__browser_drag",
+      "Bash(perl -i -pe \"s/insertContent\\\\\\('\\\\xc2\\\\xa0'\\\\.repeat\\\\\\(4\\\\\\)\\\\\\)/insertContent\\('\\\\\\\\t'\\)/\" src/app/pages/board/board-item/tiptap.extension.ts)"
     ]
   }
 }

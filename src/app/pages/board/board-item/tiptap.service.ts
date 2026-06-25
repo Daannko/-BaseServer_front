@@ -42,7 +42,7 @@ import {
   PersistentSelectionKey,
 } from '../../../helpers/tiptap/PersistentSelector';
 import type { BoardItem } from './board-item.data';
-import { BoardLink, ParagraphAttrPlugin, ParagraphWithMarks } from './tiptap.extension';
+import { BoardLink, ParagraphAttrPlugin, ParagraphWithMarks, TabIndent } from './tiptap.extension';
 import { BoardLinkService } from '../board-link.service';
 import { EditorPrefsService } from '../board-editor-prefs.service';
 
@@ -296,6 +296,7 @@ export class TiptapService {
 
         ParagraphAttrPlugin,
         BoardLink,
+        TabIndent,
         PersistentSelection,
       ],
       content: tile.content,

@@ -45,13 +45,20 @@ import {
 import { ColorPaletteComponent } from '../common/color-palette/color-palette.component';
 import { BoardDrawingComponent } from './board-drawing/board-drawing.component';
 import { BoardAiService } from './board-ai.service';
+import { AiTextService } from './ai-text.service';
+import type { SafeHtml } from '@angular/platform-browser';
 import { BoardLinkService } from './board-link.service';
 import { BoardPersistenceService } from './board-persistence.service';
 import { EditorPrefsService } from './board-editor-prefs.service';
 import type {
   FactCheckResult,
   QuizQuestion,
+  QuizQuestionType,
+  QuizGenerateRequest,
   QuizGenerateResponse,
+  QuizSummary,
+  QuizAnswerValue,
+  QuizEvaluateResult,
   ChatMessage,
   NoteContextInput,
   BoardAiAction,
@@ -300,6 +307,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
     private aiService: BoardAiService,
+    private aiText: AiTextService,
     private linkService: BoardLinkService,
     private persistence: BoardPersistenceService,
     private editorPrefs: EditorPrefsService,
@@ -679,6 +687,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
       // Offer to recover any local changes that never reached the DB.
       this.maybeOfferRestore(board.id);
+
+      // Restore an in-progress quiz (answers survive a page refresh).
+      this.restoreQuizState();
 
       await Promise.resolve();
       this.cdr.detectChanges();
@@ -1071,6 +1082,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       .pipe(takeUntil(this.destroy$))
       .subscribe(() => {
         this.updateSelectionNavbar();
+        this.loadExistingQuizzes();
         this.cdr.detectChanges();
       });
 
@@ -2235,18 +2247,51 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   /** Show fact-check details for this noteId. */
   factCheckExpanded: string | null = null;
 
-  /** Quiz generation result. */
+  /** Quiz generation result (taking mode). */
   quiz: QuizGenerateResponse | null = null;
   /** Current question index. */
   quizIndex = 0;
-  /** Coverage slider value (0–1). */
+  /** Coverage value (0–1). Sent to backend; no longer surfaced as a slider. */
   quizCoverage = 0.75;
-  /** User's answers keyed by question id. */
-  quizAnswers = new Map<string, string>();
+  /** User's answers keyed by question id. Value shape depends on question type. */
+  quizAnswers = new Map<string, QuizAnswerValue>();
   /** True once the quiz is submitted and scored. */
   quizSubmitted = false;
   /** Score summary after evaluation. */
   quizScore: { score: string; percentage: number } | null = null;
+  /** Per-question evaluation results, keyed by question id. */
+  quizResults = new Map<string, QuizEvaluateResult>();
+  /** Quiz window position (px). null = centered default. */
+  quizPos: { x: number; y: number } | null = null;
+  private quizDrag: { sx: number; sy: number; ox: number; oy: number } | null =
+    null;
+  private readonly QUIZ_STATE_KEY = 'quiz-active';
+
+  // ── Quiz generation options ────────────────────────────────────────────────
+  /** Question types the UI can render/answer (the full pickable set). */
+  readonly quizTypeOptions: { type: QuizQuestionType; label: string }[] = [
+    { type: 'SINGLE_CHOICE', label: 'Single choice' },
+    { type: 'MULTIPLE_ANSWER', label: 'Multiple answer' },
+    { type: 'TRUE_FALSE', label: 'True / false' },
+    { type: 'OPEN', label: 'Open question' },
+  ];
+  /** Types the user has enabled for the next generation. */
+  quizTypeSelection = new Set<QuizQuestionType>([
+    'SINGLE_CHOICE',
+    'MULTIPLE_ANSWER',
+    'TRUE_FALSE',
+    'OPEN',
+  ]);
+  /** Target number of questions. */
+  quizCount = 5;
+  readonly quizCountOptions = [3, 5, 10, 15, 20];
+  /** Optional free-text steer for the model. */
+  quizPrompt = '';
+  /** Ask backend to avoid repeating questions from the existing quizzes. */
+  quizAvoidExisting = false;
+  /** Quizzes already linked to the current note selection (reverse lookup). */
+  existingQuizzes: QuizSummary[] = [];
+  private existingQuizzesKey = '';
 
   /** True when all selected items are notes. */
   get selectedNotes(): BoardNote[] {
@@ -2260,7 +2305,62 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   get canGenerateQuiz(): boolean {
-    return !this.aiLoading && this.selectedNotes.length >= 1;
+    return (
+      !this.aiLoading &&
+      this.selectedNotes.length >= 1 &&
+      this.quizTypeSelection.size >= 1
+    );
+  }
+
+  /** Toggle a question type in/out of the next-generation set. */
+  toggleQuizType(type: QuizQuestionType): void {
+    if (this.quizTypeSelection.has(type)) this.quizTypeSelection.delete(type);
+    else this.quizTypeSelection.add(type);
+  }
+
+  isQuizTypeOn(type: QuizQuestionType): boolean {
+    return this.quizTypeSelection.has(type);
+  }
+
+  /** Reverse lookup: quizzes already built from the selected notes. */
+  private async loadExistingQuizzes(): Promise<void> {
+    const ids = this.selectedNotes.map((n) => n.serverId ?? n.id).sort();
+    const key = ids.join('|');
+    if (key === this.existingQuizzesKey) return; // unchanged selection
+    this.existingQuizzesKey = key;
+    if (!ids.length) {
+      this.existingQuizzes = [];
+      return;
+    }
+    const res = await this.aiService.listQuizzes({
+      noteId: ids,
+      boardId: this.selectedBoard?.id,
+      limit: 20,
+    });
+    // Selection may have changed while awaiting — guard with the key.
+    if (this.existingQuizzesKey !== key) return;
+    this.existingQuizzes = res?.quizzes ?? [];
+    this.cdr.detectChanges();
+  }
+
+  /** Open a previously-generated quiz (taking mode). */
+  async openExistingQuiz(summary: QuizSummary): Promise<void> {
+    this.aiLoading = true;
+    this.cdr.detectChanges();
+    const full = await this.aiService.getQuiz(summary.id);
+    this.aiLoading = false;
+    if (full?.questions?.length) {
+      this.quiz = full;
+      this.quizIndex = 0;
+      this.quizAnswers.clear();
+      this.quizResults.clear();
+      this.quizSubmitted = false;
+      this.quizScore = null;
+      this.quizPos = null;
+      this.persistQuizState();
+      this.updateSelectionNavbar();
+    }
+    this.cdr.detectChanges();
   }
 
   get quizCurrentQuestion(): QuizQuestion | null {
@@ -2270,6 +2370,55 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   get quizProgress(): string {
     if (!this.quiz) return '';
     return `${this.quizIndex + 1} / ${this.quiz.questions.length}`;
+  }
+
+  /** Whether a question has a non-empty answer. */
+  private isAnswered(q: QuizQuestion): boolean {
+    const a = this.quizAnswers.get(q.id);
+    if (a == null) return false;
+    if (typeof a === 'string') return a.trim().length > 0;
+    if (Array.isArray(a)) return a.length > 0;
+    return Object.keys(a).length > 0;
+  }
+
+  get quizAnsweredCount(): number {
+    if (!this.quiz) return 0;
+    return this.quiz.questions.filter((q) => this.isAnswered(q)).length;
+  }
+
+  get quizAllAnswered(): boolean {
+    return !!this.quiz && this.quizAnsweredCount >= this.quiz.questions.length;
+  }
+
+  /** Current answer for a question (template helper). */
+  quizAnswerOf(q: QuizQuestion): QuizAnswerValue | undefined {
+    return this.quizAnswers.get(q.id);
+  }
+
+  /** True when `key` is the chosen answer (single) or in the chosen set (multi). */
+  quizIsChosen(q: QuizQuestion, key: string): boolean {
+    const a = this.quizAnswers.get(q.id);
+    if (a == null) return false;
+    return Array.isArray(a) ? a.includes(key) : a === key;
+  }
+
+  quizResultFor(q: QuizQuestion): QuizEvaluateResult | undefined {
+    return this.quizResults.get(q.id);
+  }
+
+  /** Render AI/user text (code blocks, inline code, bold/italic) to safe HTML. */
+  aiHtml(text: string | null | undefined): SafeHtml {
+    return this.aiText.render(text);
+  }
+
+  /** Render any correctAnswer value as readable text (results view). */
+  quizFormatAnswer(v: QuizAnswerValue | undefined): string {
+    if (v == null) return '';
+    if (typeof v === 'string') return v;
+    if (Array.isArray(v)) return v.join(', ');
+    return Object.entries(v)
+      .map(([l, r]) => `${l} → ${r}`)
+      .join(', ');
   }
 
   // ── Save indicator ────────────────────────────────────────────────────────
@@ -2423,53 +2572,112 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.quiz = null;
     this.quizIndex = 0;
     this.quizAnswers.clear();
+    this.quizResults.clear();
     this.quizSubmitted = false;
     this.quizScore = null;
+    this.quizPos = null;
     this.cdr.detectChanges();
 
-    const req = {
+    const types = Array.from(this.quizTypeSelection);
+    const req: QuizGenerateRequest = {
       notes: this.selectedNoteInputs(),
       coverage: this.quizCoverage,
+      boardId: this.selectedBoard?.id ?? null,
+      questionTypes: types.length
+        ? types
+        : this.quizTypeOptions.map((o) => o.type),
+      count: this.quizCount,
+      prompt: this.quizPrompt.trim() || undefined,
+      avoidExisting: this.quizAvoidExisting && this.existingQuizzes.length > 0,
     };
     const res = await this.aiService.generateQuiz(req);
     this.aiLoading = false;
 
     if (res?.questions?.length) {
       this.quiz = res;
+      this.persistQuizState();
       this.updateSelectionNavbar();
+      // A new quiz was persisted for this selection — refresh the linked list.
+      if (res.id) {
+        this.existingQuizzesKey = '';
+        this.loadExistingQuizzes();
+      }
     }
     this.cdr.detectChanges();
   }
 
   quizPrev(): void {
-    if (this.quizIndex > 0) this.quizIndex--;
+    if (this.quizIndex > 0) {
+      this.quizIndex--;
+      this.persistQuizState();
+    }
   }
 
   quizNext(): void {
     if (this.quiz && this.quizIndex < this.quiz.questions.length - 1) {
       this.quizIndex++;
+      this.persistQuizState();
     }
   }
 
+  /** Single-choice / true-false pick — replaces the answer and auto-advances. */
   quizSelectAnswer(answer: string): void {
     const q = this.quizCurrentQuestion;
-    if (!q) return;
+    if (!q || this.quizSubmitted) return;
     this.quizAnswers.set(q.id, answer);
-    // Auto-advance on multiple-choice selection
-    if (q.type === 'MULTIPLE_CHOICE' && this.quizIndex < (this.quiz?.questions.length ?? 0) - 1) {
+    this.persistQuizState();
+    const last = (this.quiz?.questions.length ?? 0) - 1;
+    if (
+      (q.type === 'SINGLE_CHOICE' || q.type === 'TRUE_FALSE') &&
+      this.quizIndex < last
+    ) {
       setTimeout(() => this.quizNext(), 300);
     }
   }
 
+  /** Multiple-answer toggle — adds/removes a key from the chosen set. */
+  quizToggleAnswer(key: string): void {
+    const q = this.quizCurrentQuestion;
+    if (!q || this.quizSubmitted) return;
+    const cur = this.quizAnswers.get(q.id);
+    const set = Array.isArray(cur) ? [...cur] : [];
+    const i = set.indexOf(key);
+    if (i >= 0) set.splice(i, 1);
+    else set.push(key);
+    this.quizAnswers.set(q.id, set);
+    this.persistQuizState();
+  }
+
+  /** Open / free-text answer. */
+  quizSetText(value: string): void {
+    const q = this.quizCurrentQuestion;
+    if (!q || this.quizSubmitted) return;
+    this.quizAnswers.set(q.id, value);
+    this.persistQuizState();
+  }
+
   async submitQuiz(): Promise<void> {
-    if (!this.quiz) return;
-    const questions = Array.from(this.quizAnswers.entries()).map(
-      ([id, answer]) => ({ id, answer }),
+    if (!this.quiz || !this.quizAllAnswered) return;
+    this.aiLoading = true;
+    this.cdr.detectChanges();
+
+    const answers = Array.from(this.quizAnswers.entries()).map(
+      ([questionId, answer]) => ({ questionId, answer }),
     );
-    const res = await this.aiService.evaluateQuiz({ questions });
+    const res = this.quiz.id
+      ? await this.aiService.evaluateQuiz(this.quiz.id, { answers })
+      : await this.aiService.evaluateQuizOneOff({
+          quiz: { questions: this.quiz.questions },
+          answers,
+        });
+    this.aiLoading = false;
+
     if (res) {
       this.quizScore = { score: res.score, percentage: res.percentage };
+      this.quizResults.clear();
+      for (const r of res.results) this.quizResults.set(r.questionId, r);
       this.quizSubmitted = true;
+      this.persistQuizState();
     }
     this.cdr.detectChanges();
   }
@@ -2478,11 +2686,117 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.quiz = null;
     this.quizIndex = 0;
     this.quizAnswers.clear();
+    this.quizResults.clear();
     this.quizSubmitted = false;
     this.quizScore = null;
+    this.quizPos = null;
+    this.clearQuizState();
     // Restore selection navbar
     this.updateSelectionNavbar();
     this.cdr.detectChanges();
+  }
+
+  // ── Quiz window: drag + persistence ────────────────────────────────────────
+
+  /** Begin dragging the quiz window by its header. */
+  quizDragStart(ev: MouseEvent): void {
+    if (ev.button !== 0) return;
+    // Ignore drags that start on the close button.
+    if ((ev.target as HTMLElement).closest('.quiz-card-close')) return;
+    const pos = this.quizPos ?? this.defaultQuizPos();
+    this.quizPos = pos;
+    this.quizDrag = { sx: ev.clientX, sy: ev.clientY, ox: pos.x, oy: pos.y };
+    ev.preventDefault();
+    window.addEventListener('mousemove', this.onQuizDragMove);
+    window.addEventListener('mouseup', this.onQuizDragEnd);
+  }
+
+  private onQuizDragMove = (ev: MouseEvent): void => {
+    if (!this.quizDrag) return;
+    this.quizPos = {
+      x: Math.min(
+        Math.max(8, this.quizDrag.ox + (ev.clientX - this.quizDrag.sx)),
+        window.innerWidth - 80,
+      ),
+      y: Math.min(
+        Math.max(8, this.quizDrag.oy + (ev.clientY - this.quizDrag.sy)),
+        window.innerHeight - 60,
+      ),
+    };
+    this.cdr.detectChanges();
+  };
+
+  private onQuizDragEnd = (): void => {
+    this.quizDrag = null;
+    window.removeEventListener('mousemove', this.onQuizDragMove);
+    window.removeEventListener('mouseup', this.onQuizDragEnd);
+    this.persistQuizState();
+  };
+
+  private defaultQuizPos(): { x: number; y: number } {
+    const w = 600;
+    const h = 460;
+    return {
+      x: Math.max(20, Math.round((window.innerWidth - w) / 2)),
+      y: Math.max(70, Math.round((window.innerHeight - h) / 2)),
+    };
+  }
+
+  private quizStateKey(): string | null {
+    return this.selectedBoard
+      ? `${this.QUIZ_STATE_KEY}:${this.selectedBoard.id}`
+      : null;
+  }
+
+  /** Persist the active quiz + answers so a refresh keeps progress. */
+  private persistQuizState(): void {
+    const key = this.quizStateKey();
+    if (!key) return;
+    if (!this.quiz) {
+      localStorage.removeItem(key);
+      return;
+    }
+    const state = {
+      quiz: this.quiz,
+      answers: Array.from(this.quizAnswers.entries()),
+      index: this.quizIndex,
+      submitted: this.quizSubmitted,
+      score: this.quizScore,
+      results: Array.from(this.quizResults.entries()),
+      pos: this.quizPos,
+    };
+    try {
+      localStorage.setItem(key, JSON.stringify(state));
+    } catch {
+      /* storage full / unavailable — non-fatal */
+    }
+  }
+
+  private clearQuizState(): void {
+    const key = this.quizStateKey();
+    if (key) localStorage.removeItem(key);
+  }
+
+  /** Restore an in-progress quiz for the current board (after a refresh). */
+  private restoreQuizState(): void {
+    const key = this.quizStateKey();
+    if (!key) return;
+    const raw = localStorage.getItem(key);
+    if (!raw) return;
+    try {
+      const s = JSON.parse(raw);
+      if (!s?.quiz?.questions?.length) return;
+      this.quiz = s.quiz;
+      this.quizAnswers = new Map(s.answers ?? []);
+      this.quizResults = new Map(s.results ?? []);
+      this.quizIndex = s.index ?? 0;
+      this.quizSubmitted = !!s.submitted;
+      this.quizScore = s.score ?? null;
+      this.quizPos = s.pos ?? null;
+      this.updateSelectionNavbar();
+    } catch {
+      /* corrupt state — ignore */
+    }
   }
 
   // ── AI chat (conversational assistant) ────────────────────────────────────
@@ -2507,6 +2821,11 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         (document.querySelector('.ai-chat-input') as HTMLTextAreaElement | null)?.focus(),
       );
     }
+  }
+
+  /** Open the AI panel (no-op if already open). */
+  openChat(): void {
+    if (!this.chatOpen) this.toggleChat();
   }
 
   closeChat(): void {

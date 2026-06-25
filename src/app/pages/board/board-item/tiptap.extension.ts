@@ -221,3 +221,43 @@ export const ParagraphAttrPlugin = Extension.create({
     ];
   },
 });
+
+/**
+ * Tab handling inside note editors: keep focus in the editor and indent instead
+ * of moving to the next focusable element on the page.
+ *
+ * - In a list: Tab sinks (indents) the item, Shift-Tab lifts it.
+ * - In a code block: Tab inserts a real tab character.
+ * - In a table: defer to the Table extension's cell navigation.
+ * - Otherwise: insert a small indent (four non-breaking spaces) and swallow the
+ *   key so the browser does not shift focus.
+ */
+export const TabIndent = Extension.create({
+  name: 'tabIndent',
+
+  addKeyboardShortcuts() {
+    const editor = this.editor;
+    return {
+      Tab: () => {
+        // Let the table extension own Tab (move to next cell).
+        if (editor.isActive('table')) return false;
+        // Indent a list item instead of inserting a tab.
+        if (editor.can().sinkListItem('listItem')) {
+          return editor.commands.sinkListItem('listItem');
+        }
+        // Everywhere else (paragraphs, code blocks): insert a real tab. The
+        // editor renders paragraphs with white-space: pre-wrap + tab-size so the
+        // \t shows as indentation and is preserved in the stored content.
+        return editor.commands.insertContent('\t');
+      },
+      'Shift-Tab': () => {
+        if (editor.isActive('table')) return false;
+        if (editor.can().liftListItem('listItem')) {
+          return editor.commands.liftListItem('listItem');
+        }
+        // Swallow so focus does not leave the editor.
+        return true;
+      },
+    };
+  },
+});

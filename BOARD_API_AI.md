@@ -107,9 +107,131 @@ Content-Type: application/json
 
 ---
 
-## 2. Quiz — generate questions from selected notes
+## 2. Quiz — generate, store, and evaluate quizzes from selected notes
 
-### Request
+> Quizzes are **persistent**. Generating one creates a stored quiz (owned by the user,
+> optionally tied to a board) that can be listed, re-opened, edited, re-taken, and
+> deleted later. Each quiz carries **tags** describing what it is about, and supports
+> **multiple question types** — including open questions graded by the AI.
+
+### 2.0 Question types
+
+The `type` discriminator drives both the answer payload and the grading strategy.
+The set is open-ended — unknown types must be ignored by the frontend, not error.
+
+| `type` | Client answer (§2.7) | `answerKey` branch | Graded by | Notes |
+|--------|----------------------|--------------------|-----------|-------|
+| `SINGLE_CHOICE` | one key `"B"` | `keys` (len 1) | exact match | exactly one correct option (was `MULTIPLE_CHOICE`) |
+| `MULTIPLE_ANSWER` | array `["A","C"]` | `keys` | set match | 1+ correct; order-independent; partial credit |
+| `TRUE_FALSE` | `"TRUE"`\|`"FALSE"` | `keys` (len 1) | exact match | special case of single choice |
+| `OPEN` | free text | `rubric` + `sampleAnswer` | **AI** | short/long answer; AI judges vs rubric |
+| `FILL_BLANK` | array, one per blank | `keys` (or `rubric`) | exact / **AI** | `question` has `___` markers; `rubric` set ⇒ AI tolerates synonyms |
+| `MATCHING` | `{ leftKey: rightKey }` | `pairs` | set match | match `left[]` to `right[]`; partial credit |
+| `ORDERING` | ordered keys | `order` | sequence match | put `options[]` in correct order; partial credit |
+
+> **Compat:** the old `MULTIPLE_CHOICE` value is accepted as an alias for
+> `SINGLE_CHOICE` on read. New quizzes should emit `SINGLE_CHOICE`.
+
+### 2.1 Stored quiz model
+
+```
+Quiz {
+  "id": "string (server quiz id)",
+  "title": "string",
+  "tags": ["string", ...],          // topic tags — what the quiz is about (see 2.1a)
+  "boardId": "string | null",       // board it was generated from, if any
+  "sourceNoteIds": ["string", ...], // notes the quiz was generated from
+  "coverage": number,               // 0.0–1.0 used at generation time
+  "questionCount": number,
+  "createdAt": "ISO-8601",
+  "updatedAt": "ISO-8601",
+  "questions": [ Question, ... ]    // omitted from list endpoints; present on detail
+}
+
+Question {
+  "id": "string (unique within the quiz — used to submit answers)",
+  "type": "SINGLE_CHOICE" | "MULTIPLE_ANSWER" | "TRUE_FALSE" | "OPEN" | "FILL_BLANK" | "MATCHING" | "ORDERING",
+  "question": "string (prompt; may contain ___ blanks for FILL_BLANK)",
+  "points": number,                 // optional weight, default 1
+
+  // ── prompt material (always sent, both taking + reveal) ──
+  // choice-style types (SINGLE_CHOICE, MULTIPLE_ANSWER, ORDERING)
+  "options": [ { "key": "A", "text": "string" }, ... ],
+  // MATCHING only
+  "left":  [ { "key": "L1", "text": "string" }, ... ],
+  "right": [ { "key": "R1", "text": "string" }, ... ],
+
+  // ── answer key (server-side only; STRIPPED in taking mode, see 2.1b) ──
+  // One normalized object. Grader switches on `type`. Exactly one branch is set:
+  "answerKey": {
+    "keys":   ["B"],                // SINGLE_CHOICE | TRUE_FALSE | MULTIPLE_ANSWER | FILL_BLANK (one per blank)
+    "pairs":  { "L1": "R2", ... },  // MATCHING
+    "order":  ["B", "A", "C"],      // ORDERING
+    "rubric": "string",             // OPEN / AI-graded FILL_BLANK — what a correct answer must contain
+    "sampleAnswer": "string"        // OPEN — reference answer, shown after grading
+  },
+
+  "tags": ["string", ...],          // per-question topic tags, e.g. ["JAVA","OOP"] (see 2.1a)
+  "explanation": "string (revealed after answering)",
+  "sourceNoteId": "string | null"
+}
+```
+
+#### 2.1a Tags — quiz-level AND question-level
+
+Tags exist at **two** levels:
+
+- **Quiz tags** (`Quiz.tags`) — what the whole quiz is about, used to filter the
+  "my quizzes" list. Backend derives them from the union of question tags + note content.
+- **Question tags** (`Question.tags`) — what each individual question is about, e.g.
+  `["JAVA","OOP"]`, `["JAVA","COLLECTIONS"]`. Lets the UI label questions, group a
+  results breakdown by topic ("you missed 3/4 OOP questions"), and later build
+  cross-quiz "practice this tag" sets.
+
+Rules:
+- Backend generates tags from the source content. 1–8 tags per question, 1–8 per quiz.
+- Casing: emit a canonical form (e.g. uppercase topic codes `JAVA`, `OOP`) consistently
+  so equal tags collapse. Frontend treats them as opaque strings, compared case-sensitively.
+- `GET /ai/quiz/tags` returns the distinct **quiz-level** tag set with counts, for filter UIs.
+
+#### 2.1a-bis Note ↔ quiz link (persistent, queryable both ways)
+
+When a quiz is generated it is **permanently linked** to the notes it was built from
+via `Quiz.sourceNoteIds` (and per-question `Question.sourceNoteId`). The link must be
+queryable **from the note side** so the UI can, when the user selects/clicks notes,
+list the quizzes that already exist for them — instead of always generating a new one.
+
+- The link is stored by note **element id** — the same id the frontend sends in `notes[].id`
+  (serverId if saved, else local id). Backend must persist whatever id it was given so the
+  reverse lookup matches what the client holds.
+- A quiz can link many notes; a note can have many quizzes (many-to-many).
+- Deleting a note does **not** delete its quizzes; the dangling id is simply dropped from
+  any future reverse-lookup result (or kept — backend's choice — but must not 500).
+
+Reverse lookup (note → existing quizzes):
+
+```
+GET /ai/quiz?noteId={id}&noteId={id2}     // repeatable; OR semantics (any linked note)
+→ 200  { "quizzes": [ <summary>, ... ], "total": N }
+```
+
+Use this on selection-change to show an "Existing quizzes (N)" entry next to the
+"Generate quiz" button.
+
+#### 2.1b Answer-key exposure (anti-cheat)
+
+The whole `answerKey` object is **never** included while the user is *taking* the
+quiz. The grading data lives server-side only and is returned only:
+
+- inside an **evaluate** response (per question — via `correctAnswer`), and
+- on a **detail fetch with `?reveal=true`** (only the quiz owner; for review/editing).
+
+A normal `GET /ai/quiz/{id}` (taking mode) returns questions with prompt material
+(`options`/`left`/`right`) but **without** `answerKey`.
+
+---
+
+### 2.2 Generate a quiz (creates + stores it)
 
 ```
 POST /ai/quiz/generate
@@ -117,16 +239,24 @@ Content-Type: application/json
 
 {
   "notes": [
-    {
-      "id": "string",
-      "content": { /* TiptapDoc */ }
-    }
+    { "id": "string", "content": { /* TiptapDoc */ } }
   ],
-  "coverage": 0.75   // 0.0 – 1.0   (see below)
+  "coverage": 0.75,                 // 0.0–1.0 (see slider table below)
+  "boardId": "string | null",       // optional — associates the stored quiz with a board
+  "questionTypes": ["SINGLE_CHOICE","TRUE_FALSE","OPEN"],  // optional whitelist; default = backend's choice
+  "count": 10,                      // optional target question count (backend may clamp 4–20)
+  "prompt": "string",               // optional free-text steer (focus/difficulty/style) — appended to the system prompt
+  "persist": true                   // optional, default true. false = one-off, not stored
 }
 ```
 
-### Coverage slider
+- `notes[]` carry `x`/`y`/`width`/`height` (world coords) so the model understands the
+  layout/position of the selected notes (same geometry as `NoteInput`, §Shared types).
+- `prompt` is an optional user instruction (e.g. "focus on edge cases, exam style"). The
+  backend should treat it as guidance, not as authoritative content, and still respect
+  `coverage` / `questionTypes` / `count`.
+
+#### Coverage slider
 
 | Value | Meaning |
 |-------|---------|
@@ -135,56 +265,152 @@ Content-Type: application/json
 | `0.0` | **Exploratory**: only use topics *related to* the note content but never cover anything already stated in the notes. |
 | `0.0–1.0` | Smooth scale between the extremes. Backend interpolates the ratio of known-material questions vs. expansion-material questions. |
 
-### Response
+#### Response
 
 ```
 200
 {
-  "questions": [
-    {
-      "id": "string (unique per question — used to submit answers)",
-      "type": "MULTIPLE_CHOICE" | "TRUE_FALSE",
-      "question": "string (the question text)",
-      "options": [             // only for MULTIPLE_CHOICE
-        { "key": "A", "text": "string" },
-        { "key": "B", "text": "string" },
-        { "key": "C", "text": "string" },
-        { "key": "D", "text": "string" }
-      ],
-      "explanation": "string (revealed after answering — explains the correct answer)",
-      "sourceNoteId": "string | null (which note inspired this question, if any)"
-    }
-  ],
-  "title": "string (optional quiz title — backend may generate one)"
+  "id": "string (new stored quiz id — null if persist:false)",
+  "title": "string (backend-generated)",
+  "tags": ["string", ...],
+  "boardId": "string | null",
+  "sourceNoteIds": ["string", ...],
+  "coverage": 0.75,
+  "createdAt": "ISO-8601",
+  "questions": [ Question, ... ]    // WITHOUT correct answers (taking mode)
 }
 ```
 
-- 4–20 questions per request. Backend chooses length based on note count/content.
+- 4–20 questions per request. Backend chooses length based on note count/content unless `count` given.
 - `sourceNoteId` may be `null` for expansion-material questions (coverage < 1.0).
+- Max 10 notes per request (reject `400` beyond that).
 
-### 2b. Submit answers (optional — P2)
+---
+
+### 2.3 List stored quizzes
+
+```
+GET /ai/quiz?boardId={id}&noteId={id}&tag={tag}&tag={tag2}&q={search}&limit=50&offset=0
+```
+
+- All filters optional. `tag` repeatable (AND semantics). `noteId` repeatable (OR — any
+  linked note; this is the note → existing-quizzes reverse lookup of §2.1a-bis). `q`
+  matches title/tags.
+- Returns quiz **summaries** (no `questions` array).
+
+```
+200
+{
+  "quizzes": [
+    {
+      "id": "string", "title": "string", "tags": ["..."],
+      "boardId": "string | null", "questionCount": 12,
+      "coverage": 0.75, "createdAt": "ISO-8601", "updatedAt": "ISO-8601"
+    }
+  ],
+  "total": 37
+}
+```
+
+### 2.3a List distinct tags
+
+```
+GET /ai/quiz/tags
+→ 200
+{ "tags": [ { "tag": "mitosis", "count": 4 }, ... ] }
+```
+
+### 2.4 Fetch one quiz
+
+```
+GET /ai/quiz/{id}                 // taking mode — NO correct answers
+GET /ai/quiz/{id}?reveal=true     // owner only — full Question incl. answerKey
+→ 200  Quiz   (with questions[])
+→ 404  not found / not owned
+```
+
+### 2.5 Update a quiz (owner)
+
+```
+PATCH /ai/quiz/{id}
+Content-Type: application/json
+
+{
+  "title": "string",                // optional
+  "tags": ["string", ...],          // optional — replaces the tag set
+  "questions": [ Question, ... ]     // optional — full replace of the question list (incl. correct keys)
+}
+→ 200  Quiz (reveal shape)
+```
+
+- Use for renaming, retagging, hand-editing AI questions, or fixing a bad answer key.
+- Partial: omitted fields are left untouched.
+
+### 2.6 Delete a quiz (owner)
+
+```
+DELETE /ai/quiz/{id}
+→ 204
+```
+
+---
+
+### 2.7 Evaluate answers
+
+Two forms. Both return per-question results; **OPEN / AI-graded** questions are scored
+by the model against the stored `answerKey.rubric` / `answerKey.sampleAnswer`.
+
+**Stored quiz (preferred — server already has the questions + keys):**
+
+```
+POST /ai/quiz/{id}/evaluate
+Content-Type: application/json
+
+{
+  "answers": [
+    { "questionId": "string", "answer": <type-specific, see 2.0> }
+  ]
+}
+```
+
+**One-off quiz (`persist:false`, server holds nothing) — send the questions back:**
 
 ```
 POST /ai/quiz/evaluate
 Content-Type: application/json
 
 {
-  "questions": [
-    { "id": "string", "answer": "A" | "B" | "C" | "D" | "TRUE" | "FALSE" }
-  ]
-}
-→ 200
-{
-  "results": [
-    { "questionId": "string", "correct": true, "correctAnswer": "B" }
-  ],
-  "score": "3/5",
-  "percentage": 60
+  "quiz": { "questions": [ Question, ... ] },   // full questions incl. answer data
+  "answers": [ { "questionId": "string", "answer": <type-specific> } ]
 }
 ```
 
-Frontend can also evaluate locally (return the correct answer key), but server-side
-prevents cheating when needed.
+#### Response (both)
+
+```
+200
+{
+  "results": [
+    {
+      "questionId": "string",
+      "correct": true,              // boolean verdict (threshold-based for OPEN)
+      "score": 1.0,                 // 0.0–1.0 partial credit (OPEN / MULTIPLE_ANSWER / MATCHING / ORDERING)
+      "correctAnswer": <type-specific>,   // the canonical right answer, for display
+      "feedback": "string | null",  // AI note for OPEN/FILL_BLANK — why this score
+      "explanation": "string"       // the question's stored explanation
+    }
+  ],
+  "score": "7.5/10",                // sum of per-question score * points
+  "percentage": 75
+}
+```
+
+- `correct` for `MULTIPLE_ANSWER` / `MATCHING` / `ORDERING` is `true` only on a full
+  match; `score` carries the partial credit.
+- For `OPEN` / AI-graded `FILL_BLANK`, the backend runs an AI judge against
+  `answerKey.rubric` / `answerKey.sampleAnswer`, returns a `score` (0–1) plus
+  `feedback`, and sets `correct` when
+  `score` ≥ a backend threshold.
 
 ---
 
@@ -311,6 +537,11 @@ carries a short `reason` rendered in the approval card.
 | # | Feature | Endpoint | Priority |
 |---|---------|----------|----------|
 | 1 | Fact-check selected notes | `POST /ai/fact-check` | P0 |
-| 2 | Generate quiz from selected notes + coverage slider | `POST /ai/quiz/generate` | P0 |
+| 2 | Generate + store quiz (tags, multi-type questions) | `POST /ai/quiz/generate` | P0 |
 | 3 | Chat assistant (read selected notes, propose note edits/creates) | `POST /ai/chat` | P0 |
-| 4 | Evaluate quiz answers (server-side) | `POST /ai/quiz/evaluate` | P2 |
+| 4 | List my quizzes (filter board/tag/search) + note→quiz reverse lookup | `GET /ai/quiz` (`?noteId=`) | P1 |
+| 5 | List distinct quiz tags | `GET /ai/quiz/tags` | P1 |
+| 6 | Fetch one quiz (taking / `?reveal=true` owner) | `GET /ai/quiz/{id}` | P1 |
+| 7 | Edit quiz (title, tags, questions) | `PATCH /ai/quiz/{id}` | P2 |
+| 8 | Delete quiz | `DELETE /ai/quiz/{id}` | P2 |
+| 9 | Evaluate answers (incl. AI-graded OPEN questions) | `POST /ai/quiz/{id}/evaluate` | P1 |

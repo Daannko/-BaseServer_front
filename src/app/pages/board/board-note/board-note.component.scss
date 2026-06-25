@@ -166,6 +166,11 @@
   .tiptap p,
   .ProseMirror p {
     margin: 0 0 4px !important;
+    // Preserve tab characters (Tab inserts a real \t) while still wrapping long
+    // lines. tab-size 4 keeps the indent a sensible width.
+    white-space: pre-wrap;
+    tab-size: 4;
+    -moz-tab-size: 4;
   }
 
   // Base font-size for text that carries no explicit fontSize mark — fresh
@@ -241,6 +246,9 @@
     padding: 12px;
     overflow-x: auto;
     margin: 8px 0;
+    // Default tab-size is 8 — far too wide. 4 reads like normal code indent.
+    tab-size: 4;
+    -moz-tab-size: 4;
 
     code {
       background-color: transparent;

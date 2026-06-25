@@ -135,6 +135,102 @@
       </button>
     </div>
 
+    <!-- AI tools (operate on the selected notes) -->
+    <div class="ai-chat-tools">
+      <div class="ai-tool-status">
+        <span class="ai-tool-hint" *ngIf="aiLoading">AI thinking…</span>
+        <span class="ai-tool-hint" *ngIf="!aiLoading && !selectedNotes.length">
+          Select notes to use AI tools
+        </span>
+        <span class="ai-tool-hint" *ngIf="!aiLoading && selectedNotes.length">
+          {{ selectedNotes.length }} note{{ selectedNotes.length === 1 ? '' : 's' }} selected
+        </span>
+      </div>
+
+      <!-- Existing quizzes for the current note selection -->
+      <div class="ai-tool-existing" *ngIf="existingQuizzes.length">
+        <div class="ai-tool-existing-label">
+          Existing quizzes ({{ existingQuizzes.length }})
+        </div>
+        <button
+          class="ai-tool-existing-item"
+          type="button"
+          *ngFor="let qz of existingQuizzes"
+          [disabled]="aiLoading"
+          (click)="openExistingQuiz(qz)"
+        >
+          <span class="ai-tool-existing-title">{{ qz.title }}</span>
+          <span class="ai-tool-existing-meta">{{ qz.questionCount }} Q</span>
+          <span class="ai-tool-existing-tags">
+            <span class="quiz-tag" *ngFor="let t of qz.tags">{{ t }}</span>
+          </span>
+        </button>
+        <label class="ai-tool-toggle">
+          <input type="checkbox" [(ngModel)]="quizAvoidExisting" />
+          <span>Avoid questions from these quizzes</span>
+        </label>
+      </div>
+
+      <!-- Quiz options -->
+      <div class="ai-tool-options" *ngIf="selectedNotes.length">
+        <div class="ai-tool-field">
+          <span class="ai-tool-field-label">Question types</span>
+          <div class="ai-tool-chips">
+            <button
+              class="ai-tool-chip"
+              type="button"
+              *ngFor="let opt of quizTypeOptions"
+              [class.on]="isQuizTypeOn(opt.type)"
+              (click)="toggleQuizType(opt.type)"
+            >{{ opt.label }}</button>
+          </div>
+        </div>
+
+        <div class="ai-tool-field ai-tool-field--row">
+          <span class="ai-tool-field-label">Questions</span>
+          <div class="ai-tool-chips">
+            <button
+              class="ai-tool-chip"
+              type="button"
+              *ngFor="let n of quizCountOptions"
+              [class.on]="quizCount === n"
+              (click)="quizCount = n"
+            >{{ n }}</button>
+          </div>
+        </div>
+
+        <div class="ai-tool-field">
+          <span class="ai-tool-field-label">Custom prompt (optional)</span>
+          <textarea
+            class="ai-tool-prompt"
+            rows="2"
+            placeholder="e.g. focus on edge cases, make it hard, exam style…"
+            [(ngModel)]="quizPrompt"
+          ></textarea>
+        </div>
+      </div>
+
+      <div class="ai-chat-tools-row">
+        <button
+          class="ai-tool-btn ai-tool-btn--primary"
+          type="button"
+          [disabled]="!canGenerateQuiz"
+          (click)="startQuiz()"
+        >
+          <app-svg-icon icon="ai-sparkle"></app-svg-icon>
+          Generate quiz
+        </button>
+        <button
+          class="ai-tool-btn"
+          type="button"
+          [disabled]="!canFactCheck"
+          (click)="runFactCheck()"
+        >
+          Fact check
+        </button>
+      </div>
+    </div>
+
     <div class="ai-chat-thread">
       <div class="ai-chat-empty" *ngIf="!chatThread.length">
         Ask me to summarize, rewrite, or add notes. Selected notes are sent as
@@ -147,7 +243,7 @@
         [class.is-user]="entry.role === 'user'"
         [class.is-assistant]="entry.role === 'assistant'"
       >
-        <div class="ai-chat-bubble">{{ entry.content }}</div>
+        <div class="ai-chat-bubble" [innerHTML]="aiHtml(entry.content)"></div>
 
         <!-- Proposed-change cards -->
         <div class="ai-actions" *ngIf="entry.actions?.length">
@@ -839,42 +935,19 @@
     ></div>
   </div>
 
-  <!-- AI navbar (notes selected) -->
+  <!-- AI navbar (notes selected) — tools live in the AI panel now -->
   <ng-template #aiNavbarTemplate>
     <div class="bar ai-bar">
       <div class="navbar-tile-controls">
         <app-svg-icon icon="ai-sparkle" class="ai-bar-icon"></app-svg-icon>
         <strong>{{ selectionCount }} note{{ selectionCount === 1 ? '' : 's' }}</strong>
         <div class="navbar-spacer"></div>
-        <!-- Coverage slider for quiz -->
-        <label class="quiz-coverage-label" title="How much of the quiz should come from the selected notes vs. related topics">
-          <span>Coverage</span>
-          <input
-            type="range"
-            class="quiz-coverage-slider"
-            min="0"
-            max="1"
-            step="0.05"
-            [(ngModel)]="quizCoverage"
-          />
-          <span class="quiz-coverage-val">{{ (quizCoverage * 100) | number:'1.0-0' }}%</span>
-        </label>
-        <div class="navbar-spacer"></div>
-        <button
-          class="ai-bar-btn"
-          type="button"
-          [disabled]="!canFactCheck"
-          (click)="runFactCheck()"
-        >
-          Fact check
-        </button>
         <button
           class="ai-bar-btn ai-bar-btn--primary"
           type="button"
-          [disabled]="!canGenerateQuiz"
-          (click)="startQuiz()"
+          (click)="openChat()"
         >
-          Quiz
+          AI tools
         </button>
         <span class="draw-bar-hint" *ngIf="aiLoading">AI thinking…</span>
       </div>
@@ -896,67 +969,162 @@
     </div>
   </ng-template>
 
-  <!-- Quiz panel -->
-  <div class="quiz-panel" *ngIf="quiz && !quizSubmitted">
+  <!-- Quiz modal (taking) -->
+  <div
+    class="quiz-modal"
+    *ngIf="quiz && !quizSubmitted"
+    [class.quiz-modal--centered]="!quizPos"
+    [style.left.px]="quizPos?.x"
+    [style.top.px]="quizPos?.y"
+  >
     <div class="quiz-card">
-      <div
-        class="quiz-question"
-        *ngIf="quizCurrentQuestion as q"
-      >
-        <div class="quiz-q-num">{{ quizProgress }}</div>
-        <div class="quiz-q-text">{{ q.question }}</div>
-        <!-- Multiple choice -->
-        <div class="quiz-options" *ngIf="q.type === 'MULTIPLE_CHOICE' && q.options">
-          <button
-            class="quiz-option"
-            *ngFor="let opt of q.options"
-            [class.selected]="quizAnswers.get(q.id) === opt.key"
-            (click)="quizSelectAnswer(opt.key)"
-          >{{ opt.key }}. {{ opt.text }}</button>
-        </div>
-        <!-- True/false -->
-        <div class="quiz-options" *ngIf="q.type === 'TRUE_FALSE'">
-          <button
-            class="quiz-option"
-            [class.selected]="quizAnswers.get(q.id) === 'TRUE'"
-            (click)="quizSelectAnswer('TRUE')"
-          >True</button>
-          <button
-            class="quiz-option"
-            [class.selected]="quizAnswers.get(q.id) === 'FALSE'"
-            (click)="quizSelectAnswer('FALSE')"
-          >False</button>
+      <div class="quiz-card-header" (mousedown)="quizDragStart($event)">
+        <app-svg-icon icon="ai-sparkle" class="quiz-card-icon"></app-svg-icon>
+        <span class="quiz-card-title">{{ quiz.title || 'Quiz' }}</span>
+        <span class="quiz-card-progress">{{ quizProgress }}</span>
+        <button
+          class="quiz-card-close"
+          type="button"
+          (click)="closeQuiz()"
+          aria-label="Close quiz"
+        >
+          <app-svg-icon icon="close-x"></app-svg-icon>
+        </button>
+      </div>
+      <div class="quiz-progress-bar">
+        <div
+          class="quiz-progress-fill"
+          [style.width.%]="(quizAnsweredCount / quiz.questions.length) * 100"
+        ></div>
+      </div>
+
+      <div class="quiz-card-body">
+        <div class="quiz-question" *ngIf="quizCurrentQuestion as q">
+          <div class="quiz-q-text" [innerHTML]="aiHtml(q.question)"></div>
+          <!-- Per-question tags -->
+          <div class="quiz-tags" *ngIf="q.tags?.length">
+            <span class="quiz-tag" *ngFor="let t of q.tags">{{ t }}</span>
+          </div>
+
+          <!-- Single choice -->
+          <div class="quiz-options" *ngIf="q.type === 'SINGLE_CHOICE' && q.options">
+            <button
+              class="quiz-option"
+              *ngFor="let opt of q.options"
+              [class.selected]="quizIsChosen(q, opt.key)"
+              (click)="quizSelectAnswer(opt.key)"
+            ><span class="quiz-option-key">{{ opt.key }}</span><span class="quiz-option-text" [innerHTML]="aiHtml(opt.text)"></span></button>
+          </div>
+
+          <!-- Multiple answer -->
+          <div class="quiz-options" *ngIf="q.type === 'MULTIPLE_ANSWER' && q.options">
+            <button
+              class="quiz-option quiz-option--multi"
+              *ngFor="let opt of q.options"
+              [class.selected]="quizIsChosen(q, opt.key)"
+              (click)="quizToggleAnswer(opt.key)"
+            ><span class="quiz-option-key">{{ opt.key }}</span><span class="quiz-option-text" [innerHTML]="aiHtml(opt.text)"></span></button>
+            <span class="quiz-hint">Select all that apply</span>
+          </div>
+
+          <!-- True/false -->
+          <div class="quiz-options quiz-options--row" *ngIf="q.type === 'TRUE_FALSE'">
+            <button
+              class="quiz-option"
+              [class.selected]="quizIsChosen(q, 'TRUE')"
+              (click)="quizSelectAnswer('TRUE')"
+            >True</button>
+            <button
+              class="quiz-option"
+              [class.selected]="quizIsChosen(q, 'FALSE')"
+              (click)="quizSelectAnswer('FALSE')"
+            >False</button>
+          </div>
+
+          <!-- Open / free text -->
+          <div class="quiz-options" *ngIf="q.type === 'OPEN'">
+            <textarea
+              class="quiz-open-input"
+              rows="5"
+              placeholder="Type your answer…"
+              [ngModel]="$any(quizAnswerOf(q)) || ''"
+              (ngModelChange)="quizSetText($event)"
+            ></textarea>
+          </div>
         </div>
       </div>
+
       <div class="quiz-nav">
-        <button class="ai-bar-btn" type="button" [disabled]="quizIndex === 0" (click)="quizPrev()">← Prev</button>
-        <span class="quiz-answered">{{ quizAnswers.size }} / {{ quiz.questions.length }} answered</span>
+        <button class="quiz-btn" type="button" [disabled]="quizIndex === 0" (click)="quizPrev()">← Prev</button>
+        <span class="quiz-answered">{{ quizAnsweredCount }} / {{ quiz.questions.length }} answered</span>
         <button
-          class="ai-bar-btn"
+          class="quiz-btn"
           type="button"
-          *ngIf="quiz && quizIndex < quiz.questions.length - 1"
+          *ngIf="quizIndex < quiz.questions.length - 1"
           (click)="quizNext()"
         >Next →</button>
         <button
-          class="ai-bar-btn ai-bar-btn--primary"
+          class="quiz-btn quiz-btn--primary"
           type="button"
-          *ngIf="quiz && quizAnswers.size >= quiz.questions.length"
+          *ngIf="quizAllAnswered"
+          [disabled]="aiLoading"
           (click)="submitQuiz()"
-        >Submit</button>
+        >{{ aiLoading ? 'Grading…' : 'Submit' }}</button>
       </div>
     </div>
   </div>
 
-  <!-- Quiz results panel -->
-  <div class="quiz-panel" *ngIf="quizSubmitted && quizScore">
+  <!-- Quiz modal (results) -->
+  <div
+    class="quiz-modal quiz-modal--results"
+    *ngIf="quizSubmitted && quizScore"
+    [class.quiz-modal--centered]="!quizPos"
+    [style.left.px]="quizPos?.x"
+    [style.top.px]="quizPos?.y"
+  >
     <div class="quiz-card">
-      <h3>Results</h3>
-      <div class="quiz-score">
-        <span class="quiz-score-num">{{ quizScore!.score }}</span>
-        <span class="quiz-score-pct">{{ quizScore!.percentage }}%</span>
+      <div class="quiz-card-header" (mousedown)="quizDragStart($event)">
+        <app-svg-icon icon="ai-sparkle" class="quiz-card-icon"></app-svg-icon>
+        <span class="quiz-card-title">Results</span>
+        <div class="quiz-score">
+          <span class="quiz-score-num">{{ quizScore!.score }}</span>
+          <span class="quiz-score-pct">{{ quizScore!.percentage }}%</span>
+        </div>
+        <button
+          class="quiz-card-close"
+          type="button"
+          (click)="closeQuiz()"
+          aria-label="Close quiz"
+        >
+          <app-svg-icon icon="close-x"></app-svg-icon>
+        </button>
       </div>
+
+      <div class="quiz-card-body">
+        <div class="quiz-results-list" *ngIf="quiz">
+          <div
+            class="quiz-result"
+            *ngFor="let q of quiz.questions; let i = index"
+            [class.correct]="quizResultFor(q)?.correct"
+            [class.wrong]="quizResultFor(q) && !quizResultFor(q)!.correct"
+          >
+            <div class="quiz-result-head">
+              <span class="quiz-result-icon">{{ quizResultFor(q)?.correct ? '✓' : '✗' }}</span>
+              <span class="quiz-result-q"><span class="quiz-result-num">{{ i + 1 }}.</span><span [innerHTML]="aiHtml(q.question)"></span></span>
+              <span class="quiz-result-score" *ngIf="quizResultFor(q) as r">{{ (r.score * 100) | number:'1.0-0' }}%</span>
+            </div>
+            <div class="quiz-result-body" *ngIf="quizResultFor(q) as r">
+              <div class="quiz-result-line"><strong>Your answer:</strong> <span [innerHTML]="aiHtml(quizFormatAnswer(quizAnswerOf(q)) || '—')"></span></div>
+              <div class="quiz-result-line" *ngIf="!r.correct"><strong>Correct:</strong> <span [innerHTML]="aiHtml(quizFormatAnswer(r.correctAnswer))"></span></div>
+              <div class="quiz-result-line quiz-result-feedback" *ngIf="r.feedback" [innerHTML]="aiHtml(r.feedback)"></div>
+              <div class="quiz-result-line quiz-result-expl" *ngIf="r.explanation" [innerHTML]="aiHtml(r.explanation)"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="quiz-nav">
-        <button class="ai-bar-btn ai-bar-btn--primary" type="button" (click)="closeQuiz()">Done</button>
+        <button class="quiz-btn quiz-btn--primary" type="button" (click)="closeQuiz()">Done</button>
       </div>
     </div>
   </div>
