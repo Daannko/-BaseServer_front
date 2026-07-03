@@ -14,6 +14,7 @@ import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
 import { BoardSnapService } from '../board-snap.service';
 import { BoardHistoryService } from '../board-history.service';
 import { BoardSelectionService } from '../board-selection.service';
+import { BoardMainService } from '../board-main.service';
 import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
 
 /**
@@ -56,6 +57,7 @@ export class BoardDrawingComponent implements OnDestroy {
     private snap: BoardSnapService,
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
+    private main: BoardMainService,
   ) {}
 
   private rectSnapshot() {
@@ -96,25 +98,29 @@ export class BoardDrawingComponent implements OnDestroy {
         this.selection.items,
         p.x - this.tile.x,
         p.y - this.tile.y,
+        p.lockedAxis,
       );
-      this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy);
+      this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy, p.lockedAxis);
       return;
     }
     const s = this.snap.snapMove(
       { x: p.x, y: p.y, width: this.tile.width, height: this.tile.height },
       this.tile.id,
+      p.lockedAxis,
     );
     this.tile.x = s.x; this.tile.y = s.y;
   }
 
   onMoveStart() {
     this.selection.beginGroupMove(this.tile);
+    this.main.beginElementDrag([this.tile.id]);
     this.isDraggingTile = true;
     this.tile.forceToRender = true;
     this.gestureBefore = this.rectSnapshot();
   }
   onMoveEnd() {
     const wasGroup = this.selection.isGroupMoving(this.tile);
+    this.main.endElementDrag();
     this.isDraggingTile = false;
     this.tile.forceToRender = false;
     this.snap.clearGuides();

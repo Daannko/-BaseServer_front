@@ -1,6 +1,5 @@
 import { Injectable, NgZone } from '@angular/core';
 import { Editor } from '@tiptap/core';
-import type { JSONContent } from '@tiptap/core';
 import { Plugin, TextSelection } from '@tiptap/pm/state';
 import type { EditorState } from '@tiptap/pm/state';
 import StarterKit from '@tiptap/starter-kit';
@@ -42,49 +41,41 @@ import {
   PersistentSelectionKey,
 } from '../../../helpers/tiptap/PersistentSelector';
 import type { BoardItem } from './board-item.data';
-import { BoardLink, ParagraphAttrPlugin, ParagraphWithMarks, TabIndent } from './tiptap.extension';
+import { BoardLink, EmptyLineFontSize, TabIndent } from './tiptap.extension';
 import { BoardLinkService } from '../board-link.service';
-import { EditorPrefsService } from '../board-editor-prefs.service';
 
 type SelectionRange = { from: number; to: number };
 
 /** Shared lowlight registry for code-block syntax highlighting. Only the
  *  languages offered in the picker are registered (keeps the bundle small vs
  *  highlight.js's full `common` set). Created once — registration is global. */
-const lowlight = createLowlight();
+export const lowlight = createLowlight();
 lowlight.register({
   bash, c, cpp, csharp, css, go, java, javascript, json, kotlin,
   markdown, php, python, ruby, rust, sql, typescript, xml, yaml,
 });
 
-/** The font size to give a new code block: the textStyle size active at the
- *  cursor, else the last size used before it — so the block keeps the size the
- *  user was working in instead of resetting to the note default. */
+/**
+ * The font size active at the caret — the size a code block created here should
+ * start at. Only the caret's own textStyle mark (i.e. what the next char would
+ * use); null when there's no explicit size, so the block inherits the note
+ * default. Deliberately does NOT scan earlier runs (that pulled in a headline's
+ * size and made code blocks start huge).
+ */
 function currentFontSize(state: EditorState): string | null {
   const marks = state.storedMarks || state.selection.$from.marks();
   const active = marks.find((m) => m.type.name === 'textStyle');
-  if (active?.attrs?.['fontSize']) return active.attrs['fontSize'] as string;
-
-  // Cursor's own marks had none (e.g. a fresh line) — use the nearest preceding
-  // run that did carry a fontSize.
-  let last: string | null = null;
-  state.doc.nodesBetween(0, state.selection.from, (node) => {
-    if (!node.isText) return true;
-    const ts = node.marks.find((m) => m.type.name === 'textStyle');
-    if (ts?.attrs?.['fontSize']) last = ts.attrs['fontSize'] as string;
-    return true;
-  });
-  return last;
+  return (active?.attrs?.['fontSize'] as string) ?? null;
 }
 
 /**
- * Syntax-highlighted code block (lowlight) with two tweaks:
- *  - a `fontSize` node attribute (rendered on <pre>) so the block keeps the
- *    font size that was active when it was created, not the note default;
+ * Syntax-highlighted code block (lowlight) with:
+ *  - a `fontSize` node attribute (rendered on <pre>) so a block keeps its own
+ *    size, set from the surrounding text when created and changeable after;
  *  - a custom ``` input rule with no leading anchor, so typing ``` mid-line
  *    breaks to a new line and starts the code block fresh.
  */
-const HighlightedCodeBlock = CodeBlockLowlight.extend({
+export const HighlightedCodeBlock = CodeBlockLowlight.extend({
   addAttributes() {
     return {
       ...this.parent?.(),
@@ -246,7 +237,6 @@ export class TiptapService {
     private richText: RichTextService,
     private ngZone: NgZone,
     private boardLink: BoardLinkService,
-    private editorPrefs: EditorPrefsService,
   ) {}
 
   /** Begin linking the current selection to a board element. Returns false if
@@ -268,8 +258,7 @@ export class TiptapService {
     this.contentEditor = new Editor({
       element: contentElement,
       extensions: [
-        ParagraphWithMarks,
-        StarterKit.configure({ paragraph: false, code: false, codeBlock: false }),
+        StarterKit.configure({ code: false, codeBlock: false }),
         // tiptap's default Code mark sets `excludes: '_'`, which strips every
         // other mark (incl. textStyle carrying fontSize/color) the moment code
         // is applied — so `code` reset to the note's default font. We still want
@@ -294,23 +283,12 @@ export class TiptapService {
         TableCell,
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
 
-        ParagraphAttrPlugin,
         BoardLink,
         TabIndent,
+        EmptyLineFontSize,
         PersistentSelection,
       ],
       content: tile.content,
-      onCreate: ({ editor }) => {
-        // Empty / un-tagged content (fresh note, or one whose runs carry no
-        // fontSize mark): seed the user's last-used font size so a new note
-        // starts in the size you were just working in — NOT a size-derived
-        // default. Content already carrying per-run fontSize marks (e.g. loaded
-        // from the server) keeps its own sizes.
-        if (!contentHasFontSize(tile.content)) {
-          const sz = `${this.editorPrefs.lastFontSize}px`;
-          editor.chain().selectAll().setFontSize(sz).run();
-        }
-      },
       onFocus: ({ editor }) => {
         this.lastContentSelection = null;
         this.detectTableContext(editor);
@@ -319,7 +297,6 @@ export class TiptapService {
       },
       onUpdate: ({ editor }) => {
         tile.content = editor.getJSON();
-        this.reseedEmptyFontSize(editor);
         this.detectTableContext(editor);
         this.updateCurrentStyles(editor);
       },
@@ -331,6 +308,10 @@ export class TiptapService {
       editorProps: {
         attributes: {
           class: 'content-area',
+          // No spellcheck: 96 contentEditable editors each running the OS
+          // spellchecker + drawing squiggle underlines is a real per-frame
+          // paint/CPU cost on the board. Spellcheck adds little for short notes.
+          spellcheck: 'false',
         },
       },
     });
@@ -497,7 +478,7 @@ export class TiptapService {
     editor.chain().focus().toggleOrderedList().run();
   }
   toggleCodeBlock(editor: Editor) {
-    // Carry the current font size into the block so it doesn't reset to default.
+    // Start the block at the size of the surrounding text.
     const fontSize = currentFontSize(editor.state);
     editor.chain().focus().toggleCodeBlock({ fontSize } as any).run();
   }
@@ -558,20 +539,6 @@ export class TiptapService {
     } else {
       editor.chain().focus().setMark('textStyle', { fontSize: normalized }).run();
     }
-    // Remember this as the size new/empty elements default to.
-    const px = parseInt(normalized, 10);
-    if (Number.isFinite(px)) this.editorPrefs.lastFontSize = px;
-  }
-
-  /** When an editor goes empty (new note, or all text deleted via Ctrl+A), seed
-   *  the caret with the last-used font size so the next character typed uses it
-   *  instead of falling back to the note's base size. Guarded against re-firing:
-   *  the stored mark already matching means no transaction, no onUpdate loop. */
-  private reseedEmptyFontSize(editor: Editor) {
-    if (!editor.isEmpty) return;
-    const want = `${this.editorPrefs.lastFontSize}px`;
-    if (editor.getAttributes('textStyle')['fontSize'] === want) return;
-    editor.chain().setMark('textStyle', { fontSize: want }).run();
   }
 
   private updateCurrentStyles(editor: Editor) {
@@ -638,10 +605,9 @@ export class TiptapService {
     const current = editor.isActive('codeBlock')
       ? (editor.getAttributes('codeBlock')['fontSize'] as string | undefined)
       : (editor.getAttributes('textStyle')['fontSize'] as string | undefined);
-    // No explicit size → fall back to the note's computed base, which scales
-    // with note size (see --note-font-size), not a fixed 21px.
+    // No explicit size → fall back to the caret's computed font size.
     const base = current ?? this.computedSizeAt(editor, editor.state.selection.from);
-    const num = parseInt(base || '21', 10);
+    const num = parseInt(base || '16', 10);
     const next = Math.max(1, num + delta);
     this.applyFontSize(String(next), editor);
   }
@@ -738,13 +704,4 @@ export class TiptapService {
       }
     }
   }
-}
-
-// ── Helper ──────────────────────────────────────────────────────────────────
-
-/** True when the document JSON contains at least one fontSize mark.
- *  Used to decide whether onCreate should inject the note's base font size
- *  (skip if server-saved content already carries per-text-run sizes). */
-function contentHasFontSize(doc: JSONContent): boolean {
-  return JSON.stringify(doc).includes('"fontSize"');
 }

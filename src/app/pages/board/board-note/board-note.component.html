@@ -12,12 +12,19 @@
   (rectChange)="onTileWorldRectChange($event)"
   (resizeEnd)="onResizeEnd()"
   class="board-item"
+  [class.dbg-no-radius]="debug.disableRadius"
   [style.--tile-w]="tile.width + 'px'"
   [style.--tile-h]="tile.height + 'px'"
   [style.--tile-min]="
     (tile.width > tile.height ? tile.width : tile.height) + 'px'
   "
 >
+  <span hidden>{{ debug.tickNote() }}</span>
+
+  <!-- @PERF_DEBUG flat-square mode: bare positioned div, no shell/overlays/editor. -->
+  <div class="note-flat" *ngIf="debug.renderFlatSquares"></div>
+
+  <ng-container *ngIf="!debug.renderFlatSquares">
   <div class="selection-outline" *ngIf="isSelected"></div>
 
   <!-- controls bar: appears when focused, sits above the note -->
@@ -113,18 +120,14 @@
     </div>
   </div>
 
-  <svg class="connector-wave" aria-hidden="true">
-    <path #connectorWavePath class="connector-wave-path"
-      (pointerdown)="$event.stopPropagation()"
-      (dblclick)="$event.stopPropagation()"
-    />
-  </svg>
-
   <div
     class="note-surface"
     [class.is-focused]="isFocused"
     [class.is-clear]="isClear"
-    [style.border-radius]="noteRadius"
+    [class.dbg-no-radius]="debug.disableRadius"
+    [class.dbg-solid-border]="debug.disableDashedBorder"
+    [class.dbg-strip-chrome]="debug.stripNoteChrome"
+    [style.border-radius]="debug.disableRadius ? '0' : noteRadius"
     [style.background]="noteBgColor"
     [style.--note-border-color]="noteBorderColor"
     [style.--note-border-width]="noteBorderWidth + 'px'"
@@ -137,9 +140,25 @@
     (moveEnd)="onMoveEnd()"
   >
     <div class="note-body" (pointerdown)="$event.stopPropagation()">
-      <div #contentElement class="content-editor"></div>
+      <!-- Live editor: mounted only while this note is being edited. -->
+      <div *ngIf="isEditing" #contentElement class="content-editor"></div>
+
+      <!-- Static render (default): identical-looking HTML, no editor. Click to
+           edit. In disable-editor debug mode, shows plain text instead. -->
+      <div
+        *ngIf="!isEditing && !debug.renderBareSquares"
+        class="content-editor content-static"
+        [class.is-static]="debug.disableEditor"
+        (click)="onStaticClick($event)"
+      >
+        <ng-container *ngIf="debug.disableEditor; else richStatic">{{ plainText }}</ng-container>
+        <ng-template #richStatic>
+          <div class="ProseMirror tiptap" [innerHTML]="renderedHtml"></div>
+        </ng-template>
+      </div>
     </div>
   </div>
+  </ng-container>
 
   <ng-template #navbarContentTemplate let-tile="tile">
     <div class="bar note-bar">

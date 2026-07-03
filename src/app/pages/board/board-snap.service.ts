@@ -150,14 +150,6 @@ export class BoardSnapService {
     );
   }
 
-  /** Same as candidates(), but excludes a whole set of ids (used for group moves
-   *  so the dragged selection never snaps to its own members). */
-  private candidatesExcluding(excludeIds: Set<string>): BoardItem[] {
-    return [...this.main.notes, ...this.main.sections, ...this.main.images].filter(
-      (n) => !excludeIds.has(n.id) && n.inView,
-    );
-  }
-
   /**
    * Closest edge/center alignment for `rect` on each axis independently, among
    * `others`. Shared by single-item and group moves.
@@ -252,16 +244,61 @@ export class BoardSnapService {
   }
 
   /**
-   * Snap a dragged note so its edges/centers align with nearby notes.
-   * Each axis snaps independently to the closest candidate within threshold.
-   * Emits guide lines for whatever was snapped to.
+   * The one move-snap routine shared by every kind of drag. Snaps `rect`
+   * (a single element's rect, or a selection's bounding box) translated by
+   * (dx, dy) against every on-screen element NOT in `excludeIds`. Each axis
+   * snaps independently to the closest candidate within threshold; a Shift-held
+   * `lockedAxis` is never snapped. Returns the adjusted translation and emits
+   * the alignment guides.
+   *
+   * Single moves pass a one-item rect (and dx=dy=0 with the rect already at the
+   * intended position, via snapMove); group moves pass the bounding box and the
+   * intended delta — identical logic for both, so "the group is just a bigger
+   * single element".
    */
-  snapMove(rect: ItemRect, excludeId: string): { x: number; y: number } {
-    const { bestX, bestY } = this.bestAxisSnaps(rect, this.candidates(excludeId));
-    const x = Math.round(bestX ? bestX.value : rect.x);
-    const y = Math.round(bestY ? bestY.value : rect.y);
-    this.emitMoveGuides(bestX, bestY, rect, x, y);
-    return { x, y };
+  snapTranslation(
+    rect: ItemRect,
+    dx: number,
+    dy: number,
+    excludeIds: Set<string>,
+    lockedAxis?: 'x' | 'y',
+  ): { dx: number; dy: number } {
+    const others = [
+      ...this.main.notes,
+      ...this.main.sections,
+      ...this.main.images,
+    ].filter((n) => !excludeIds.has(n.id) && n.inView);
+
+    const moved: ItemRect = {
+      x: rect.x + dx,
+      y: rect.y + dy,
+      width: rect.width,
+      height: rect.height,
+    };
+
+    let { bestX, bestY } = this.bestAxisSnaps(moved, others);
+    if (lockedAxis === 'x') bestX = null;
+    if (lockedAxis === 'y') bestY = null;
+
+    const x = bestX ? bestX.value : moved.x;
+    const y = bestY ? bestY.value : moved.y;
+    this.emitMoveGuides(bestX, bestY, moved, Math.round(x), Math.round(y));
+
+    return { dx: dx + (x - moved.x), dy: dy + (y - moved.y) };
+  }
+
+  /**
+   * Snap a single dragged element to nearby elements. Thin wrapper over
+   * snapTranslation: the rect is already at the intended position, so the
+   * translation is zero and we hand back the absolute snapped position.
+   */
+  snapMove(
+    rect: ItemRect,
+    excludeId: string,
+    lockedAxis?: 'x' | 'y',
+  ): { x: number; y: number } {
+    const r = this.snapTranslation(rect, 0, 0, new Set([excludeId]), lockedAxis);
+    return { x: Math.round(rect.x + r.dx), y: Math.round(rect.y + r.dy) };
   }
 
   /**
@@ -275,6 +312,7 @@ export class BoardSnapService {
     items: BoardItem[],
     dx: number,
     dy: number,
+    lockedAxis?: 'x' | 'y',
   ): { dx: number; dy: number } {
     if (!items.length) return { dx, dy };
 
@@ -286,22 +324,14 @@ export class BoardSnapService {
       maxY = Math.max(maxY, it.y + it.height);
     }
 
-    // Prospective group bounding box after applying the intended translation.
-    const rect: ItemRect = {
-      x: minX + dx,
-      y: minY + dy,
-      width: maxX - minX,
-      height: maxY - minY,
-    };
-
     const ids = new Set(items.map((i) => i.id));
-    const { bestX, bestY } = this.bestAxisSnaps(rect, this.candidatesExcluding(ids));
-
-    const x = bestX ? bestX.value : rect.x;
-    const y = bestY ? bestY.value : rect.y;
-    this.emitMoveGuides(bestX, bestY, rect, Math.round(x), Math.round(y));
-
-    return { dx: dx + (x - rect.x), dy: dy + (y - rect.y) };
+    return this.snapTranslation(
+      { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+      dx,
+      dy,
+      ids,
+      lockedAxis,
+    );
   }
 
   /**

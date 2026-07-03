@@ -143,6 +143,42 @@ a {
   }
 }
 
+// Shared syntax-highlight token colors (lowlight / highlight.js). One source of
+// truth for every code block — note editor, quiz answer editor, and AI text —
+// so the palette isn't duplicated per component.
+.hljs-comment,
+.hljs-quote { color: #7c8593; font-style: italic; }
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag { color: #c792ea; }
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition { color: #c3e88d; }
+.hljs-deletion,
+.hljs-selector-attr,
+.hljs-selector-pseudo,
+.hljs-meta { color: #f78c6c; }
+.hljs-doctag { color: #7c8593; }
+.hljs-attr { color: #ffcb6b; }
+.hljs-symbol,
+.hljs-bullet,
+.hljs-link { color: #89ddff; }
+.hljs-number,
+.hljs-variable,
+.hljs-regexp { color: #f78c6c; }
+.hljs-function .hljs-title,
+.hljs-class .hljs-title { color: #82aaff; }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: bold; }
+
 // Tiptap editor global styles
 .tiptap {
   height: 100%;
@@ -171,4 +207,16 @@ a {
 .board-item .content-editor .ProseMirror:focus-visible {
   outline: none !important;
   box-shadow: none !important;
+}
+
+// Board elements mounted ahead of the viewport (frustum-cull overscan ring).
+// content-visibility:hidden makes the browser skip their layout + paint
+// entirely, so pre-mounted components cost nothing per frame; the class drops
+// the moment the element scrolls into actual view (see hostOffscreen in the
+// board element components).
+app-board-note.board-item-offscreen,
+app-board-section.board-item-offscreen,
+app-board-image.board-item-offscreen,
+app-board-drawing.board-item-offscreen {
+  content-visibility: hidden;
 }

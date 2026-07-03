@@ -26,6 +26,54 @@
         </button>
       </div>
 
+      <div class="options-item options-board-details" *ngIf="selectedBoard">
+        <span class="options-item-title">Board details</span>
+        <span class="options-item-subtitle">Rename this board or edit its description</span>
+        <label class="options-field-label">
+          <span>Name</span>
+          <input
+            class="options-text-input"
+            type="text"
+            [(ngModel)]="editBoardName"
+            [class.is-invalid]="!isEditNameValid"
+            placeholder="Board name"
+            (click)="$event.stopPropagation()"
+          />
+        </label>
+        <label class="options-field-label">
+          <span>Description</span>
+          <textarea
+            class="options-textarea"
+            rows="3"
+            [(ngModel)]="editBoardDescription"
+            placeholder="What is this board about?"
+            (click)="$event.stopPropagation()"
+          ></textarea>
+        </label>
+        <button
+          class="options-save-button"
+          type="button"
+          [disabled]="!isEditNameValid || !boardDetailsDirty || savingBoardDetails"
+          (click)="saveBoardDetails(); $event.stopPropagation()"
+        >
+          {{ savingBoardDetails ? 'Saving…' : 'Save changes' }}
+        </button>
+      </div>
+
+      <div class="options-item options-item--field">
+        <span class="options-item-title">Default text size</span>
+        <span class="options-item-subtitle">Base size for new notes &amp; empty lines</span>
+        <input
+          class="options-num-input"
+          type="number"
+          min="6"
+          max="200"
+          [ngModel]="defaultNoteFontSize"
+          (ngModelChange)="setDefaultNoteFontSize($event)"
+          (click)="$event.stopPropagation()"
+        />
+      </div>
+
       <button
         class="options-item"
         type="button"
@@ -114,14 +162,25 @@
     class="ai-chat-fab"
     type="button"
     title="AI assistant"
+    (mousedown)="preserveSelectionMousedown($event)"
     (click)="toggleChat()"
   >
     <app-svg-icon icon="ai-sparkle"></app-svg-icon>
     <span>AI</span>
   </button>
 
-  <!-- AI chat panel -->
-  <div class="ai-chat" *ngIf="chatOpen">
+  <!-- AI assistant panel -->
+  <div
+    class="ai-chat"
+    *ngIf="chatOpen"
+    [style.width.px]="aiPanelWidth"
+    (mousedown)="preserveSelectionMousedown($event)"
+  >
+    <div
+      class="ai-resize-handle"
+      (mousedown)="aiResizeDown($event)"
+      title="Drag to resize"
+    ></div>
     <div class="ai-chat-header">
       <app-svg-icon icon="ai-sparkle" class="ai-chat-header-icon"></app-svg-icon>
       <span class="ai-chat-title">Board assistant</span>
@@ -135,193 +194,531 @@
       </button>
     </div>
 
-    <!-- AI tools (operate on the selected notes) -->
-    <div class="ai-chat-tools">
-      <div class="ai-tool-status">
-        <span class="ai-tool-hint" *ngIf="aiLoading">AI thinking…</span>
-        <span class="ai-tool-hint" *ngIf="!aiLoading && !selectedNotes.length">
-          Select notes to use AI tools
-        </span>
-        <span class="ai-tool-hint" *ngIf="!aiLoading && selectedNotes.length">
-          {{ selectedNotes.length }} note{{ selectedNotes.length === 1 ? '' : 's' }} selected
-        </span>
-      </div>
-
-      <!-- Existing quizzes for the current note selection -->
-      <div class="ai-tool-existing" *ngIf="existingQuizzes.length">
-        <div class="ai-tool-existing-label">
-          Existing quizzes ({{ existingQuizzes.length }})
-        </div>
-        <button
-          class="ai-tool-existing-item"
-          type="button"
-          *ngFor="let qz of existingQuizzes"
-          [disabled]="aiLoading"
-          (click)="openExistingQuiz(qz)"
-        >
-          <span class="ai-tool-existing-title">{{ qz.title }}</span>
-          <span class="ai-tool-existing-meta">{{ qz.questionCount }} Q</span>
-          <span class="ai-tool-existing-tags">
-            <span class="quiz-tag" *ngFor="let t of qz.tags">{{ t }}</span>
-          </span>
-        </button>
-        <label class="ai-tool-toggle">
-          <input type="checkbox" [(ngModel)]="quizAvoidExisting" />
-          <span>Avoid questions from these quizzes</span>
-        </label>
-      </div>
-
-      <!-- Quiz options -->
-      <div class="ai-tool-options" *ngIf="selectedNotes.length">
-        <div class="ai-tool-field">
-          <span class="ai-tool-field-label">Question types</span>
-          <div class="ai-tool-chips">
-            <button
-              class="ai-tool-chip"
-              type="button"
-              *ngFor="let opt of quizTypeOptions"
-              [class.on]="isQuizTypeOn(opt.type)"
-              (click)="toggleQuizType(opt.type)"
-            >{{ opt.label }}</button>
-          </div>
-        </div>
-
-        <div class="ai-tool-field ai-tool-field--row">
-          <span class="ai-tool-field-label">Questions</span>
-          <div class="ai-tool-chips">
-            <button
-              class="ai-tool-chip"
-              type="button"
-              *ngFor="let n of quizCountOptions"
-              [class.on]="quizCount === n"
-              (click)="quizCount = n"
-            >{{ n }}</button>
-          </div>
-        </div>
-
-        <div class="ai-tool-field">
-          <span class="ai-tool-field-label">Custom prompt (optional)</span>
-          <textarea
-            class="ai-tool-prompt"
-            rows="2"
-            placeholder="e.g. focus on edge cases, make it hard, exam style…"
-            [(ngModel)]="quizPrompt"
-          ></textarea>
-        </div>
-      </div>
-
-      <div class="ai-chat-tools-row">
-        <button
-          class="ai-tool-btn ai-tool-btn--primary"
-          type="button"
-          [disabled]="!canGenerateQuiz"
-          (click)="startQuiz()"
-        >
-          <app-svg-icon icon="ai-sparkle"></app-svg-icon>
-          Generate quiz
-        </button>
-        <button
-          class="ai-tool-btn"
-          type="button"
-          [disabled]="!canFactCheck"
-          (click)="runFactCheck()"
-        >
-          Fact check
-        </button>
-      </div>
+    <!-- Tabs -->
+    <div class="ai-tabs">
+      <button class="ai-tab" type="button" [class.on]="aiTab === 'chat'" (click)="setAiTab('chat')">Chat</button>
+      <button class="ai-tab" type="button" [class.on]="aiTab === 'quiz'" (click)="setAiTab('quiz')">Quiz</button>
+      <button class="ai-tab" type="button" [class.on]="aiTab === 'factcheck'" (click)="setAiTab('factcheck')">Fact check</button>
     </div>
 
-    <div class="ai-chat-thread">
-      <div class="ai-chat-empty" *ngIf="!chatThread.length">
-        Ask me to summarize, rewrite, or add notes. Selected notes are sent as
-        context — I’ll propose changes for you to approve.
-      </div>
+    <!-- Selection status (quiz / fact-check operate on selected notes) -->
+    <div class="ai-tool-status ai-tool-status--bar" *ngIf="aiTab !== 'chat' && !quizActive">
+      <span class="ai-tool-hint" *ngIf="aiLoading">AI thinking…</span>
+      <span class="ai-tool-hint" *ngIf="!aiLoading && !selectedNotes.length">
+        Select notes to use this tool
+      </span>
+      <span class="ai-tool-hint" *ngIf="!aiLoading && selectedNotes.length">
+        {{ selectedNotes.length }} note{{ selectedNotes.length === 1 ? '' : 's' }} selected
+      </span>
+    </div>
 
-      <div
-        class="ai-chat-msg"
-        *ngFor="let entry of chatThread"
-        [class.is-user]="entry.role === 'user'"
-        [class.is-assistant]="entry.role === 'assistant'"
-      >
-        <div class="ai-chat-bubble" [innerHTML]="aiHtml(entry.content)"></div>
+    <!-- ── CHAT TAB ─────────────────────────────────────────────────────── -->
+    <ng-container *ngIf="aiTab === 'chat'">
+      <!-- Conversation list -->
+      <div class="ai-panel-scroll ai-chat-sessions" *ngIf="chatView === 'list'">
+        <button class="ai-newchat-btn" type="button" (click)="newChat()">
+          <app-svg-icon icon="ai-sparkle"></app-svg-icon>
+          New chat
+        </button>
 
-        <!-- Proposed-change cards -->
-        <div class="ai-actions" *ngIf="entry.actions?.length">
-          <div
-            class="ai-action"
-            *ngFor="let pa of entry.actions"
-            [class.is-applied]="pa.status === 'applied'"
-            [class.is-rejected]="pa.status === 'rejected'"
-            [attr.data-kind]="pa.action.type"
-          >
-            <div class="ai-action-head">
-              <span class="ai-action-label">{{ actionLabel(pa.action) }}</span>
-              <span class="ai-action-status" *ngIf="pa.status === 'applied'">Applied</span>
-              <span class="ai-action-status is-rejected" *ngIf="pa.status === 'rejected'">Rejected</span>
-            </div>
-            <div class="ai-action-reason">{{ pa.action.reason }}</div>
-            <div class="ai-action-preview" *ngIf="actionPreview(pa.action) as prev">
-              {{ prev }}
-            </div>
-            <div class="ai-action-buttons" *ngIf="pa.status === 'pending'">
-              <button class="ai-action-apply" type="button" (click)="applyAction(pa)">
-                Apply
-              </button>
-              <button class="ai-action-reject" type="button" (click)="rejectAction(pa)">
-                Reject
-              </button>
-            </div>
-            <div
-              class="ai-action-buttons"
-              *ngIf="pa.status === 'applied' && pa.action.type === 'update_note'"
-            >
-              <button class="ai-action-revert" type="button" (click)="revertAction(pa)">
-                Revert
-              </button>
-            </div>
-          </div>
+        <div class="ai-tool-hint" *ngIf="chatSessionsLoading">Loading conversations…</div>
+        <div class="ai-chat-empty ai-chat-empty--list" *ngIf="!chatSessionsLoading && !chatSessions.length">
+          No conversations yet. Start a new chat.
+        </div>
 
+        <div
+          class="ai-session-item"
+          *ngFor="let s of chatSessions"
+          (click)="openChatSession(s)"
+        >
+          <span class="ai-session-main">
+            <span class="ai-session-title">{{ s.title || 'Untitled chat' }}</span>
+            <span class="ai-session-meta">{{ s.messageCount }} msg</span>
+          </span>
           <button
-            class="ai-apply-all"
+            class="ai-session-del"
             type="button"
-            *ngIf="hasPendingActions(entry)"
-            (click)="applyAllActions(entry)"
+            title="Delete conversation"
+            (click)="deleteChatSession(s, $event)"
           >
-            Apply all
+            <app-svg-icon icon="close-x"></app-svg-icon>
           </button>
         </div>
       </div>
 
-      <div class="ai-chat-thinking" *ngIf="chatLoading">AI thinking…</div>
+      <!-- Open conversation -->
+      <ng-container *ngIf="chatView === 'conversation'">
+        <div class="ai-conv-head">
+          <button class="quiz-head-btn" type="button" title="All chats" (click)="exitToChatList()">←</button>
+          <span class="ai-conv-title">{{ chatSessionTitle }}</span>
+          <button class="quiz-head-btn" type="button" title="New chat" (click)="newChat()">＋</button>
+        </div>
+
+        <div class="ai-chat-thread">
+          <div class="ai-tool-hint ai-chat-loading-hist" *ngIf="chatSessionLoading">Loading messages…</div>
+          <div class="ai-chat-empty" *ngIf="!chatSessionLoading && !chatThread.length">
+            Ask me to summarize, rewrite, or add notes. Selected notes and
+            highlighted text ride along as context. No selection needed — just
+            type a prompt.
+          </div>
+
+          <div
+            class="ai-chat-msg"
+            *ngFor="let entry of chatThread"
+            [class.is-user]="entry.role === 'user'"
+            [class.is-assistant]="entry.role === 'assistant'"
+          >
+            <div class="ai-chat-bubble" [innerHTML]="aiHtml(entry.content)"></div>
+
+            <!-- Copy the assistant's reply (raw markdown) -->
+            <div class="ai-msg-tools" *ngIf="entry.role === 'assistant' && entry.content">
+              <button class="ai-msg-copy" type="button" (click)="copyMessage(entry)">
+                {{ copiedMessages.has(entry) ? '✓ Copied' : 'Copy' }}
+              </button>
+            </div>
+
+            <!-- What this turn referenced -->
+            <div class="ai-msg-context" *ngIf="entry.context">
+              <button
+                class="ai-msg-ctx-chip ai-msg-ctx-chip--note"
+                type="button"
+                *ngFor="let n of entry.context.notes"
+                title="Go to note"
+                (click)="centerOnReferencedNote(n.id)"
+              >
+                <app-svg-icon icon="ai-sparkle"></app-svg-icon>{{ n.label }}
+              </button>
+              <span class="ai-msg-ctx-chip ai-msg-ctx-chip--text" *ngIf="entry.context.text" title="{{ entry.context.text }}">
+                “{{ entry.context.text }}”
+              </span>
+            </div>
+
+            <!-- Proposed-change cards -->
+            <div class="ai-actions" *ngIf="entry.actions?.length">
+              <div
+                class="ai-action"
+                *ngFor="let pa of entry.actions"
+                [class.is-applied]="pa.status === 'applied'"
+                [class.is-rejected]="pa.status === 'rejected'"
+                [attr.data-kind]="pa.action.type"
+              >
+                <div class="ai-action-head">
+                  <span class="ai-action-label">{{ actionLabel(pa.action) }}</span>
+                  <span class="ai-action-status" *ngIf="pa.status === 'applied'">Applied</span>
+                  <span class="ai-action-status is-rejected" *ngIf="pa.status === 'rejected'">Rejected</span>
+                </div>
+                <div class="ai-action-reason">{{ pa.action.reason }}</div>
+                <div class="ai-action-preview" *ngIf="actionPreview(pa.action) as prev">
+                  {{ prev }}
+                </div>
+                <div class="ai-action-buttons" *ngIf="pa.status === 'pending'">
+                  <button class="ai-action-apply" type="button" (click)="applyAction(pa)">
+                    Apply
+                  </button>
+                  <button class="ai-action-reject" type="button" (click)="rejectAction(pa)">
+                    Reject
+                  </button>
+                </div>
+                <div
+                  class="ai-action-buttons"
+                  *ngIf="pa.status === 'applied' && !pa.historical && pa.action.type === 'update_note'"
+                >
+                  <button class="ai-action-revert" type="button" (click)="revertAction(pa)">
+                    Revert
+                  </button>
+                </div>
+              </div>
+
+              <button
+                class="ai-apply-all"
+                type="button"
+                *ngIf="hasPendingActions(entry)"
+                (click)="applyAllActions(entry)"
+              >
+                Apply all
+              </button>
+            </div>
+          </div>
+
+          <div class="ai-chat-thinking" *ngIf="chatLoading">
+            <span>AI thinking…</span>
+            <button class="ai-stop-btn" type="button" (click)="cancelChat()">Stop</button>
+          </div>
+        </div>
+      </ng-container>
+    </ng-container>
+
+    <!-- ── QUIZ TAB ─────────────────────────────────────────────────────── -->
+    <ng-container *ngIf="aiTab === 'quiz'">
+      <!-- Generation form (no active quiz) -->
+      <div class="ai-panel-scroll" *ngIf="!quizActive">
+        <!-- Existing quizzes — note-scoped, or board-wide when nothing selected -->
+        <div class="ai-tool-existing" *ngIf="existingQuizzes.length">
+          <div class="ai-tool-existing-label">
+            {{ existingQuizzesUnscoped ? 'Board quizzes' : 'Existing quizzes' }}
+            ({{ existingQuizzes.length }})
+          </div>
+          <div class="ai-tool-existing-note" *ngIf="existingQuizzesUnscoped">
+            Not tied to any note selection. Select notes to scope a quiz.
+          </div>
+          <button
+            class="ai-tool-existing-item"
+            type="button"
+            *ngFor="let qz of existingQuizzes"
+            [disabled]="aiLoading"
+            (click)="openExistingQuiz(qz)"
+          >
+            <span class="ai-tool-existing-row">
+              <span class="ai-tool-existing-title">{{ quizDisplayName(qz) }}</span>
+              <span class="ai-tool-existing-meta">{{ qz.questionCount }} Q</span>
+            </span>
+            <span class="ai-tool-existing-tags" *ngIf="qz.tags?.length">
+              <span class="quiz-tag" *ngFor="let t of qz.tags">{{ t }}</span>
+            </span>
+          </button>
+        </div>
+
+        <!-- Quiz options -->
+        <div class="ai-tool-options">
+          <div class="ai-tool-field">
+            <span class="ai-tool-field-label">Question types</span>
+            <div class="ai-tool-chips">
+              <button
+                class="ai-tool-chip"
+                type="button"
+                *ngFor="let opt of quizTypeOptions"
+                [class.on]="isQuizTypeOn(opt.type)"
+                (click)="toggleQuizType(opt.type)"
+              >{{ opt.label }}</button>
+            </div>
+          </div>
+
+          <div class="ai-tool-field ai-tool-field--row">
+            <span class="ai-tool-field-label">Questions</span>
+            <div class="ai-tool-chips">
+              <button
+                class="ai-tool-chip"
+                type="button"
+                *ngFor="let n of quizCountOptions"
+                [class.on]="quizCount === n"
+                (click)="quizCount = n"
+              >{{ n }}</button>
+            </div>
+          </div>
+
+          <label class="ai-tool-toggle">
+            <input type="checkbox" [(ngModel)]="quizExtractTopics" />
+            <span class="ai-toggle-box" aria-hidden="true"></span>
+            <span class="ai-toggle-text">
+              <span class="ai-toggle-title">Extract topics</span>
+              <span class="ai-toggle-desc">Build from the notes’ general topics, not their literal text — broader questions that don’t just quote your notes.</span>
+            </span>
+          </label>
+
+          <label class="ai-tool-toggle">
+            <input type="checkbox" [(ngModel)]="quizExplainOptions" />
+            <span class="ai-toggle-box" aria-hidden="true"></span>
+            <span class="ai-toggle-text">
+              <span class="ai-toggle-title">Add explanation</span>
+              <span class="ai-toggle-desc">Explain why each option is right or wrong, so you learn from mistakes.</span>
+            </span>
+          </label>
+
+          <label class="ai-tool-toggle" *ngIf="existingQuizzes.length && !existingQuizzesUnscoped">
+            <input type="checkbox" [(ngModel)]="quizAvoidExisting" />
+            <span class="ai-toggle-box" aria-hidden="true"></span>
+            <span class="ai-toggle-text">
+              <span class="ai-toggle-title">Avoid repeats</span>
+              <span class="ai-toggle-desc">Don’t reuse questions from the existing quizzes above.</span>
+            </span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Active quiz — inline here, unless detached into the pop-out window -->
+      <ng-container *ngIf="quizActive && !quizPopout" [ngTemplateOutlet]="quizPanel"></ng-container>
+    </ng-container>
+
+    <!-- ── FACT CHECK TAB ───────────────────────────────────────────────── -->
+    <div class="ai-panel-scroll" *ngIf="aiTab === 'factcheck'">
+      <div class="ai-factcheck-intro">
+        Fact check inspects the claims in your selected notes and flags each as
+        true, false, uncertain, or opinion. Results appear as badges on the notes.
+      </div>
+      <div class="ai-chat-tools-row" *ngIf="factCheckResults.size">
+        <button class="ai-tool-btn" type="button" (click)="clearFactChecks()">
+          Clear results ({{ factCheckResults.size }})
+        </button>
+      </div>
     </div>
 
-    <!-- Context chips -->
-    <div class="ai-chat-context" *ngIf="chatContextNotes.length">
+    <!-- Context chips (chat only) -->
+    <div class="ai-chat-context" *ngIf="aiTab === 'chat' && chatView === 'conversation' && hasChatContext">
       <span class="ai-chat-context-label">Context:</span>
       <span class="ai-chat-chip" *ngFor="let n of chatContextNotes">
         {{ itemPreview(n) }}
       </span>
+      <span class="ai-chat-chip ai-chat-chip--text" *ngIf="chatSelectedText" title="{{ chatSelectedText }}">
+        <span class="ai-chat-chip-quote">“{{ chatSelectedText }}”</span>
+        <button
+          class="ai-chat-chip-x"
+          type="button"
+          (click)="clearChatSelectedText()"
+          aria-label="Remove selected text"
+        >
+          <app-svg-icon icon="close-x"></app-svg-icon>
+        </button>
+      </span>
     </div>
 
-    <div class="ai-chat-input-row">
+    <!-- Shared input row + Send (drives the active tab) -->
+    <div class="ai-chat-input-row" *ngIf="showAiInput">
       <textarea
         class="ai-chat-input"
         rows="1"
         [(ngModel)]="chatInput"
-        (keydown.enter)="$event.preventDefault(); sendChat()"
-        placeholder="Ask the assistant…  (Enter to send)"
-        [disabled]="chatLoading"
+        (keydown.enter)="$event.preventDefault(); aiSend()"
+        [placeholder]="aiInputPlaceholder"
+        [disabled]="aiInputDisabled"
       ></textarea>
       <button
         class="ai-chat-send"
         type="button"
-        [disabled]="chatLoading || !chatInput.trim()"
-        (click)="sendChat()"
+        [disabled]="aiSendDisabled"
+        (click)="aiSend()"
       >
-        Send
+        {{ aiSendLabel }}
       </button>
     </div>
   </div>
+
+  <!-- ── Quiz pop-out window (floating, resizable, non-blocking) ─────────── -->
+  <div
+    class="quiz-popup"
+    *ngIf="quizPopout && quizActive"
+    [style.left.px]="quizPos?.x"
+    [style.top.px]="quizPos?.y"
+    [style.width.px]="quizPopoutSize?.w"
+    [style.height.px]="quizPopoutSize?.h"
+  >
+    <ng-container [ngTemplateOutlet]="quizPanel"></ng-container>
+    <!-- Resize handles (all edges + corners, note-style) -->
+    <div class="qz-rs qz-rs-n" (mousedown)="quizResizeStart($event, 'n')"></div>
+    <div class="qz-rs qz-rs-s" (mousedown)="quizResizeStart($event, 's')"></div>
+    <div class="qz-rs qz-rs-e" (mousedown)="quizResizeStart($event, 'e')"></div>
+    <div class="qz-rs qz-rs-w" (mousedown)="quizResizeStart($event, 'w')"></div>
+    <div class="qz-rs qz-rs-ne" (mousedown)="quizResizeStart($event, 'ne')"></div>
+    <div class="qz-rs qz-rs-nw" (mousedown)="quizResizeStart($event, 'nw')"></div>
+    <div class="qz-rs qz-rs-se" (mousedown)="quizResizeStart($event, 'se')"></div>
+    <div class="qz-rs qz-rs-sw" (mousedown)="quizResizeStart($event, 'sw')"></div>
+  </div>
+
+  <!-- ── Reusable quiz UI (rendered in side panel OR pop-out) ───────────── -->
+  <ng-template #quizPanel>
+    <!-- Taking -->
+    <div class="ai-panel-scroll quiz-inline" *ngIf="quizActive && !quizSubmitted">
+      <div class="quiz-inline-head" (mousedown)="quizDragStart($event)">
+        <span class="quiz-card-title">{{ quiz!.title || 'Quiz' }}</span>
+        <span class="quiz-card-progress">{{ quizProgress }}</span>
+        <button
+          class="quiz-head-btn"
+          type="button"
+          *ngIf="!quizPopout"
+          title="Open in window"
+          (click)="openQuizPopout()"
+        >⇱</button>
+        <button
+          class="quiz-head-btn"
+          type="button"
+          [title]="quizPopout ? 'Minimize to side panel' : 'Close quiz'"
+          (click)="quizPopout ? dockQuizToSide() : closeQuiz()"
+        >
+          <app-svg-icon icon="close-x"></app-svg-icon>
+        </button>
+      </div>
+      <div class="quiz-progress-bar">
+        <div
+          class="quiz-progress-fill"
+          [style.width.%]="(quizAnsweredCount / quiz!.questions.length) * 100"
+        ></div>
+      </div>
+
+      <div class="quiz-question" *ngIf="quizCurrentQuestion as q">
+        <div class="quiz-q-text" [innerHTML]="aiHtml(q.question)"></div>
+        <div class="quiz-tags" *ngIf="q.tags?.length">
+          <span class="quiz-tag" *ngFor="let t of q.tags">{{ t }}</span>
+        </div>
+
+        <div class="quiz-options" *ngIf="q.type === 'SINGLE_CHOICE' && q.options">
+          <button
+            class="quiz-option"
+            *ngFor="let opt of q.options"
+            [class.selected]="quizIsChosen(q, opt.key)"
+            (click)="quizSelectAnswer(opt.key)"
+          ><span class="quiz-option-key">{{ opt.key }}</span><span class="quiz-option-text" [innerHTML]="aiHtml(opt.text)"></span></button>
+        </div>
+
+        <div class="quiz-options" *ngIf="q.type === 'MULTIPLE_ANSWER' && q.options">
+          <button
+            class="quiz-option quiz-option--multi"
+            *ngFor="let opt of q.options"
+            [class.selected]="quizIsChosen(q, opt.key)"
+            (click)="quizToggleAnswer(opt.key)"
+          ><span class="quiz-option-key">{{ opt.key }}</span><span class="quiz-option-text" [innerHTML]="aiHtml(opt.text)"></span></button>
+          <span class="quiz-hint">Select all that apply</span>
+        </div>
+
+        <div class="quiz-options quiz-options--row" *ngIf="q.type === 'TRUE_FALSE'">
+          <button
+            class="quiz-option"
+            [class.selected]="quizIsChosen(q, 'TRUE')"
+            (click)="quizSelectAnswer('TRUE')"
+          >True</button>
+          <button
+            class="quiz-option"
+            [class.selected]="quizIsChosen(q, 'FALSE')"
+            (click)="quizSelectAnswer('FALSE')"
+          >False</button>
+        </div>
+
+        <div class="quiz-options" *ngIf="q.type === 'OPEN'">
+          <app-quiz-answer-editor
+            [doc]="quizOpenDocs.get(q.id) ?? null"
+            (docChange)="quizSetOpenDoc($event)"
+          ></app-quiz-answer-editor>
+          <span class="quiz-hint">Tab indents · ``` for a code block · ` for inline code</span>
+        </div>
+      </div>
+
+      <div class="quiz-nav">
+        <button class="quiz-btn" type="button" [disabled]="quizIndex === 0" (click)="quizPrev()">← Prev</button>
+        <span class="quiz-answered">{{ quizAnsweredCount }} / {{ quiz!.questions.length }} answered</span>
+        <button
+          class="quiz-btn"
+          type="button"
+          *ngIf="quizIndex < quiz!.questions.length - 1"
+          (click)="quizNext()"
+        >Next →</button>
+        <button
+          class="quiz-btn quiz-btn--primary"
+          type="button"
+          *ngIf="quizIndex >= quiz!.questions.length - 1"
+          [disabled]="aiLoading"
+          (click)="submitQuiz()"
+        >{{ aiLoading ? 'Grading…' : quizAllAnswered ? 'Submit' : 'Submit (' + (quiz!.questions.length - quizAnsweredCount) + ' blank)' }}</button>
+      </div>
+    </div>
+
+    <!-- Results -->
+    <div class="ai-panel-scroll quiz-inline" *ngIf="quizActive && quizSubmitted">
+      <div class="quiz-inline-head" (mousedown)="quizDragStart($event)">
+        <span class="quiz-card-title">Results</span>
+        <div class="quiz-score" *ngIf="quizScore">
+          <span class="quiz-score-num">{{ quizScore!.score }}</span>
+          <span class="quiz-score-pct">{{ quizScore!.percentage }}%</span>
+        </div>
+        <button
+          class="quiz-head-btn"
+          type="button"
+          *ngIf="!quizPopout"
+          title="Open in window"
+          (click)="openQuizPopout()"
+        >⇱</button>
+        <button
+          class="quiz-head-btn"
+          type="button"
+          [title]="quizPopout ? 'Minimize to side panel' : 'Close quiz'"
+          (click)="quizPopout ? dockQuizToSide() : closeQuiz()"
+        >
+          <app-svg-icon icon="close-x"></app-svg-icon>
+        </button>
+      </div>
+
+      <div class="quiz-results-list">
+        <div
+          class="quiz-result"
+          *ngFor="let q of quiz!.questions; let i = index"
+          [class.correct]="quizResultFor(q)?.correct"
+          [class.wrong]="quizResultFor(q) && !quizResultFor(q)!.correct"
+        >
+          <div
+            class="quiz-result-head"
+            [class.expanded]="quizResultExpanded.has(q.id)"
+            (click)="toggleQuizResult(q)"
+          >
+            <span class="quiz-result-icon">{{ quizResultFor(q)?.correct ? '✓' : '✗' }}</span>
+            <span class="quiz-result-q"><span class="quiz-result-num">{{ i + 1 }}.</span><span [innerHTML]="aiHtml(q.question)"></span></span>
+            <span class="quiz-result-score" *ngIf="quizResultFor(q) as r">{{ (r.score * 100) | number:'1.0-0' }}%</span>
+            <span class="quiz-result-caret" aria-hidden="true">⌄</span>
+          </div>
+          <div class="quiz-result-body" *ngIf="quizResultExpanded.has(q.id) && quizResultFor(q) as r">
+            <div class="quiz-result-line"><strong>Your answer:</strong> <span [innerHTML]="quizAnswerHtml(q)"></span></div>
+            <div class="quiz-result-line" *ngIf="!r.correct"><strong>Correct:</strong> <span [innerHTML]="aiHtml(quizFormatAnswer(r.correctAnswer))"></span></div>
+            <div class="quiz-result-line quiz-result-feedback" *ngIf="r.feedback" [innerHTML]="aiHtml(r.feedback)"></div>
+            <div class="quiz-result-line quiz-result-expl" *ngIf="r.explanation" [innerHTML]="aiHtml(r.explanation)"></div>
+            <div class="quiz-result-sources" *ngIf="!quizIsTopicQuiz && quizSourceNotes(q).length">
+              <span class="quiz-result-sources-label">From</span>
+              <button
+                class="quiz-result-source"
+                type="button"
+                *ngFor="let s of quizSourceNotes(q)"
+                (click)="centerOnReferencedNote(s.id)"
+                title="Jump to note"
+              >↦ {{ s.label }}</button>
+            </div>
+            <button
+              class="quiz-reveal-btn"
+              type="button"
+              *ngIf="!r.correct && q.options?.length"
+              (click)="toggleQuizOptions(q)"
+            >{{ quizOptionsShown.has(q.id) ? 'Hide options' : 'Show options' }}</button>
+            <div class="quiz-opt-expls" *ngIf="!r.correct && q.options?.length && quizOptionsShown.has(q.id)">
+              <div
+                class="quiz-opt-expl"
+                *ngFor="let opt of q.options"
+                [class.correct]="quizOptionState(q, opt.key) === 'correct'"
+                [class.wrong]="quizOptionState(q, opt.key) === 'wrong'"
+              >
+                <div class="quiz-opt-expl-head">
+                  <span class="quiz-opt-expl-key">{{ opt.key }}</span>
+                  <span class="quiz-opt-expl-text" [innerHTML]="aiHtml(opt.text)"></span>
+                  <span class="quiz-opt-expl-tags">
+                    <span class="quiz-opt-expl-tag tag-correct" *ngIf="quizOptionState(q, opt.key) === 'correct'">correct</span>
+                    <span class="quiz-opt-expl-tag tag-picked" *ngIf="quizIsChosen(q, opt.key)">your pick</span>
+                  </span>
+                </div>
+                <div class="quiz-opt-expl-why" *ngIf="opt.explanation" [innerHTML]="aiHtml(opt.explanation)"></div>
+              </div>
+            </div>
+            <button
+              class="quiz-explain-btn"
+              type="button"
+              *ngIf="quizCanExplain(q)"
+              [disabled]="quizExplainLoading.has(q.id)"
+              (click)="explainQuestionOptions(q)"
+            >
+              <app-svg-icon icon="ai-sparkle"></app-svg-icon>
+              {{ quizExplainLoading.has(q.id) ? 'Explaining…' : 'Explain options' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="quiz-nav">
+        <button
+          class="quiz-btn"
+          type="button"
+          *ngIf="quizCanExplainAll"
+          [disabled]="quizExplainAllLoading"
+          (click)="explainAllOptions()"
+        >
+          <app-svg-icon icon="ai-sparkle"></app-svg-icon>
+          {{ quizExplainAllLoading ? 'Explaining…' : 'Explain all' }}
+        </button>
+        <button class="quiz-btn quiz-btn--primary" type="button" (click)="closeQuiz()">Done</button>
+      </div>
+    </div>
+  </ng-template>
 
   <div class="board-container" #board>
     <div *ngIf="isSearchOpen">
@@ -517,7 +914,6 @@
             [zoom]="zoom"
             [attr.data-sync]="item.syncState"
             (mousedown)="bringToFront(item)"
-            (dblclick)="onNoteDblClick($event, item)"
             (navbarChange)="onNoteNavbarChange($event)"
             (deleteTile)="onDeleteNote(item)"
             *ngIf="isItemVisible(item)"
@@ -596,6 +992,20 @@
           stroke-linejoin="round"
         />
       </svg>
+
+      <!-- Peer outlines: borders of every other on-screen element, shown while
+           dragging so the user can see alignment targets. -->
+      <ng-container *ngIf="dragging$ | async">
+        <div
+          *ngFor="let r of peerOutlines()"
+          class="drag-peer-outline"
+          [style.left.px]="r.x"
+          [style.top.px]="r.y"
+          [style.width.px]="r.width"
+          [style.height.px]="r.height"
+          [style.borderWidth.px]="1 / zoom"
+        ></div>
+      </ng-container>
 
       <!-- Snap alignment guides (world coordinates, drawn during drag/resize) -->
       <ng-container *ngIf="snapGuides$ | async as guides">
@@ -688,8 +1098,12 @@
     ></div>
   </div>
 
+  <!-- Perf debug overlay (top-right) -->
+  <app-board-debug-overlay></app-board-debug-overlay>
+
   <!-- Board info (top-left, under navbar, fixed overlay) -->
   <div class="board-info">
+    <span hidden>{{ debug.tickBoard() }}</span>
     <!-- Zoom -->
     <span [class.board-info--visible]="cameraZoomVisible">Zoom {{ cameraZoomPct }}%</span>
     <!-- Position -->
@@ -968,166 +1382,6 @@
       </div>
     </div>
   </ng-template>
-
-  <!-- Quiz modal (taking) -->
-  <div
-    class="quiz-modal"
-    *ngIf="quiz && !quizSubmitted"
-    [class.quiz-modal--centered]="!quizPos"
-    [style.left.px]="quizPos?.x"
-    [style.top.px]="quizPos?.y"
-  >
-    <div class="quiz-card">
-      <div class="quiz-card-header" (mousedown)="quizDragStart($event)">
-        <app-svg-icon icon="ai-sparkle" class="quiz-card-icon"></app-svg-icon>
-        <span class="quiz-card-title">{{ quiz.title || 'Quiz' }}</span>
-        <span class="quiz-card-progress">{{ quizProgress }}</span>
-        <button
-          class="quiz-card-close"
-          type="button"
-          (click)="closeQuiz()"
-          aria-label="Close quiz"
-        >
-          <app-svg-icon icon="close-x"></app-svg-icon>
-        </button>
-      </div>
-      <div class="quiz-progress-bar">
-        <div
-          class="quiz-progress-fill"
-          [style.width.%]="(quizAnsweredCount / quiz.questions.length) * 100"
-        ></div>
-      </div>
-
-      <div class="quiz-card-body">
-        <div class="quiz-question" *ngIf="quizCurrentQuestion as q">
-          <div class="quiz-q-text" [innerHTML]="aiHtml(q.question)"></div>
-          <!-- Per-question tags -->
-          <div class="quiz-tags" *ngIf="q.tags?.length">
-            <span class="quiz-tag" *ngFor="let t of q.tags">{{ t }}</span>
-          </div>
-
-          <!-- Single choice -->
-          <div class="quiz-options" *ngIf="q.type === 'SINGLE_CHOICE' && q.options">
-            <button
-              class="quiz-option"
-              *ngFor="let opt of q.options"
-              [class.selected]="quizIsChosen(q, opt.key)"
-              (click)="quizSelectAnswer(opt.key)"
-            ><span class="quiz-option-key">{{ opt.key }}</span><span class="quiz-option-text" [innerHTML]="aiHtml(opt.text)"></span></button>
-          </div>
-
-          <!-- Multiple answer -->
-          <div class="quiz-options" *ngIf="q.type === 'MULTIPLE_ANSWER' && q.options">
-            <button
-              class="quiz-option quiz-option--multi"
-              *ngFor="let opt of q.options"
-              [class.selected]="quizIsChosen(q, opt.key)"
-              (click)="quizToggleAnswer(opt.key)"
-            ><span class="quiz-option-key">{{ opt.key }}</span><span class="quiz-option-text" [innerHTML]="aiHtml(opt.text)"></span></button>
-            <span class="quiz-hint">Select all that apply</span>
-          </div>
-
-          <!-- True/false -->
-          <div class="quiz-options quiz-options--row" *ngIf="q.type === 'TRUE_FALSE'">
-            <button
-              class="quiz-option"
-              [class.selected]="quizIsChosen(q, 'TRUE')"
-              (click)="quizSelectAnswer('TRUE')"
-            >True</button>
-            <button
-              class="quiz-option"
-              [class.selected]="quizIsChosen(q, 'FALSE')"
-              (click)="quizSelectAnswer('FALSE')"
-            >False</button>
-          </div>
-
-          <!-- Open / free text -->
-          <div class="quiz-options" *ngIf="q.type === 'OPEN'">
-            <textarea
-              class="quiz-open-input"
-              rows="5"
-              placeholder="Type your answer…"
-              [ngModel]="$any(quizAnswerOf(q)) || ''"
-              (ngModelChange)="quizSetText($event)"
-            ></textarea>
-          </div>
-        </div>
-      </div>
-
-      <div class="quiz-nav">
-        <button class="quiz-btn" type="button" [disabled]="quizIndex === 0" (click)="quizPrev()">← Prev</button>
-        <span class="quiz-answered">{{ quizAnsweredCount }} / {{ quiz.questions.length }} answered</span>
-        <button
-          class="quiz-btn"
-          type="button"
-          *ngIf="quizIndex < quiz.questions.length - 1"
-          (click)="quizNext()"
-        >Next →</button>
-        <button
-          class="quiz-btn quiz-btn--primary"
-          type="button"
-          *ngIf="quizAllAnswered"
-          [disabled]="aiLoading"
-          (click)="submitQuiz()"
-        >{{ aiLoading ? 'Grading…' : 'Submit' }}</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Quiz modal (results) -->
-  <div
-    class="quiz-modal quiz-modal--results"
-    *ngIf="quizSubmitted && quizScore"
-    [class.quiz-modal--centered]="!quizPos"
-    [style.left.px]="quizPos?.x"
-    [style.top.px]="quizPos?.y"
-  >
-    <div class="quiz-card">
-      <div class="quiz-card-header" (mousedown)="quizDragStart($event)">
-        <app-svg-icon icon="ai-sparkle" class="quiz-card-icon"></app-svg-icon>
-        <span class="quiz-card-title">Results</span>
-        <div class="quiz-score">
-          <span class="quiz-score-num">{{ quizScore!.score }}</span>
-          <span class="quiz-score-pct">{{ quizScore!.percentage }}%</span>
-        </div>
-        <button
-          class="quiz-card-close"
-          type="button"
-          (click)="closeQuiz()"
-          aria-label="Close quiz"
-        >
-          <app-svg-icon icon="close-x"></app-svg-icon>
-        </button>
-      </div>
-
-      <div class="quiz-card-body">
-        <div class="quiz-results-list" *ngIf="quiz">
-          <div
-            class="quiz-result"
-            *ngFor="let q of quiz.questions; let i = index"
-            [class.correct]="quizResultFor(q)?.correct"
-            [class.wrong]="quizResultFor(q) && !quizResultFor(q)!.correct"
-          >
-            <div class="quiz-result-head">
-              <span class="quiz-result-icon">{{ quizResultFor(q)?.correct ? '✓' : '✗' }}</span>
-              <span class="quiz-result-q"><span class="quiz-result-num">{{ i + 1 }}.</span><span [innerHTML]="aiHtml(q.question)"></span></span>
-              <span class="quiz-result-score" *ngIf="quizResultFor(q) as r">{{ (r.score * 100) | number:'1.0-0' }}%</span>
-            </div>
-            <div class="quiz-result-body" *ngIf="quizResultFor(q) as r">
-              <div class="quiz-result-line"><strong>Your answer:</strong> <span [innerHTML]="aiHtml(quizFormatAnswer(quizAnswerOf(q)) || '—')"></span></div>
-              <div class="quiz-result-line" *ngIf="!r.correct"><strong>Correct:</strong> <span [innerHTML]="aiHtml(quizFormatAnswer(r.correctAnswer))"></span></div>
-              <div class="quiz-result-line quiz-result-feedback" *ngIf="r.feedback" [innerHTML]="aiHtml(r.feedback)"></div>
-              <div class="quiz-result-line quiz-result-expl" *ngIf="r.explanation" [innerHTML]="aiHtml(r.explanation)"></div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div class="quiz-nav">
-        <button class="quiz-btn quiz-btn--primary" type="button" (click)="closeQuiz()">Done</button>
-      </div>
-    </div>
-  </div>
 
   <app-context-menu
     [visible]="ctxMenu.visible"

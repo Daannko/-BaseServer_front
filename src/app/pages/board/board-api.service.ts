@@ -67,6 +67,24 @@ export class BoardApiService {
     }
   }
 
+  async updateBoard(
+    boardId: string,
+    changes: { name?: string; description?: string },
+  ): Promise<Board | null> {
+    try {
+      const updated = await firstValueFrom(
+        this.http.patch<Board>(`${this.apiUrl}/board/${boardId}`, changes),
+      );
+      const current = this._boards.value ?? [];
+      this._boards.next(this.upsertBoard(current, updated));
+      return updated;
+    } catch (e: unknown) {
+      const status = e instanceof HttpErrorResponse ? ` (${e.status})` : '';
+      this.snackBarService.error(`Failed to update board${status}`);
+      return null;
+    }
+  }
+
   async deleteBoard(boardId: string): Promise<void> {
     try {
       await firstValueFrom(this.http.delete(`${this.apiUrl}/board/${boardId}`));

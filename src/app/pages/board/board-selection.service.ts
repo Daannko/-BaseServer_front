@@ -72,12 +72,15 @@ export class BoardSelectionService {
     return this.moving && this.anchor === anchor;
   }
 
-  /** Translate the whole group so the anchor lands at (x, y). */
-  moveGroupTo(anchor: BoardItem, x: number, y: number): void {
+  /** Translate the whole group so the anchor lands at (x, y). When `lockedAxis`
+   *  is set (Shift held), that axis is hard-pinned to each element's gesture-start
+   *  value — delta forced to exactly 0 — so the group moves along one axis only,
+   *  regardless of any accumulated drift from prior frames. */
+  moveGroupTo(anchor: BoardItem, x: number, y: number, lockedAxis?: 'x' | 'y'): void {
     const a = this.starts.get(anchor);
     if (!a) return;
-    const dx = x - a.x;
-    const dy = y - a.y;
+    const dx = lockedAxis === 'x' ? 0 : x - a.x;
+    const dy = lockedAxis === 'y' ? 0 : y - a.y;
     for (const it of this._items) {
       const s = this.starts.get(it);
       if (!s) continue;

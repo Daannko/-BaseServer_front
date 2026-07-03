@@ -1,7 +1,8 @@
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Injectable } from '@angular/core';
 import { environment } from '../../../environments/environment';
-import { firstValueFrom } from 'rxjs';
+import { firstValueFrom, Observable, of } from 'rxjs';
+import { catchError } from 'rxjs/operators';
 import { SnackBarService } from '../../service/snackbar.service';
 import type {
   FactCheckRequest,
@@ -18,6 +19,9 @@ import type {
   Quiz,
   ChatRequest,
   ChatResponse,
+  ChatSession,
+  ChatSessionListResponse,
+  ChatActionStatus,
 } from './models/ai.model';
 
 @Injectable({ providedIn: 'root' })
@@ -139,6 +143,41 @@ export class BoardAiService {
     }
   }
 
+  /** Backfill per-option explanations for every closed question of a quiz.
+   *  Sets `explainOptions=true`. Returns reveal-shape quiz (with explanations). */
+  async explainQuizOptions(id: string): Promise<Quiz | null> {
+    try {
+      return await firstValueFrom(
+        this.http.post<Quiz>(
+          `${this.apiUrl}/ai/quiz/${id}/explain-options`,
+          {},
+        ),
+      );
+    } catch (e: unknown) {
+      this.handleError('quiz explanation', e);
+      return null;
+    }
+  }
+
+  /** Backfill per-option explanations for a single question. 404 if unknown.
+   *  Returns reveal-shape quiz (with explanations). */
+  async explainQuizQuestionOptions(
+    id: string,
+    questionId: string,
+  ): Promise<Quiz | null> {
+    try {
+      return await firstValueFrom(
+        this.http.post<Quiz>(
+          `${this.apiUrl}/ai/quiz/${id}/questions/${questionId}/explain-options`,
+          {},
+        ),
+      );
+    } catch (e: unknown) {
+      this.handleError('quiz explanation', e);
+      return null;
+    }
+  }
+
   async patchQuiz(id: string, req: QuizPatchRequest): Promise<Quiz | null> {
     try {
       return await firstValueFrom(
@@ -164,14 +203,75 @@ export class BoardAiService {
 
   // ── Chat ──────────────────────────────────────────────────────────────────
 
-  async chat(req: ChatRequest): Promise<ChatResponse | null> {
+  /** Observable chat call — subscribe so the caller can cancel via unsubscribe
+   *  (cancels the underlying HTTP request). Errors surface as `null`. */
+  chat$(req: ChatRequest): Observable<ChatResponse | null> {
+    return this.http.post<ChatResponse>(`${this.apiUrl}/ai/chat`, req).pipe(
+      catchError((e: unknown) => {
+        this.handleError('chat', e);
+        return of(null);
+      }),
+    );
+  }
+
+  /** List saved chat sessions for a board (newest first, no messages). */
+  async listChatSessions(
+    boardId: string,
+  ): Promise<ChatSessionListResponse | null> {
+    const params = new HttpParams().set('boardId', boardId);
     try {
       return await firstValueFrom(
-        this.http.post<ChatResponse>(`${this.apiUrl}/ai/chat`, req),
+        this.http.get<ChatSessionListResponse>(`${this.apiUrl}/ai/chat/sessions`, {
+          params,
+        }),
       );
     } catch (e: unknown) {
-      this.handleError('chat', e);
+      this.handleError('chat sessions', e);
       return null;
+    }
+  }
+
+  /** Fetch one conversation with its full message history. */
+  async getChatSession(id: string): Promise<ChatSession | null> {
+    try {
+      return await firstValueFrom(
+        this.http.get<ChatSession>(`${this.apiUrl}/ai/chat/sessions/${id}`),
+      );
+    } catch (e: unknown) {
+      this.handleError('chat session', e);
+      return null;
+    }
+  }
+
+  async deleteChatSession(id: string): Promise<boolean> {
+    try {
+      await firstValueFrom(
+        this.http.delete<void>(`${this.apiUrl}/ai/chat/sessions/${id}`),
+      );
+      return true;
+    } catch (e: unknown) {
+      this.handleError('chat session delete', e);
+      return false;
+    }
+  }
+
+  /** Persist a single proposed-action's resolution (apply / reject / revert).
+   *  Addressed by position in the stored conversation. Fire-and-forget. */
+  async updateChatActionStatus(
+    sessionId: string,
+    messageIndex: number,
+    actionIndex: number,
+    status: ChatActionStatus,
+  ): Promise<void> {
+    try {
+      await firstValueFrom(
+        this.http.patch<void>(
+          `${this.apiUrl}/ai/chat/sessions/${sessionId}/action-status`,
+          { messageIndex, actionIndex, status },
+        ),
+      );
+    } catch {
+      // Non-fatal — the UI already reflects the change locally.
     }
   }
 

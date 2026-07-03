@@ -61,6 +61,9 @@ export type QuizQuestionType =
 export interface QuizOption {
   key: string;
   text: string;
+  /** reveal/evaluate only — why this option is correct or wrong. Present when
+   *  the quiz was generated with `explainOptions: true`. Stripped while taking. */
+  explanation?: string;
 }
 
 /** Type-specific answer value submitted by the client (see §2.7).
@@ -109,9 +112,18 @@ export interface QuizGenerateRequest {
   count?: number;
   /** Optional free-text steer for the model (focus, difficulty, style…). */
   prompt?: string;
+  /** Explain every option of closed questions — why each one is right or wrong
+   *  — so the taker learns from their mistakes. Adds per-option `explanation`
+   *  to choice-style questions in reveal/evaluate output. */
+  explainOptions?: boolean;
   /** Ask the backend to avoid repeating questions from quizzes already linked
    *  to these notes. Backend pulls the existing questions itself. */
   avoidExisting?: boolean;
+  /** Build the quiz from the notes' general topics/tags instead of their literal
+   *  content. The backend extracts (and caches) per-note tags, then generates
+   *  from those tags only — so questions stay on-topic without quoting the notes.
+   *  All caching + invalidation is server-side; the client just sets this flag. */
+  extractTopics?: boolean;
   persist?: boolean; // default true server-side
 }
 
@@ -124,6 +136,11 @@ export interface QuizGenerateResponse {
   sourceNoteIds: string[];
   coverage: number;
   createdAt: string;
+  /** Echoes the generate request — quiz carries per-option explanations. */
+  explainOptions?: boolean;
+  /** Echoes the generate request — quiz was built from topics/tags only (no
+   *  note content). Used to hide per-note source links in results. */
+  extractTopics?: boolean;
   questions: QuizQuestion[];
 }
 
@@ -138,6 +155,9 @@ export interface Quiz {
   questionCount: number;
   createdAt: string;
   updatedAt: string;
+  explainOptions?: boolean;
+  /** Quiz was generated from topics/tags only (no note content). */
+  extractTopics?: boolean;
   questions: QuizQuestion[];
 }
 
@@ -205,6 +225,9 @@ export interface QuizEvaluateResult {
   correctAnswer: QuizAnswerValue;
   feedback: string | null; // AI note for OPEN / FILL_BLANK
   explanation: string;
+  /** Closed questions only — every option with a per-option explanation
+   *  (why right/wrong). Present when the quiz has `explainOptions`. */
+  options?: QuizOption[];
 }
 
 export interface QuizEvaluateResponse {
@@ -237,6 +260,53 @@ export interface ChatRequest {
   boardId: string;
   messages: ChatMessage[];
   selection: NoteContextInput[];
+  /** Text the user highlighted inside an element, sent as focused context. */
+  selectedText?: string;
+  /** Existing session to append to; null/omitted starts a new session that the
+   *  server creates and returns in the response. */
+  sessionId?: string | null;
+}
+
+// ── Chat sessions ───────────────────────────────────────────────────────────
+
+export type ChatActionStatus = 'pending' | 'applied' | 'rejected';
+
+/** A proposed action plus its resolution, as persisted in a session. */
+export interface ChatStoredAction {
+  action: BoardAiAction;
+  status: ChatActionStatus;
+}
+
+/** A stored conversation turn (assistant turns may carry proposed actions). */
+export interface ChatStoredMessage {
+  role: ChatRole;
+  content: string;
+  actions?: ChatStoredAction[];
+}
+
+/** List-row for a saved conversation (no messages). */
+export interface ChatSessionSummary {
+  id: string;
+  boardId: string;
+  title: string;
+  messageCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ChatSessionListResponse {
+  sessions: ChatSessionSummary[];
+  total: number;
+}
+
+/** Full conversation (detail fetch). */
+export interface ChatSession {
+  id: string;
+  boardId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messages: ChatStoredMessage[];
 }
 
 /** Add a new note. `tempId` correlates with later actions in the same response. */
@@ -284,4 +354,9 @@ export type BoardAiAction =
 export interface ChatResponse {
   message: string;
   actions: BoardAiAction[];
+  /** Session this turn was stored in — echoes the request's sessionId, or a
+   *  freshly created id when the request omitted one. */
+  sessionId?: string;
+  /** Server-derived title for the session (e.g. from the first message). */
+  title?: string;
 }

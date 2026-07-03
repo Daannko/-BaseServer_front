@@ -12,6 +12,9 @@ import {
 export interface Position {
   x: number;
   y: number;
+  /** When Shift-locked, the axis held constant ('y' = horizontal-only move,
+   *  'x' = vertical-only move). Consumers use it to skip snapping that axis. */
+  lockedAxis?: 'x' | 'y';
 }
 
 @Directive({
@@ -107,17 +110,21 @@ export class ItemMoveDirective implements OnInit, OnDestroy {
           // Shift = axis lock (Photoshop-style): move along one axis only.
           // Pick the dominant axis from total travel since the gesture start,
           // then snap the other coord back to where it started.
+          let lockedAxis: 'x' | 'y' | undefined;
           if (moveEv.shiftKey) {
             if (Math.abs(rawDxFromStart) >= Math.abs(rawDyFromStart)) {
               outY = startPosY;
+              lockedAxis = 'y';
             } else {
               outX = startPosX;
+              lockedAxis = 'x';
             }
           }
 
           const next: Position = {
             x: Math.round(outX),
             y: Math.round(outY),
+            lockedAxis,
           };
 
           // Emit inside Angular so bindings update.

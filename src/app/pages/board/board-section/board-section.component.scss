@@ -37,6 +37,17 @@
     bottom: auto;
     left: auto;
     right: auto;
+    // Always occupy the row (override the shared display:none) and just toggle
+    // visibility — so the section name keeps a FIXED position above the menus
+    // instead of jumping up when the controls appear on focus.
+    display: flex;
+    visibility: hidden;
+    pointer-events: none;
+
+    &.is-visible {
+      visibility: visible;
+      pointer-events: auto;
+    }
   }
 }
 
@@ -69,6 +80,7 @@
   border-radius: 12px;
   box-sizing: border-box;
   border: var(--section-border-width, 1px) solid var(--section-border-color, transparent);
+  cursor: grab;
 
   &:hover {
     border-color: var(--section-border-color, var(--bp-border));

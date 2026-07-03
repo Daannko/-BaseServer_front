@@ -41,7 +41,9 @@
       "mcp__playwright__browser_press_key",
       "PowerShell(git --no-pager log -L 166,177:src/app/pages/board/board-item/tiptap.service.ts --no-patch 2>$null; Write-Output \"----- blame -----\"; git --no-pager blame -L 166,177 src/app/pages/board/board-item/tiptap.service.ts)",
       "mcp__playwright__browser_drag",
-      "Bash(perl -i -pe \"s/insertContent\\\\\\('\\\\xc2\\\\xa0'\\\\.repeat\\\\\\(4\\\\\\)\\\\\\)/insertContent\\('\\\\\\\\t'\\)/\" src/app/pages/board/board-item/tiptap.extension.ts)"
+      "Bash(perl -i -pe \"s/insertContent\\\\\\('\\\\xc2\\\\xa0'\\\\.repeat\\\\\\(4\\\\\\)\\\\\\)/insertContent\\('\\\\\\\\t'\\)/\" src/app/pages/board/board-item/tiptap.extension.ts)",
+      "mcp__playwright__browser_close",
+      "PowerShell(\\(Get-Content \"D:\\\\BaseServer_front\\\\src\\\\app\\\\pages\\\\board\\\\board-note\\\\board-note.component.html\" | Measure-Object -Line\\).Lines; \\(Get-Content \"D:\\\\BaseServer_front\\\\src\\\\app\\\\pages\\\\board\\\\board.component.ts\" | Measure-Object -Line\\).Lines)"
     ]
   }
 }

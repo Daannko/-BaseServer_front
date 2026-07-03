@@ -21,7 +21,7 @@ import { BoardNoteComponent } from './board-note/board-note.component';
 import { NavbarService } from '../../helpers/navbar/navbar.service';
 import { BoardMainService } from './board-main.service';
 import { BoardApiService } from './board-api.service';
-import { Observable, Subject, takeUntil } from 'rxjs';
+import { Observable, Subject, Subscription, takeUntil } from 'rxjs';
 import { SvgIconComponent } from '../../helpers/svg-icon/svg-icon.component';
 import { Board } from './models/board.model';
 import {
@@ -46,10 +46,14 @@ import { ColorPaletteComponent } from '../common/color-palette/color-palette.com
 import { BoardDrawingComponent } from './board-drawing/board-drawing.component';
 import { BoardAiService } from './board-ai.service';
 import { AiTextService } from './ai-text.service';
+import { NoteRenderService } from './board-note/note-render.service';
+import { QuizAnswerEditorComponent } from './quiz-answer-editor/quiz-answer-editor.component';
 import type { SafeHtml } from '@angular/platform-browser';
 import { BoardLinkService } from './board-link.service';
 import { BoardPersistenceService } from './board-persistence.service';
 import { EditorPrefsService } from './board-editor-prefs.service';
+import { BoardDebugService } from './board-debug.service';
+import { BoardDebugOverlayComponent } from './board-debug/board-debug-overlay.component';
 import type {
   FactCheckResult,
   QuizQuestion,
@@ -59,7 +63,10 @@ import type {
   QuizSummary,
   QuizAnswerValue,
   QuizEvaluateResult,
+  QuizOption,
+  Quiz,
   ChatMessage,
+  ChatSessionSummary,
   NoteContextInput,
   BoardAiAction,
 } from './models/ai.model';
@@ -71,6 +78,8 @@ interface ProposedAction {
   status: 'pending' | 'applied' | 'rejected';
   /** Previous body, captured on apply of an update so it can be reverted. */
   prevContent?: JSONContent;
+  /** Loaded from a stored session — read-only, no apply/revert buttons. */
+  historical?: boolean;
 }
 
 /** One entry in the chat thread (user turn or assistant turn + its actions). */
@@ -78,6 +87,8 @@ interface ChatThreadEntry {
   role: 'user' | 'assistant';
   content: string;
   actions?: ProposedAction[];
+  /** Context attached to a user turn — referenced notes + highlighted text. */
+  context?: { notes: { id: string; label: string }[]; text?: string };
 }
 
 @Component({
@@ -94,6 +105,8 @@ interface ChatThreadEntry {
     ContextMenuComponent,
     ColorPaletteComponent,
     BoardDrawingComponent,
+    BoardDebugOverlayComponent,
+    QuizAnswerEditorComponent,
   ],
   templateUrl: './board.component.html',
   styleUrls: ['./board.component.scss'],
@@ -127,6 +140,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   boards$!: Observable<Board[] | null>;
   snapGuides$!: Observable<SnapGuides>;
   aspectGuide$!: Observable<AspectGuide | null>;
+  dragging$!: Observable<boolean>;
   isSearchOpen = true;
   isCreateOpen = false;
   optionsOpen = false;
@@ -297,6 +311,44 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.newBoardName.trim().length > 0;
   }
 
+  // ── Edit board details (name / description) ───────────────────────────────
+  editBoardName = '';
+  editBoardDescription = '';
+  savingBoardDetails = false;
+
+  get isEditNameValid(): boolean {
+    return this.editBoardName.trim().length > 0;
+  }
+
+  /** True once the edit fields differ from the loaded board, so Save can stay
+   *  disabled for a no-op. */
+  get boardDetailsDirty(): boolean {
+    if (!this.selectedBoard) return false;
+    return (
+      this.editBoardName.trim() !== (this.selectedBoard.name ?? '') ||
+      this.editBoardDescription.trim() !== (this.selectedBoard.description ?? '')
+    );
+  }
+
+  async saveBoardDetails(): Promise<void> {
+    if (!this.selectedBoard || !this.isEditNameValid || this.savingBoardDetails) return;
+    const name = this.editBoardName.trim();
+    const description = this.editBoardDescription.trim();
+    this.savingBoardDetails = true;
+    const updated = await this.boardSearchService.updateBoard(this.selectedBoard.id, {
+      name,
+      description,
+    });
+    this.savingBoardDetails = false;
+    if (!updated) return;
+    // Reflect the saved values locally so the navbar / export pick them up.
+    this.selectedBoard.name = updated.name;
+    this.selectedBoard.description = updated.description;
+    this.editBoardName = updated.name;
+    this.editBoardDescription = updated.description;
+    this.cdr.detectChanges();
+  }
+
   constructor(
     private navBarService: NavbarService,
     private cdr: ChangeDetectorRef,
@@ -308,14 +360,17 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private selection: BoardSelectionService,
     private aiService: BoardAiService,
     private aiText: AiTextService,
+    private noteRender: NoteRenderService,
     private linkService: BoardLinkService,
     private persistence: BoardPersistenceService,
     private editorPrefs: EditorPrefsService,
+    public debug: BoardDebugService,
     private router: Router,
   ) {
     this.boards$ = this.boardSearchService.boards$;
     this.snapGuides$ = this.snapService.guides$;
     this.aspectGuide$ = this.snapService.aspectGuide$;
+    this.dragging$ = this.mainBoardService.dragging$;
     this.history.onChange = () => this.cdr.detectChanges();
 
     // Wire serializable history callbacks
@@ -376,6 +431,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   private addToList(item: BoardItem, list: BoardItem[], map?: Map<string, BoardItem>): void {
     if (!list.includes(item)) list.push(item);
     map?.set(item.id, item);
+    this.mainBoardService.bumpGeometry();
     this.cdr.detectChanges();
   }
 
@@ -383,6 +439,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const i = list.indexOf(item);
     if (i >= 0) list.splice(i, 1);
     map?.delete(item.id);
+    this.mainBoardService.bumpGeometry();
     this.cdr.detectChanges();
   }
 
@@ -462,6 +519,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     // One history entry for the whole paste, so a single Ctrl+Z removes them all.
     this.history.pushCreate(pasted.map((i) => i.id));
     this.selection.set(pasted);
+    this.mainBoardService.bumpGeometry();
     this.cdr.detectChanges();
     this.mainBoardService.noteComponents = this.noteComponents?.toArray() ?? [];
   }
@@ -474,6 +532,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   // ── Options popup (export / import / logout) ──────────────────────────────
 
   openOptions() {
+    // Seed the edit-board fields from the currently open board.
+    this.editBoardName = this.selectedBoard?.name ?? '';
+    this.editBoardDescription = this.selectedBoard?.description ?? '';
     this.optionsOpen = true;
   }
 
@@ -741,6 +802,11 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.mainBoardService
       ? this.mainBoardService.isItemVisible(item)
       : false;
+  }
+
+  /** Outlines of every on-screen element not currently being dragged. */
+  peerOutlines(): Array<{ x: number; y: number; width: number; height: number }> {
+    return this.mainBoardService ? this.mainBoardService.peerOutlines() : [];
   }
 
   moveToItem(item: BoardItem) {
@@ -1120,10 +1186,14 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
+  private boardResizeObserver?: ResizeObserver;
+
   ngOnDestroy(): void {
+    this.boardResizeObserver?.disconnect();
     this.stopSaveDots();
     this.stopDeleteHold();
     this.stopLinkEnterHold();
+    this.chatSub?.unsubscribe();
     // Persist a final snapshot, then stop the background timers.
     if (this.selectedBoard) {
       this.persistence.save(
@@ -1180,6 +1250,16 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     boardEl.addEventListener('click', this.onBoardClickCapture as EventListener, true);
     window.addEventListener('mousemove', this.trackMouse, { passive: true });
 
+    // Keep the frustum-cull viewport in sync with the board's real size. Window
+    // resizes and AI-panel open/close/resize change it; without this the cached
+    // size goes stale and on-screen items get culled (vanish) wrongly.
+    this.boardResizeObserver = new ResizeObserver(() => {
+      this.mainBoardService.refreshViewportSize();
+      this.mainBoardService.updateBoard();
+      this.cdr.detectChanges();
+    });
+    this.boardResizeObserver.observe(boardEl);
+
     if (this.notes.length > 0) {
       this.mainBoardService.centerOnItem(this.notes[0]);
     }
@@ -1226,6 +1306,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.sections.push(section);
     this.bringSectionToFront(section);
     this.recordCreate(section, this.sections);
+    this.mainBoardService.bumpGeometry();
     this.cdr.detectChanges();
   }
 
@@ -1251,6 +1332,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.notes.push(note);
     this.notesMap.set(note.id, note);
     this.recordCreate(note, this.notes, this.notesMap);
+    this.mainBoardService.bumpGeometry();
 
     Promise.resolve().then(() => {
       this.cdr.detectChanges();
@@ -1359,6 +1441,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.images.push(image);
     this.bringToFront(image);
     this.recordCreate(image, this.images);
+    this.mainBoardService.bumpGeometry();
     this.cdr.detectChanges();
   }
 
@@ -1991,6 +2074,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.groupDragStarts.set(it, { x: it.x, y: it.y });
     }
 
+    this.mainBoardService.beginElementDrag(
+      [...this.groupDragStarts.keys()].map((it) => it.id),
+    );
+
     const board = this.boardRef.nativeElement as HTMLElement;
     try { board.setPointerCapture(ev.pointerId); } catch {}
 
@@ -2003,17 +2090,42 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (!this.groupDragActive) return;
     ev.preventDefault();
 
-    const dxPx = ev.clientX - this.groupDragStartX;
-    const dyPx = ev.clientY - this.groupDragStartY;
+    let dxPx = ev.clientX - this.groupDragStartX;
+    let dyPx = ev.clientY - this.groupDragStartY;
+    // Shift = axis lock (same rule as a single-element move): travel along the
+    // dominant axis only, measured from the gesture start.
+    let lockedAxis: 'x' | 'y' | undefined;
+    if (ev.shiftKey) {
+      if (Math.abs(dxPx) >= Math.abs(dyPx)) { dyPx = 0; lockedAxis = 'y'; }
+      else { dxPx = 0; lockedAxis = 'x'; }
+    }
     const z = this.zoom || 1;
     const dxW = dxPx / z;
     const dyW = dyPx / z;
 
-    for (const it of this.groupDragStarts.keys()) {
-      const s = this.groupDragStarts.get(it);
-      if (!s) continue;
-      it.x = Math.round(s.x + dxW);
-      it.y = Math.round(s.y + dyW);
+    // Treat the whole selection as one element: snap its start bounding box,
+    // translated by the intended delta, against everything outside the
+    // selection — the exact same snap routine a single move uses.
+    let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+    const ids = new Set<string>();
+    for (const [it, s] of this.groupDragStarts) {
+      ids.add(it.id);
+      minX = Math.min(minX, s.x);
+      minY = Math.min(minY, s.y);
+      maxX = Math.max(maxX, s.x + it.width);
+      maxY = Math.max(maxY, s.y + it.height);
+    }
+    const adj = this.snapService.snapTranslation(
+      { x: minX, y: minY, width: maxX - minX, height: maxY - minY },
+      dxW,
+      dyW,
+      ids,
+      lockedAxis,
+    );
+
+    for (const [it, s] of this.groupDragStarts) {
+      it.x = Math.round(s.x + adj.dx);
+      it.y = Math.round(s.y + adj.dy);
     }
     this.cdr.detectChanges();
   };
@@ -2030,6 +2142,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     window.removeEventListener('pointermove', this.onGroupDragMove);
     window.removeEventListener('pointerup', this.onGroupDragUp);
     window.removeEventListener('pointercancel', this.onGroupDragUp);
+
+    this.snapService.clearGuides();
+    this.mainBoardService.endElementDrag();
 
     // Record one undo step (positionUpdated is set by the x/y setters during drag)
     this.pushGroupDragUndo();
@@ -2253,14 +2368,23 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   quizIndex = 0;
   /** Coverage value (0–1). Sent to backend; no longer surfaced as a slider. */
   quizCoverage = 0.75;
-  /** User's answers keyed by question id. Value shape depends on question type. */
+  /** User's answers keyed by question id. Value shape depends on question type.
+   *  For OPEN questions this holds the plain-text mirror used for grading; the
+   *  rich source doc lives in `quizOpenDocs`. */
   quizAnswers = new Map<string, QuizAnswerValue>();
+  /** OPEN answers as ProseMirror docs — the rich-text editor's source of truth.
+   *  Rendered back through NoteRenderService so code blocks colour like notes. */
+  quizOpenDocs = new Map<string, JSONContent>();
   /** True once the quiz is submitted and scored. */
   quizSubmitted = false;
   /** Score summary after evaluation. */
   quizScore: { score: string; percentage: number } | null = null;
   /** Per-question evaluation results, keyed by question id. */
   quizResults = new Map<string, QuizEvaluateResult>();
+  /** Wrong questions whose option list (key + text) is revealed in results. */
+  quizOptionsShown = new Set<string>();
+  /** Result rows expanded to show the full breakdown (collapsed by default). */
+  quizResultExpanded = new Set<string>();
   /** Quiz window position (px). null = centered default. */
   quizPos: { x: number; y: number } | null = null;
   private quizDrag: { sx: number; sy: number; ox: number; oy: number } | null =
@@ -2287,8 +2411,13 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   readonly quizCountOptions = [3, 5, 10, 15, 20];
   /** Optional free-text steer for the model. */
   quizPrompt = '';
+  /** Explain every option (why right/wrong) so the taker learns from mistakes. */
+  quizExplainOptions = false;
   /** Ask backend to avoid repeating questions from the existing quizzes. */
   quizAvoidExisting = false;
+  /** Build the quiz from the notes' general topics/tags rather than their literal
+   *  content. Backend does the extraction + caching + generation. */
+  quizExtractTopics = false;
   /** Quizzes already linked to the current note selection (reverse lookup). */
   existingQuizzes: QuizSummary[] = [];
   private existingQuizzesKey = '';
@@ -2322,25 +2451,35 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.quizTypeSelection.has(type);
   }
 
-  /** Reverse lookup: quizzes already built from the selected notes. */
+  /** Existing-quiz list is board-wide (no selection) rather than note-scoped. */
+  existingQuizzesUnscoped = false;
+
+  /** Quizzes built from the selected notes, or — with nothing selected — every
+   *  quiz on the board (so note-less quizzes stay reachable). */
   private async loadExistingQuizzes(): Promise<void> {
     const ids = this.selectedNotes.map((n) => n.serverId ?? n.id).sort();
-    const key = ids.join('|');
-    if (key === this.existingQuizzesKey) return; // unchanged selection
+    const boardId = this.selectedBoard?.id;
+    const unscoped = ids.length === 0;
+    const key = unscoped ? `board:${boardId ?? ''}` : ids.join('|');
+    if (key === this.existingQuizzesKey) return; // unchanged
     this.existingQuizzesKey = key;
-    if (!ids.length) {
+    if (unscoped && !boardId) {
       this.existingQuizzes = [];
       return;
     }
-    const res = await this.aiService.listQuizzes({
-      noteId: ids,
-      boardId: this.selectedBoard?.id,
-      limit: 20,
-    });
+    const res = await this.aiService.listQuizzes(
+      unscoped ? { boardId, limit: 20 } : { noteId: ids, boardId, limit: 20 },
+    );
     // Selection may have changed while awaiting — guard with the key.
     if (this.existingQuizzesKey !== key) return;
     this.existingQuizzes = res?.quizzes ?? [];
+    this.existingQuizzesUnscoped = unscoped;
     this.cdr.detectChanges();
+  }
+
+  /** Display name for a quiz row — falls back to a short id. */
+  quizDisplayName(qz: QuizSummary): string {
+    return qz.title?.trim() || `Quiz #${qz.id.slice(0, 8)}`;
   }
 
   /** Open a previously-generated quiz (taking mode). */
@@ -2353,12 +2492,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.quiz = full;
       this.quizIndex = 0;
       this.quizAnswers.clear();
+      this.quizOpenDocs.clear();
       this.quizResults.clear();
+      this.quizResultExpanded.clear();
       this.quizSubmitted = false;
       this.quizScore = null;
       this.quizPos = null;
       this.persistQuizState();
-      this.updateSelectionNavbar();
+      this.openChat();
+      this.aiTab = 'quiz';
     }
     this.cdr.detectChanges();
   }
@@ -2406,9 +2548,54 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     return this.quizResults.get(q.id);
   }
 
+  /** Per-option status in the results view. 'correct' = part of the answer key,
+   *  'wrong' = chosen but not in the key, '' = neither. */
+  quizOptionState(q: QuizQuestion, key: string): 'correct' | 'wrong' | '' {
+    const correct = this.quizResultFor(q)?.correctAnswer;
+    const inKey = Array.isArray(correct)
+      ? correct.includes(key)
+      : correct === key;
+    if (inKey) return 'correct';
+    return this.quizIsChosen(q, key) ? 'wrong' : '';
+  }
+
+  /** Closed questions whose options carry per-option explanations to show. */
+  quizHasOptionExplanations(q: QuizQuestion): boolean {
+    return !!q.options?.some((o) => !!o.explanation);
+  }
+
+  /** Toggle the revealed option list (key + text) for a wrong question. */
+  toggleQuizOptions(q: QuizQuestion): void {
+    if (this.quizOptionsShown.has(q.id)) this.quizOptionsShown.delete(q.id);
+    else this.quizOptionsShown.add(q.id);
+  }
+
+  /** Expand/collapse a result row (collapsed shows just question + score). */
+  toggleQuizResult(q: QuizQuestion): void {
+    if (this.quizResultExpanded.has(q.id)) this.quizResultExpanded.delete(q.id);
+    else this.quizResultExpanded.add(q.id);
+  }
+
+  /** Quiz built from extracted topics/tags only — no per-note attribution, so
+   *  the "From note" source links are hidden in results. */
+  get quizIsTopicQuiz(): boolean {
+    return !!this.quiz?.extractTopics;
+  }
+
   /** Render AI/user text (code blocks, inline code, bold/italic) to safe HTML. */
   aiHtml(text: string | null | undefined): SafeHtml {
     return this.aiText.render(text);
+  }
+
+  /** Source notes a question derives from that still exist on the board — used
+   *  for the "jump to note" link in results (replaces textual "the note says…"). */
+  quizSourceNotes(q: QuizQuestion): { id: string; label: string }[] {
+    const out: { id: string; label: string }[] = [];
+    for (const id of q.sourceNoteIds ?? []) {
+      const n = this.notes.find((x) => x.serverId === id || x.id === id);
+      if (n) out.push({ id, label: this.itemPreview(n) });
+    }
+    return out;
   }
 
   /** Render any correctAnswer value as readable text (results view). */
@@ -2515,9 +2702,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
    *  otherwise the default navbar. No-op while draw mode owns the navbar. */
   private updateSelectionNavbar(): void {
     if (this.drawMode) return;
-    if (this.quiz) {
-      this.navBarService.setTemplate(this.quizNavbarTemplate);
-    } else if (this.selectedNotes.length === this.selection.size && this.selection.size > 0) {
+    if (this.selectedNotes.length === this.selection.size && this.selection.size > 0) {
       this.navBarService.setTemplate(this.aiNavbarTemplate);
     } else if (this.selection.size) {
       this.navBarService.setTemplate(this.selectionNavbarTemplate);
@@ -2572,7 +2757,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.quiz = null;
     this.quizIndex = 0;
     this.quizAnswers.clear();
+    this.quizOpenDocs.clear();
     this.quizResults.clear();
+    this.quizOptionsShown.clear();
+    this.quizResultExpanded.clear();
     this.quizSubmitted = false;
     this.quizScore = null;
     this.quizPos = null;
@@ -2588,15 +2776,20 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         : this.quizTypeOptions.map((o) => o.type),
       count: this.quizCount,
       prompt: this.quizPrompt.trim() || undefined,
+      explainOptions: this.quizExplainOptions,
       avoidExisting: this.quizAvoidExisting && this.existingQuizzes.length > 0,
+      extractTopics: this.quizExtractTopics,
     };
     const res = await this.aiService.generateQuiz(req);
     this.aiLoading = false;
 
     if (res?.questions?.length) {
       this.quiz = res;
+      // Remember topics-mode locally so results hide per-note source links, even
+      // if the backend doesn't echo the flag on the response.
+      if (this.quizExtractTopics) this.quiz.extractTopics = true;
       this.persistQuizState();
-      this.updateSelectionNavbar();
+      this.aiTab = 'quiz';
       // A new quiz was persisted for this selection — refresh the linked list.
       if (res.id) {
         this.existingQuizzesKey = '';
@@ -2649,15 +2842,33 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   /** Open / free-text answer. */
-  quizSetText(value: string): void {
+  /** Store an OPEN answer edited in the rich-text editor: keep the rich doc and
+   *  mirror its plain text into quizAnswers (what gets graded / answered-checked). */
+  quizSetOpenDoc(doc: JSONContent): void {
     const q = this.quizCurrentQuestion;
     if (!q || this.quizSubmitted) return;
-    this.quizAnswers.set(q.id, value);
+    this.quizOpenDocs.set(q.id, doc);
+    this.quizAnswers.set(q.id, extractPlainText(doc).trim());
     this.persistQuizState();
+    // The editor's update fires from a ProseMirror DOM event that may land
+    // outside Angular's zone, so the answered-count / Submit button won't
+    // refresh on their own — drive change detection explicitly.
+    this.cdr.detectChanges();
+  }
+
+  /** Rendered "Your answer" for the results view. OPEN answers render through the
+   *  shared note renderer (colored code blocks); others fall back to AI markdown. */
+  quizAnswerHtml(q: QuizQuestion): SafeHtml {
+    const doc = this.quizOpenDocs.get(q.id);
+    if (q.type === 'OPEN' && doc) return this.noteRender.render(doc);
+    return this.aiText.render(
+      this.quizFormatAnswer(this.quizAnswerOf(q)) || '—',
+    );
   }
 
   async submitQuiz(): Promise<void> {
-    if (!this.quiz || !this.quizAllAnswered) return;
+    // Allow submitting with blanks — the user may simply not know some answers.
+    if (!this.quiz) return;
     this.aiLoading = true;
     this.cdr.detectChanges();
 
@@ -2675,23 +2886,106 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (res) {
       this.quizScore = { score: res.score, percentage: res.percentage };
       this.quizResults.clear();
-      for (const r of res.results) this.quizResults.set(r.questionId, r);
+      for (const r of res.results) {
+        this.quizResults.set(r.questionId, r);
+        // Evaluate carries per-option explanations on the result; mirror them
+        // onto the question options so the results view renders uniformly.
+        if (r.options?.length) this.mergeOptionExplanations(r.questionId, r.options);
+      }
       this.quizSubmitted = true;
       this.persistQuizState();
     }
     this.cdr.detectChanges();
   }
 
+  /** Question ids with an in-flight explain-options request. */
+  quizExplainLoading = new Set<string>();
+  /** True while the whole-quiz explain-options backfill is running. */
+  quizExplainAllLoading = false;
+
+  /** True once a closed question carries per-option explanations. */
+  quizQuestionExplained(q: QuizQuestion): boolean {
+    return !!q.options?.some((o) => !!o.explanation);
+  }
+
+  /** Closed question, answered wrong, still missing per-option explanations —
+   *  the only case where the on-demand "Explain" button is offered. */
+  quizCanExplain(q: QuizQuestion): boolean {
+    if (!this.quiz?.id) return false; // backfill needs a persisted quiz
+    if (!q.options?.length) return false; // closed questions only
+    if (this.quizResultFor(q)?.correct) return false;
+    return !this.quizQuestionExplained(q);
+  }
+
+  /** Any wrong closed question still lacking explanations → offer "Explain all". */
+  get quizCanExplainAll(): boolean {
+    return !!this.quiz?.id && this.quiz.questions.some((q) => this.quizCanExplain(q));
+  }
+
+  /** Copy per-option explanations onto a question's options, matched by key. */
+  private mergeOptionExplanations(questionId: string, options: QuizOption[]): void {
+    const q = this.quiz?.questions.find((x) => x.id === questionId);
+    if (!q?.options) return;
+    const byKey = new Map(options.map((o) => [o.key, o]));
+    q.options = q.options.map((o) => {
+      const src = byKey.get(o.key);
+      return src?.explanation ? { ...o, explanation: src.explanation } : o;
+    });
+  }
+
+  /** Generate per-option explanations for one wrong question (results view). */
+  async explainQuestionOptions(q: QuizQuestion): Promise<void> {
+    if (!this.quiz?.id || this.quizExplainLoading.has(q.id)) return;
+    this.quizExplainLoading.add(q.id);
+    this.cdr.detectChanges();
+    const res = await this.aiService.explainQuizQuestionOptions(this.quiz.id, q.id);
+    this.quizExplainLoading.delete(q.id);
+    if (res) this.applyRevealQuiz(res);
+    this.cdr.detectChanges();
+  }
+
+  /** Generate per-option explanations for every closed question at once. */
+  async explainAllOptions(): Promise<void> {
+    if (!this.quiz?.id || this.quizExplainAllLoading) return;
+    this.quizExplainAllLoading = true;
+    this.cdr.detectChanges();
+    const res = await this.aiService.explainQuizOptions(this.quiz.id);
+    this.quizExplainAllLoading = false;
+    if (res) this.applyRevealQuiz(res);
+    this.cdr.detectChanges();
+  }
+
+  /** Merge option explanations from a reveal-shape quiz into the active quiz. */
+  private applyRevealQuiz(reveal: Quiz): void {
+    if (!this.quiz) return;
+    for (const rq of reveal.questions) {
+      if (rq.options?.length) this.mergeOptionExplanations(rq.id, rq.options);
+    }
+    this.quiz.explainOptions = true;
+    this.persistQuizState();
+  }
+
   closeQuiz(): void {
+    const wasPopout = this.quizPopout;
     this.quiz = null;
     this.quizIndex = 0;
     this.quizAnswers.clear();
+    this.quizOpenDocs.clear();
     this.quizResults.clear();
+    this.quizOptionsShown.clear();
+    this.quizResultExpanded.clear();
     this.quizSubmitted = false;
     this.quizScore = null;
     this.quizPos = null;
+    this.quizPopout = false;
+    // Forget the floating-window geometry so the next quiz sizes to content.
+    this.quizPopoutSize = null;
     this.clearQuizState();
-    // Restore selection navbar
+    // Ending the quiz from the pop-out returns to the side panel (now empty).
+    if (wasPopout) {
+      this.openChat();
+      this.aiTab = 'quiz';
+    }
     this.updateSelectionNavbar();
     this.cdr.detectChanges();
   }
@@ -2700,9 +2994,9 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   /** Begin dragging the quiz window by its header. */
   quizDragStart(ev: MouseEvent): void {
-    if (ev.button !== 0) return;
-    // Ignore drags that start on the close button.
-    if ((ev.target as HTMLElement).closest('.quiz-card-close')) return;
+    if (ev.button !== 0 || !this.quizPopout) return;
+    // Ignore drags that start on a header button.
+    if ((ev.target as HTMLElement).closest('button')) return;
     const pos = this.quizPos ?? this.defaultQuizPos();
     this.quizPos = pos;
     this.quizDrag = { sx: ev.clientX, sy: ev.clientY, ox: pos.x, oy: pos.y };
@@ -2759,11 +3053,13 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const state = {
       quiz: this.quiz,
       answers: Array.from(this.quizAnswers.entries()),
+      openDocs: Array.from(this.quizOpenDocs.entries()),
       index: this.quizIndex,
       submitted: this.quizSubmitted,
       score: this.quizScore,
       results: Array.from(this.quizResults.entries()),
-      pos: this.quizPos,
+      // Pop-out window geometry is intentionally NOT persisted — short-lived,
+      // per-quiz only.
     };
     try {
       localStorage.setItem(key, JSON.stringify(state));
@@ -2788,12 +3084,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (!s?.quiz?.questions?.length) return;
       this.quiz = s.quiz;
       this.quizAnswers = new Map(s.answers ?? []);
+      this.quizOpenDocs = new Map(s.openDocs ?? []);
       this.quizResults = new Map(s.results ?? []);
       this.quizIndex = s.index ?? 0;
       this.quizSubmitted = !!s.submitted;
       this.quizScore = s.score ?? null;
-      this.quizPos = s.pos ?? null;
-      this.updateSelectionNavbar();
+      this.quizPos = null;
+      // Restore silently — the AI panel stays closed on reload; the quiz is
+      // waiting on the Quiz tab when the user opens the panel.
+      this.aiTab = 'quiz';
     } catch {
       /* corrupt state — ignore */
     }
@@ -2809,14 +3108,124 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   chatLoading = false;
   /** The full conversation (user + assistant turns, with proposed actions). */
   chatThread: ChatThreadEntry[] = [];
+  /** Assistant turns whose "Copy" button is briefly showing its done state. */
+  copiedMessages = new Set<ChatThreadEntry>();
   /** Maps a response's create_note tempIds → the freshly created note, so a
    *  sibling action in the same response can reference it. Reset per send. */
   private chatTempIdMap = new Map<string, BoardNote>();
+
+  /** Copy an assistant reply's raw markdown to the clipboard, with brief feedback. */
+  copyMessage(entry: ChatThreadEntry): void {
+    const text = entry.content ?? '';
+    if (!text || !navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(
+      () => {
+        this.copiedMessages.add(entry);
+        this.cdr.detectChanges();
+        setTimeout(() => {
+          this.copiedMessages.delete(entry);
+          this.cdr.detectChanges();
+        }, 1500);
+      },
+      () => {
+        /* clipboard blocked — nothing to do */
+      },
+    );
+  }
+
+  // ── Chat sessions ──────────────────────────────────────────────────────────
+  /** 'list' = all conversations; 'conversation' = a single open/new chat. */
+  chatView: 'list' | 'conversation' = 'list';
+  chatSessions: ChatSessionSummary[] = [];
+  chatSessionsLoading = false;
+  chatSessionLoading = false;
+  /** Active session id; null while a brand-new chat has no server record yet. */
+  chatSessionId: string | null = null;
+  chatSessionTitle = 'New chat';
+  private chatSessionsBoardId: string | null = null;
+
+  /** Load the session list for the current board (once, lazily). */
+  async loadChatSessions(force = false): Promise<void> {
+    if (!this.selectedBoard) return;
+    const loaded = this.chatSessionsBoardId === this.selectedBoard.id;
+    if (loaded && !force) return;
+    this.chatSessionsBoardId = this.selectedBoard.id;
+    this.chatSessionsLoading = true;
+    this.cdr.detectChanges();
+    const res = await this.aiService.listChatSessions(this.selectedBoard.id);
+    this.chatSessions = res?.sessions ?? [];
+    this.chatSessionsLoading = false;
+    this.cdr.detectChanges();
+  }
+
+  /** Start a fresh conversation (persisted on the first send). */
+  newChat(): void {
+    this.chatSessionId = null;
+    this.chatSessionTitle = 'New chat';
+    this.chatThread = [];
+    this.chatSelectedText = '';
+    this.chatView = 'conversation';
+    this.cdr.detectChanges();
+    setTimeout(() =>
+      (document.querySelector('.ai-chat-input') as HTMLTextAreaElement | null)?.focus(),
+    );
+  }
+
+  /** Back to the conversation list. */
+  exitToChatList(): void {
+    this.chatView = 'list';
+    this.loadChatSessions(true);
+    this.cdr.detectChanges();
+  }
+
+  /** Open a saved conversation — messages are fetched lazily here. */
+  async openChatSession(summary: ChatSessionSummary): Promise<void> {
+    this.chatSessionLoading = true;
+    this.chatView = 'conversation';
+    this.chatSessionId = summary.id;
+    this.chatSessionTitle = summary.title;
+    this.chatThread = [];
+    this.cdr.detectChanges();
+    const full = await this.aiService.getChatSession(summary.id);
+    this.chatSessionLoading = false;
+    if (full) {
+      this.chatSessionTitle = full.title;
+      this.chatThread = full.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        actions: (m.actions ?? []).map((sa) => ({
+          action: sa.action,
+          status: sa.status,
+          // From history: can re-apply/reject a pending one, but can't revert an
+          // applied edit (the pre-edit body isn't restored across reloads).
+          historical: true,
+        })),
+      }));
+    }
+    this.cdr.detectChanges();
+    this.scrollChatToBottom();
+  }
+
+  /** Delete a saved conversation. */
+  async deleteChatSession(summary: ChatSessionSummary, ev: MouseEvent): Promise<void> {
+    ev.stopPropagation();
+    const ok = await this.aiService.deleteChatSession(summary.id);
+    if (!ok) return;
+    this.chatSessions = this.chatSessions.filter((s) => s.id !== summary.id);
+    // If the open conversation was deleted, fall back to the list.
+    if (this.chatSessionId === summary.id) {
+      this.chatSessionId = null;
+      this.chatThread = [];
+      this.chatView = 'list';
+    }
+    this.cdr.detectChanges();
+  }
 
   toggleChat(): void {
     this.chatOpen = !this.chatOpen;
     this.cdr.detectChanges();
     if (this.chatOpen) {
+      if (this.aiTab === 'chat') this.loadChatSessions();
       setTimeout(() =>
         (document.querySelector('.ai-chat-input') as HTMLTextAreaElement | null)?.focus(),
       );
@@ -2833,9 +3242,323 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.cdr.detectChanges();
   }
 
+  // ── AI panel tabs (Chat / Quiz / Fact check) ──────────────────────────────
+  /** Active tab in the AI side panel. */
+  aiTab: 'chat' | 'quiz' | 'factcheck' = 'chat';
+
+  // ── AI panel width (drag-to-resize the left edge) ─────────────────────────
+  private readonly AI_PANEL_WIDTH_KEY = 'ai-panel-width';
+  private readonly AI_PANEL_MIN = 300;
+  aiPanelWidth = this.loadAiPanelWidth();
+  private aiResizeStart: { sx: number; ow: number } | null = null;
+
+  private loadAiPanelWidth(): number {
+    const v = Number(localStorage.getItem('ai-panel-width'));
+    return v >= 300 && v <= 900 ? v : 380;
+  }
+
+  private get aiPanelMax(): number {
+    return Math.max(this.AI_PANEL_MIN, Math.round(window.innerWidth * 0.9));
+  }
+
+  aiResizeDown(ev: MouseEvent): void {
+    if (ev.button !== 0) return;
+    ev.preventDefault();
+    this.aiResizeStart = { sx: ev.clientX, ow: this.aiPanelWidth };
+    window.addEventListener('mousemove', this.onAiResizeMove);
+    window.addEventListener('mouseup', this.onAiResizeEnd);
+  }
+
+  private onAiResizeMove = (ev: MouseEvent): void => {
+    if (!this.aiResizeStart) return;
+    // Panel is anchored right — dragging left (negative dx) widens it.
+    const w = this.aiResizeStart.ow + (this.aiResizeStart.sx - ev.clientX);
+    this.aiPanelWidth = Math.min(Math.max(this.AI_PANEL_MIN, w), this.aiPanelMax);
+    this.cdr.detectChanges();
+  };
+
+  private onAiResizeEnd = (): void => {
+    this.aiResizeStart = null;
+    window.removeEventListener('mousemove', this.onAiResizeMove);
+    window.removeEventListener('mouseup', this.onAiResizeEnd);
+    localStorage.setItem(this.AI_PANEL_WIDTH_KEY, String(this.aiPanelWidth));
+  };
+
+  // ── Quiz pop-out window ────────────────────────────────────────────────────
+  /** Quiz detached into a floating, board-non-blocking window. */
+  quizPopout = false;
+  /** Last manual size, in-memory only — re-applied when the SAME quiz is popped
+   *  out again. null ⇒ size to content. Reset when the quiz closes. */
+  quizPopoutSize: { w: number; h: number } | null = null;
+
+  private readonly QUIZ_POPUP_MIN_W = 360;
+  private readonly QUIZ_POPUP_MIN_H = 240;
+
+  /** Default window size — bounded to the viewport. */
+  private defaultQuizSize(): { w: number; h: number } {
+    return {
+      w: Math.min(680, Math.round(window.innerWidth * 0.9)),
+      h: Math.min(620, Math.round(window.innerHeight * 0.85)),
+    };
+  }
+
+  /** Detach the quiz into a floating window; close the side panel. */
+  openQuizPopout(): void {
+    this.quizPopout = true;
+    this.chatOpen = false;
+    if (!this.quizPopoutSize) this.quizPopoutSize = this.defaultQuizSize();
+    if (!this.quizPos) {
+      this.quizPos = {
+        x: Math.max(8, Math.round((window.innerWidth - this.quizPopoutSize.w) / 2)),
+        y: Math.max(8, Math.round((window.innerHeight - this.quizPopoutSize.h) / 2)),
+      };
+    }
+    this.cdr.detectChanges();
+  }
+
+  /** Re-dock the quiz; size is kept in memory for a re-open. */
+  dockQuizToSide(): void {
+    this.quizPopout = false;
+    this.openChat();
+    this.aiTab = 'quiz';
+    this.cdr.detectChanges();
+  }
+
+  // ── Pop-out resize (all 8 edges/corners, like a note) ─────────────────────
+  private quizResize: {
+    dir: string;
+    sx: number;
+    sy: number;
+    ow: number;
+    oh: number;
+    ox: number;
+    oy: number;
+  } | null = null;
+
+  quizResizeStart(ev: MouseEvent, dir: string): void {
+    if (ev.button !== 0 || !this.quizPopoutSize || !this.quizPos) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    this.quizResize = {
+      dir,
+      sx: ev.clientX,
+      sy: ev.clientY,
+      ow: this.quizPopoutSize.w,
+      oh: this.quizPopoutSize.h,
+      ox: this.quizPos.x,
+      oy: this.quizPos.y,
+    };
+    window.addEventListener('mousemove', this.onQuizResizeMove);
+    window.addEventListener('mouseup', this.onQuizResizeEnd);
+  }
+
+  private onQuizResizeMove = (ev: MouseEvent): void => {
+    const r = this.quizResize;
+    if (!r) return;
+    let w = r.ow;
+    let h = r.oh;
+    let x = r.ox;
+    let y = r.oy;
+    const dx = ev.clientX - r.sx;
+    const dy = ev.clientY - r.sy;
+    if (r.dir.includes('e')) w = r.ow + dx;
+    if (r.dir.includes('s')) h = r.oh + dy;
+    if (r.dir.includes('w')) {
+      w = r.ow - dx;
+      x = r.ox + dx;
+    }
+    if (r.dir.includes('n')) {
+      h = r.oh - dy;
+      y = r.oy + dy;
+    }
+    // Enforce minimums while keeping the dragged edge anchored.
+    if (w < this.QUIZ_POPUP_MIN_W) {
+      if (r.dir.includes('w')) x -= this.QUIZ_POPUP_MIN_W - w;
+      w = this.QUIZ_POPUP_MIN_W;
+    }
+    if (h < this.QUIZ_POPUP_MIN_H) {
+      if (r.dir.includes('n')) y -= this.QUIZ_POPUP_MIN_H - h;
+      h = this.QUIZ_POPUP_MIN_H;
+    }
+    w = Math.min(w, window.innerWidth - 16);
+    h = Math.min(h, window.innerHeight - 16);
+    x = Math.min(Math.max(0, x), window.innerWidth - w);
+    y = Math.min(Math.max(0, y), window.innerHeight - h);
+    this.quizPopoutSize = { w: Math.round(w), h: Math.round(h) };
+    this.quizPos = { x: Math.round(x), y: Math.round(y) };
+    this.cdr.detectChanges();
+  };
+
+  private onQuizResizeEnd = (): void => {
+    this.quizResize = null;
+    window.removeEventListener('mousemove', this.onQuizResizeMove);
+    window.removeEventListener('mouseup', this.onQuizResizeEnd);
+  };
+
+  setAiTab(tab: 'chat' | 'quiz' | 'factcheck'): void {
+    this.aiTab = tab;
+    if (tab === 'quiz') this.loadExistingQuizzes();
+    if (tab === 'chat') this.loadChatSessions();
+    this.cdr.detectChanges();
+  }
+
+  /** A quiz is loaded (taking or results) — the quiz tab shows it, not the form. */
+  get quizActive(): boolean {
+    return !!this.quiz;
+  }
+
+  /** Bottom input row is hidden while a quiz is being taken/reviewed (its own
+   *  nav drives it) — shown for chat, quiz generation, and fact check. */
+  get showAiInput(): boolean {
+    if (this.aiTab === 'quiz') return !this.quizActive;
+    if (this.aiTab === 'chat') return this.chatView === 'conversation';
+    return true;
+  }
+
+  /** Fact check needs no free text — disable the box, keep the Send button. */
+  get aiInputDisabled(): boolean {
+    if (this.aiTab === 'factcheck') return true;
+    return this.aiTab === 'chat' ? this.chatLoading : this.aiLoading;
+  }
+
+  get aiInputPlaceholder(): string {
+    switch (this.aiTab) {
+      case 'quiz':
+        return 'Custom prompt (optional) — focus, difficulty, exam style…';
+      case 'factcheck':
+        return 'Fact check runs on the selected notes — press Check';
+      default:
+        return 'Ask the assistant…  (Enter to send)';
+    }
+  }
+
+  get aiSendLabel(): string {
+    switch (this.aiTab) {
+      case 'quiz':
+        return 'Generate';
+      case 'factcheck':
+        return 'Check';
+      default:
+        return 'Send';
+    }
+  }
+
+  get aiSendDisabled(): boolean {
+    if (this.aiLoading || this.chatLoading) return true;
+    switch (this.aiTab) {
+      case 'quiz':
+        return !this.canGenerateQuiz;
+      case 'factcheck':
+        return !this.canFactCheck;
+      default:
+        // Chat: prompt is enough — no note selection required.
+        return !this.chatInput.trim() || !this.selectedBoard;
+    }
+  }
+
+  /** Single entry point for the shared Send button — routes by active tab. */
+  async aiSend(): Promise<void> {
+    if (this.aiSendDisabled) return;
+    switch (this.aiTab) {
+      case 'quiz':
+        this.quizPrompt = this.chatInput.trim();
+        await this.startQuiz();
+        break;
+      case 'factcheck':
+        await this.runFactCheck();
+        break;
+      default:
+        await this.sendChat();
+    }
+  }
+
   /** Notes currently attached as context (chips above the input). */
   get chatContextNotes(): BoardNote[] {
     return this.selectedNotes;
+  }
+
+  /** Text the user highlighted inside an element — attached to the next message. */
+  chatSelectedText = '';
+
+  /** True when there is anything to show in the context strip. */
+  get hasChatContext(): boolean {
+    return this.chatContextNotes.length > 0 || !!this.chatSelectedText;
+  }
+
+  /** Capture a highlighted selection inside a board element so it can ride along
+   *  as focused context. Ignores selections in the chat input itself. */
+  @HostListener('document:mouseup')
+  @HostListener('document:keyup')
+  captureChatSelection(): void {
+    const sel = window.getSelection();
+    const text = sel?.toString().trim() ?? '';
+    if (!text) return; // empty selection (e.g. a plain click) — keep last capture
+    const anchor = sel?.anchorNode as Node | null;
+    const host =
+      anchor instanceof Element ? anchor : anchor?.parentElement ?? null;
+    // Capture selections made inside a board element, not the UI chrome — done
+    // regardless of whether the chat panel is open, so "select then open chat"
+    // still has the highlighted text waiting as context.
+    if (host?.closest('.board-note, .board-item, .ProseMirror')) {
+      this.chatSelectedText = text.slice(0, 4000);
+      this.cdr.detectChanges();
+    }
+  }
+
+  clearChatSelectedText(): void {
+    this.chatSelectedText = '';
+    this.cdr.detectChanges();
+  }
+
+  /** Keep a note's text selection alive when interacting with the AI panel.
+   *  A mousedown on non-input chrome would otherwise move focus and collapse the
+   *  selection; preventing the default keeps the highlight (click still fires).
+   *  Inputs/textareas are exempt so the user can focus and type. */
+  /** Copy a code block rendered into AI text (chat / quiz). The buttons live in
+   *  sanitized innerHTML, so they're handled by delegation instead of bindings. */
+  @HostListener('click', ['$event'])
+  onAiCodeCopyClick(ev: MouseEvent): void {
+    const btn = (ev.target as HTMLElement | null)?.closest?.(
+      '.ai-code-copy',
+    ) as HTMLElement | null;
+    if (!btn) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    const code = btn.closest('.ai-code-wrap')?.querySelector('pre code');
+    const text = code?.textContent ?? '';
+    if (!text || !navigator.clipboard) return;
+    navigator.clipboard.writeText(text).then(
+      () => {
+        btn.classList.add('is-copied');
+        btn.textContent = '✓ Copied';
+        setTimeout(() => {
+          btn.classList.remove('is-copied');
+          btn.textContent = 'Copy';
+        }, 1500);
+      },
+      () => {},
+    );
+  }
+
+  /** User-configurable base font size for notes (Options popup). */
+  get defaultNoteFontSize(): number {
+    return this.editorPrefs.defaultNoteFontSize;
+  }
+  setDefaultNoteFontSize(v: number | string): void {
+    const px = typeof v === 'number' ? v : parseInt(v, 10);
+    if (Number.isFinite(px) && px > 0) {
+      this.editorPrefs.defaultNoteFontSize = px;
+      this.cdr.detectChanges();
+    }
+  }
+
+  preserveSelectionMousedown(ev: MouseEvent): void {
+    const t = ev.target as HTMLElement | null;
+    // Only guard the drag chrome (header bar / resize handle): a mousedown there
+    // would move focus and collapse the note's selection, so keep it alive.
+    // Everything else in the panel — chat replies, quiz text, titles, hints,
+    // form fields — stays selectable. Buttons still fire (click is unaffected).
+    if (t?.closest('.ai-chat-header, .ai-resize-handle')) ev.preventDefault();
   }
 
   /** Build the enriched selection context (notes only, with geometry). */
@@ -2851,11 +3574,30 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }));
   }
 
-  async sendChat(): Promise<void> {
+  /** In-flight chat request, so it can be cancelled. */
+  private chatSub: Subscription | null = null;
+
+  get chatBusy(): boolean {
+    return !!this.chatSub;
+  }
+
+  sendChat(): void {
     const text = this.chatInput.trim();
     if (!text || this.chatLoading || !this.selectedBoard) return;
 
-    this.chatThread.push({ role: 'user', content: text });
+    // Snapshot the context attached to this turn so it stays visible in history.
+    const ctxNotes = this.chatContextNotes.map((n) => ({
+      id: n.serverId ?? n.id,
+      label: this.itemPreview(n),
+    }));
+    const ctxText = this.chatSelectedText || undefined;
+
+    this.chatThread.push({
+      role: 'user',
+      content: text,
+      context:
+        ctxNotes.length || ctxText ? { notes: ctxNotes, text: ctxText } : undefined,
+    });
     this.chatInput = '';
     this.chatLoading = true;
     this.cdr.detectChanges();
@@ -2867,25 +3609,59 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }));
 
     this.chatTempIdMap.clear();
-    const res = await this.aiService.chat({
-      boardId: this.selectedBoard.id,
-      messages,
-      selection: this.buildChatSelection(),
-    });
-    this.chatLoading = false;
+    this.chatSub = this.aiService
+      .chat$({
+        boardId: this.selectedBoard.id,
+        messages,
+        selection: this.buildChatSelection(),
+        selectedText: this.chatSelectedText || undefined,
+        sessionId: this.chatSessionId,
+      })
+      .subscribe((res) => {
+        this.chatSub = null;
+        this.chatLoading = false;
+        this.chatSelectedText = '';
 
-    if (res) {
-      this.chatThread.push({
-        role: 'assistant',
-        content: res.message,
-        actions: (res.actions ?? []).map((action) => ({
-          action,
-          status: 'pending' as const,
-        })),
+        if (res) {
+          this.chatThread.push({
+            role: 'assistant',
+            content: res.message,
+            actions: (res.actions ?? []).map((action) => ({
+              action,
+              status: 'pending' as const,
+            })),
+          });
+          if (res.sessionId) {
+            const isNew = this.chatSessionId !== res.sessionId;
+            this.chatSessionId = res.sessionId;
+            if (res.title) this.chatSessionTitle = res.title;
+            if (isNew) this.loadChatSessions(true);
+          }
+        }
+        this.cdr.detectChanges();
+        this.scrollChatToBottom();
       });
+  }
+
+  /** Jump the camera to a note referenced in the chat history. */
+  centerOnReferencedNote(id: string): void {
+    const note = this.resolveNote(id);
+    if (note) this.mainBoardService.centerOnItem(note);
+  }
+
+  /** Abort the in-flight chat request (unsubscribe cancels the HTTP call).
+   *  Drops the unanswered user turn and restores it to the input for a retry. */
+  cancelChat(): void {
+    if (!this.chatSub) return;
+    this.chatSub.unsubscribe();
+    this.chatSub = null;
+    this.chatLoading = false;
+    const last = this.chatThread[this.chatThread.length - 1];
+    if (last?.role === 'user') {
+      this.chatThread.pop();
+      this.chatInput = last.content;
     }
     this.cdr.detectChanges();
-    this.scrollChatToBottom();
   }
 
   private scrollChatToBottom(): void {
@@ -2997,24 +3773,46 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
 
     pa.status = 'applied';
+    this.persistActionStatus(pa);
     this.cdr.detectChanges();
   }
 
   rejectAction(pa: ProposedAction): void {
     if (pa.status !== 'pending') return;
     pa.status = 'rejected';
+    this.persistActionStatus(pa);
     this.cdr.detectChanges();
   }
 
   /** Revert an applied `update_note` (not tracked by the board undo stack). */
   revertAction(pa: ProposedAction): void {
-    if (pa.status !== 'applied') return;
+    if (pa.status !== 'applied' || pa.historical) return;
     const a = pa.action;
     if (a.type === 'update_note' && pa.prevContent !== undefined) {
       const note = this.resolveNote(a.id);
       if (note) note.content = pa.prevContent;
       pa.status = 'pending';
+      this.persistActionStatus(pa);
       this.cdr.detectChanges();
+    }
+  }
+
+  /** Push an action's resolution to the server so it survives a reload. */
+  private persistActionStatus(pa: ProposedAction): void {
+    if (!this.chatSessionId) return;
+    for (let m = 0; m < this.chatThread.length; m++) {
+      const acts = this.chatThread[m].actions;
+      if (!acts) continue;
+      const a = acts.indexOf(pa);
+      if (a >= 0) {
+        this.aiService.updateChatActionStatus(
+          this.chatSessionId,
+          m,
+          a,
+          pa.status,
+        );
+        return;
+      }
     }
   }
 

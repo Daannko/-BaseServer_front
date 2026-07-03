@@ -1,0 +1,107 @@
+<div class="dbg" *ngIf="debug.overlayVisible">
+  <div class="dbg-head">
+    <span class="dbg-title">PERF</span>
+    <button class="dbg-hide" type="button" (click)="hide()" title="Hide overlay">×</button>
+  </div>
+
+  <div class="dbg-row">
+    <span class="dbg-label">FPS</span>
+    <span class="dbg-val" #fpsEl>–</span>
+  </div>
+  <div class="dbg-row">
+    <span class="dbg-label">Frame</span>
+    <span class="dbg-val" #frameEl>–</span>
+  </div>
+  <div class="dbg-row">
+    <span class="dbg-label">Board CD</span>
+    <span class="dbg-val" #cdBoardEl>–</span>
+  </div>
+  <div class="dbg-row">
+    <span class="dbg-label">Notes CD</span>
+    <span class="dbg-val" #cdNotesEl>–</span>
+  </div>
+  <div class="dbg-row">
+    <span class="dbg-label">Live notes</span>
+    <span class="dbg-val" #liveEl>–</span>
+  </div>
+  <div class="dbg-row dbg-row--warn">
+    <span class="dbg-label">Mounts</span>
+    <span class="dbg-val" #mountEl>–</span>
+  </div>
+  <div class="dbg-row dbg-row--warn">
+    <span class="dbg-label">Destroys</span>
+    <span class="dbg-val" #destroyEl>–</span>
+  </div>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
+      [checked]="debug.panGpuLayer"
+      (change)="debug.setLive('panGpuLayer', $any($event.target).checked)"
+    />
+    <span>GPU layer during pan</span>
+  </label>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
+      [checked]="debug.freezeGridOnPan"
+      (change)="debug.setLive('freezeGridOnPan', $any($event.target).checked)"
+    />
+    <span>Freeze grid while panning</span>
+  </label>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
+      [checked]="debug.renderBareSquares"
+      (change)="debug.setRenderBareSquares($any($event.target).checked)"
+    />
+    <span>Square mode (shell, no text — reloads)</span>
+  </label>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
+      [checked]="debug.disableRadius"
+      (change)="debug.setLive('disableRadius', $any($event.target).checked)"
+    />
+    <span>Disable border-radius</span>
+  </label>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
+      [checked]="debug.disableDashedBorder"
+      (change)="debug.setLive('disableDashedBorder', $any($event.target).checked)"
+    />
+    <span>Solid borders (no dashed)</span>
+  </label>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
+      [checked]="debug.stripNoteChrome"
+      (change)="debug.setLive('stripNoteChrome', $any($event.target).checked)"
+    />
+    <span>Strip fill/border (keep DOM)</span>
+  </label>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
+      [checked]="debug.renderFlatSquares"
+      (change)="debug.setRenderFlatSquares($any($event.target).checked)"
+    />
+    <span>Flat squares (paint floor — reloads)</span>
+  </label>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
+      [checked]="debug.disableEditor"
+      (change)="toggleEditor($event)"
+    />
+    <span>Disable text editor (reloads)</span>
+  </label>
+</div>

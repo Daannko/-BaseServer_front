@@ -10,6 +10,7 @@ import {
   TemplateRef,
   HostListener,
   HostBinding,
+  ChangeDetectorRef,
 } from '@angular/core';
 import { BoardItem } from '../board-item/board-item.data';
 import { BoardNote, NoteOptions, DEFAULT_NOTE_OPTIONS } from './board-note.data';
@@ -26,6 +27,11 @@ import { BoardMainService } from '../board-main.service';
 import { BoardSnapService } from '../board-snap.service';
 import { BoardHistoryService } from '../board-history.service';
 import { BoardSelectionService } from '../board-selection.service';
+import { EditorPrefsService } from '../board-editor-prefs.service';
+import { BoardDebugService } from '../board-debug.service';
+import { extractPlainText } from '../../../helpers/rich-text.util';
+import { NoteRenderService } from './note-render.service';
+import type { SafeHtml } from '@angular/platform-browser';
 
 @Component({
   selector: 'app-board-note',
@@ -87,11 +93,6 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     return String(this.zoom);
   }
 
-  // Frozen at note creation (see BoardNote.fontSize); resizing won't rescale it.
-  @HostBinding('style.--note-font-size') get noteFontSize() {
-    return `${(this.tile as BoardNote).fontSize ?? 42}px`;
-  }
-
   @HostBinding('style.--note-pad-v') get notePadV() {
     return `${this.noteOptions.padding ?? 0}px`;
   }
@@ -103,7 +104,29 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
    *  an aligned neighbour is squared off so touching items read as one block;
    *  every free corner keeps the normal radius. Recomputed live, so it updates
    *  while dragging/snapping. */
+  // Cache for noteRadius: this getter is bound in the template and scans every
+  // board element, so without a cache it costs O(N) per note per CD pass —
+  // O(N²) board-wide every frame during pan/zoom. The corner-squaring only
+  // depends on element geometry, so we recompute only when the board's
+  // geometryVersion changes or this note's own rect moves.
+  private radiusCache = '';
+  private radiusVer = -1;
+  private radiusSig = '';
+
   get noteRadius(): string {
+    const a = this.tile;
+    if (!a) return '0px';
+    const sig = `${a.x},${a.y},${a.width},${a.height}`;
+    if (this.radiusVer === this.main.geometryVersion && this.radiusSig === sig) {
+      return this.radiusCache;
+    }
+    this.radiusVer = this.main.geometryVersion;
+    this.radiusSig = sig;
+    this.radiusCache = this.computeNoteRadius();
+    return this.radiusCache;
+  }
+
+  private computeNoteRadius(): string {
     const a = this.tile;
     const R = (a?.width ?? 0) * 0.02;
     if (!a) return `${R}px`;
@@ -211,10 +234,13 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
 
   /** Clear = no background, no border color, no text. Gets a visible outline so it stays findable. */
   get isClear(): boolean {
+    const empty = this.isEditing
+      ? (this.tiptap.contentEditor?.isEmpty ?? true)
+      : this.plainText.trim() === '';
     return (
       this.noteBgColor === null &&
       this.noteBorderColor === null &&
-      (this.tiptap.contentEditor?.isEmpty ?? true)
+      empty
     );
   }
 
@@ -237,7 +263,49 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     private snap: BoardSnapService,
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
+    public debug: BoardDebugService,
+    private noteRender: NoteRenderService,
+    private editorPrefs: EditorPrefsService,
+    private cdr: ChangeDetectorRef,
   ) {}
+
+  /** Base font size for text with no explicit size mark — the user-configurable
+   *  default (Options popup). Explicit per-run fontSize marks still override it. */
+  @HostBinding('style.--note-font-size') get noteBaseFontSize() {
+    return `${this.editorPrefs.defaultNoteFontSize}px`;
+  }
+
+  /** True while a live tiptap editor is mounted on this note (i.e. it's being
+   *  edited). Unfocused notes render static HTML instead — see renderedHtml. */
+  isEditing = false;
+
+  /** Static rendered HTML of the note content, identical to the editor. Memoized
+   *  by content reference so it only re-renders when the content actually
+   *  changes (the getter is bound in the template). */
+  private _htmlCache: SafeHtml = '';
+  private _htmlSrc: unknown = undefined;
+  get renderedHtml(): SafeHtml {
+    const doc = (this.tile as BoardNote).content;
+    if (this._htmlSrc === doc) return this._htmlCache;
+    this._htmlSrc = doc;
+    this._htmlCache = this.noteRender.render(doc);
+    return this._htmlCache;
+  }
+
+  /** Plain-text fallback shown when the rich-text editor is disabled for
+   *  performance debugging. Derived from the note's content document.
+   *  Memoized by content reference — the getter is bound in the template, so
+   *  without the cache extractPlainText() would re-traverse the whole doc on
+   *  every change-detection pass (96× per tick during pan). */
+  private _plainTextCache = '';
+  private _plainTextSrc: unknown = undefined;
+  get plainText(): string {
+    const doc = (this.tile as BoardNote).content;
+    if (this._plainTextSrc === doc) return this._plainTextCache;
+    this._plainTextSrc = doc;
+    this._plainTextCache = extractPlainText(doc as any);
+    return this._plainTextCache;
+  }
 
   // Rect snapshot at the start of a move/resize gesture, for history.
   private gestureBefore: { x: number; y: number; width: number; height: number } | null = null;
@@ -250,9 +318,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   clearSelectionHighlight() { this.tiptap.clearSelectionHighlight(); }
 
   focus() {
-    this.isFocused = true;
-    this.tile.forceToRender = true;
-    this.tiptap.contentEditor?.commands.focus('end');
+    this.enterEditMode();
   }
 
   @HostListener('document:mousedown', ['$event'])
@@ -283,6 +349,12 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
         selection.removeAllRanges();
       }
       this.tiptap.clearSelectionHighlight();
+      // Clicking anywhere outside this note (and not on its toolbar) ends
+      // editing: save the content and tear down the live editor back to static.
+      if (this.isEditing && !this.tiptap.hasActiveSelection) {
+        this.exitEditMode();
+        return;
+      }
     }
     if (!this.isDraggingTile && !this.tiptap.hasActiveSelection) {
       this.tile.forceToRender = false;
@@ -290,10 +362,105 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   }
 
   ngAfterViewInit() {
+    this.debug.tickMount();
+    // No editor is created up front: unfocused notes render static HTML
+    // (see renderedHtml / template). A live editor is mounted only on demand in
+    // enterEditMode() — so the board holds at most one contentEditable at a time
+    // instead of one per note.
+  }
+
+  /** Click on the static note body: follow a board-link, else enter edit mode. */
+  onStaticClick(e: MouseEvent): void {
+    const path = (e.composedPath?.() ?? []) as EventTarget[];
+    const linkEl = path.find(
+      (p): p is HTMLElement =>
+        p instanceof HTMLElement && p.hasAttribute('data-board-link'),
+    );
+    const targetId = linkEl?.getAttribute('data-board-link');
+    if (targetId) {
+      e.preventDefault();
+      this.main.navigateToLink(targetId);
+      return;
+    }
+    this.enterEditMode(e);
+  }
+
+  /** Mount a live tiptap editor on this note and focus it. No-op if already
+   *  editing or if a perf-debug flag disables editors. `event` is the click that
+   *  opened the editor, so the caret can land where the user clicked. */
+  enterEditMode(event?: MouseEvent): void {
+    if (this.isEditing) return;
+    if (
+      this.debug.renderFlatSquares ||
+      this.debug.renderBareSquares ||
+      this.debug.disableEditor
+    )
+      return;
+
+    this.isEditing = true;
+    this.isFocused = true;
+    this.tile.forceToRender = true;
+    // Render the editor host element (*ngIf="isEditing") before mounting.
+    this.cdr.detectChanges();
+    this.setupEditor();
+
+    // Focus WITHOUT scrolling. The note/board are clipped (overflow: clip) so
+    // they aren't scroll containers, but scrollIntoView:false also stops
+    // ProseMirror from trying to reveal the caret — which otherwise scrolled an
+    // ancestor and shifted the whole board (camera drift, notes culling out).
+    const ed = this.tiptap.contentEditor;
+    if (ed) {
+      const coords = event
+        ? ed.view.posAtCoords({ left: event.clientX, top: event.clientY })
+        : null;
+      if (coords) {
+        ed.chain().setTextSelection(coords.pos).focus(undefined, { scrollIntoView: false }).run();
+      } else {
+        ed.chain().focus('end', { scrollIntoView: false }).run();
+      }
+    }
+    this.requestNavbar(this.navbarContentTemplate);
+  }
+
+  /** Save content, tear down the live editor, and fall back to static HTML. */
+  exitEditMode(): void {
+    if (!this.isEditing) return;
+    const ed = this.tiptap.contentEditor;
+    // Only write back when the doc actually changed during this edit session.
+    // getJSON() always returns a fresh object, so an unconditional assign would
+    // trip the reference-equality content setter and mark the note dirty on
+    // every click-away — re-saving notes that were never edited. Compare against
+    // the snapshot taken at edit start (same editor → same normalization).
+    if (ed && JSON.stringify(ed.getJSON()) !== this.editInitialJson) {
+      this.tile.content = ed.getJSON();
+    }
+    this.editInitialJson = null;
+    this.removeDocumentMouseUp?.();
+    this.removeDocumentMouseUp = undefined;
+    this.resizeObserver?.disconnect();
+    this.resizeObserver = undefined;
+    this.tiptap.destroyEditors();
+    this.isEditing = false;
+    this.isFocused = false;
+    this._htmlSrc = undefined; // force a fresh static render of the new content
+    if (!this.navbarPinned) this.tile.forceToRender = false;
+    this.cdr.detectChanges();
+  }
+
+  /** Wire the live editor + its DOM listeners. Runs only while editing, so the
+   *  content host (#contentElement) exists. */
+  /** Doc JSON snapshot taken when editing starts, so exitEditMode can tell
+   *  whether the content actually changed (vs. a no-op focus/blur). */
+  private editInitialJson: string | null = null;
+
+  private setupEditor(): void {
     this.tiptap.initEditors({
       tile: this.tile,
       contentElement: this.contentElement.nativeElement,
     });
+    this.editInitialJson = JSON.stringify(
+      this.tiptap.contentEditor?.getJSON() ?? null,
+    );
 
     const contentRoot = this.contentElement.nativeElement as HTMLElement;
     contentRoot.addEventListener('click', (e: MouseEvent) => {
@@ -360,6 +527,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     const s = this.snap.snapResize(r, prev, this.tile.id);
     this.tile.x = s.x; this.tile.y = s.y;
     this.tile.width = s.width; this.tile.height = s.height;
+    this.main.bumpGeometry();
   }
 
   onTileWorldPosChange(p: Position) {
@@ -368,15 +536,19 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
         this.selection.items,
         p.x - this.tile.x,
         p.y - this.tile.y,
+        p.lockedAxis,
       );
-      this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy);
+      this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy, p.lockedAxis);
+      this.main.bumpGeometry();
       return;
     }
     const s = this.snap.snapMove(
       { x: p.x, y: p.y, width: this.tile.width, height: this.tile.height },
       this.tile.id,
+      p.lockedAxis,
     );
     this.tile.x = s.x; this.tile.y = s.y;
+    this.main.bumpGeometry();
   }
 
   onDeleteClick(event: MouseEvent) {
@@ -408,6 +580,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   private removeDocumentMouseUp?: () => void;
 
   ngOnDestroy() {
+    this.debug.tickDestroy();
     clearTimeout(this.deleteConfirmTimeout);
     this.removeDocumentMouseUp?.();
     this.resizeObserver?.disconnect();
@@ -423,12 +596,14 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
 
   onMoveStart() {
     this.selection.beginGroupMove(this.tile);
+    this.main.beginElementDrag([this.tile.id]);
     this.isDraggingTile = true;
     this.tile.forceToRender = true;
     this.gestureBefore = this.rectSnapshot();
   }
   onMoveEnd() {
     const wasGroup = this.selection.isGroupMoving(this.tile);
+    this.main.endElementDrag();
     this.isDraggingTile = false;
     if (!this.navbarPinned) this.tile.forceToRender = false;
     this.snap.clearGuides();

@@ -4,23 +4,6 @@
   pointer-events: none;
 }
 
-.connector-wave {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  overflow: visible;
-  pointer-events: none;
-}
-
-.connector-wave-path {
-  fill: rgba(180, 180, 180, 0.18);
-  stroke: none;
-  cursor: crosshair;
-  pointer-events: none;
-  opacity: 0;
-}
-
 .board-item {
   position: absolute;
   left: 0;
@@ -43,6 +26,32 @@
 // Rich-text toolbar (navbar template) chrome, also shared with board-section:
 @import '../board-item/toolbar';
 
+// @PERF_DEBUG: strip rounded-corner clip to measure its paint cost. Remove block.
+.board-item.dbg-no-radius {
+  border-radius: 0 !important;
+}
+.note-surface.dbg-no-radius {
+  border-radius: 0 !important;
+  overflow: visible !important;
+}
+// @PERF_DEBUG: force dashed is-clear borders to solid to measure dash paint cost.
+.note-surface.dbg-solid-border {
+  border-style: solid !important;
+}
+// @PERF_DEBUG: strip fill/border/shadow (keep DOM) to split paint vs DOM-depth.
+.note-surface.dbg-strip-chrome {
+  background: transparent !important;
+  border-color: transparent !important;
+  box-shadow: none !important;
+}
+// @PERF_DEBUG flat-square baseline: a single flat fill, nothing else.
+.note-flat {
+  width: 100%;
+  height: 100%;
+  background: rgba(120, 140, 200, 0.25);
+  pointer-events: auto;
+}
+
 .note-surface {
   position: relative;
   box-sizing: border-box;
@@ -52,7 +61,9 @@
   border: var(--note-border-width, 1px) solid var(--note-border-color, transparent);
   background: transparent;
   cursor: grab;
-  overflow: hidden;
+  // clip (not hidden): clips identically but is NOT a scroll container, so
+  // focusing the editor can't scroll it and shift the board.
+  overflow: clip;
   transition:
     border-color 120ms ease-out,
     box-shadow 120ms ease-out;
@@ -91,7 +102,7 @@
   height: 100%;
   box-sizing: border-box;
   padding: var(--note-pad-v) var(--note-pad-h);
-  overflow: hidden;
+  overflow: clip;
   display: flex;
   min-height: 0;
   cursor: text;
@@ -151,17 +162,49 @@
   }
 }
 
+// Perf-debug plain-text fallback (rich-text editor disabled): render the note's
+// text statically with the same base font size, no ProseMirror.
+.content-editor.is-static {
+  flex: 1 1 auto;
+  overflow: clip;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 6px 6px 0 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: var(--note-font-size, 25px);
+  line-height: 1.1;
+  cursor: default;
+}
+
 ::ng-deep .content-editor {
   flex: 1 1 auto;
-  // Clip overflow instead of scrolling — text past the note's bounds is simply
-  // not shown and can't be scrolled to.
-  overflow: hidden;
+  // clip (not hidden): text past the note's bounds is clipped and the element
+  // is NOT a scroll container — so focusing the caret can't scroll it (which
+  // jumped the cursor to the bottom and cut the top/bottom of overflowing text).
+  // Overflow is anchored to the TOP: bottom is simply clipped.
+  overflow: clip;
   height: 100%;
   box-sizing: border-box;
   padding-right: 6px;
   cursor: text;
   padding-top: 6px;
   line-height: 1;
+
+  // Lists: nudge in from the left so the marker (•, 1.) isn't clipped against
+  // the note's left edge.
+  .tiptap ul,
+  .tiptap ol,
+  .ProseMirror ul,
+  .ProseMirror ol {
+    margin: 0 0 4px;
+    padding-left: 1.5em;
+  }
+  .tiptap li,
+  .ProseMirror li {
+    margin: 0;
+    p { margin: 0 !important; }
+  }
 
   .tiptap p,
   .ProseMirror p {
@@ -173,14 +216,12 @@
     -moz-tab-size: 4;
   }
 
-  // Base font-size for text that carries no explicit fontSize mark — fresh
-  // empty notes and any other untagged run. Driven by --note-font-size, set at
-  // creation from the user's last-used size (BoardNote.fontSize / EditorPrefs),
-  // not the note's dimensions. Explicit per-run fontSize marks still override
-  // this, and the editor seeds the caret with the last-used size on empty.
+  // Base font-size for text that carries no explicit fontSize mark. A plain
+  // static default — explicit per-run fontSize marks (from the size picker)
+  // still override it.
   .tiptap,
   .ProseMirror {
-    font-size: var(--note-font-size, 14px);
+    font-size: var(--note-font-size, 25px);
   }
 
   :global(.ProseMirror),
@@ -201,11 +242,10 @@
       line-height: 1.35;
     }
 
-    // Empty paragraphs: use the note base size so the caret & placeholder
-    // are proportionally scaled. Once text is typed the explicit fontSize
-    // marks take over.
+    // Empty paragraphs: caret & placeholder use the base size. Once text is
+    // typed, explicit fontSize marks take over.
     p.is-editor-empty::before {
-      font-size: var(--note-font-size, 21px);
+      font-size: var(--note-font-size, 25px);
     }
 
     p { line-height: inherit; }
@@ -261,40 +301,7 @@
       font-size: 1em;
       line-height: 1.5;
     }
-
-    // lowlight / highlight.js token colors (dark theme tuned to the code bg).
-    .hljs-comment,
-    .hljs-quote { color: #7c8593; font-style: italic; }
-    .hljs-keyword,
-    .hljs-selector-tag,
-    .hljs-built_in,
-    .hljs-name,
-    .hljs-tag { color: #c792ea; }
-    .hljs-string,
-    .hljs-title,
-    .hljs-section,
-    .hljs-attribute,
-    .hljs-literal,
-    .hljs-template-tag,
-    .hljs-template-variable,
-    .hljs-type,
-    .hljs-addition { color: #c3e88d; }
-    .hljs-deletion,
-    .hljs-selector-attr,
-    .hljs-selector-pseudo,
-    .hljs-meta { color: #f78c6c; }
-    .hljs-doctag { color: #7c8593; }
-    .hljs-attr { color: #ffcb6b; }
-    .hljs-symbol,
-    .hljs-bullet,
-    .hljs-link { color: #89ddff; }
-    .hljs-number,
-    .hljs-variable,
-    .hljs-regexp { color: #f78c6c; }
-    .hljs-function .hljs-title,
-    .hljs-class .hljs-title { color: #82aaff; }
-    .hljs-emphasis { font-style: italic; }
-    .hljs-strong { font-weight: bold; }
+    // hljs token colors come from the shared global rules in styles.scss.
   }
 
   table {

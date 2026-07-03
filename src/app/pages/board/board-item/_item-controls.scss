@@ -17,19 +17,20 @@
   left: 0;
   right: 0;
   height: var(--ctrl-size);
-  display: flex;
+  // Hidden via display:none, NOT opacity:0 — an opacity:0 element still paints
+  // every frame (here: a controls bar on all 96 notes during pan). display:none
+  // removes it from paint/layout until the note is actually focused.
+  display: none;
   align-items: center;
   background: transparent;
   border: 1px solid transparent;
   border-bottom: none;
   border-radius: calc(var(--tile-w) * 0.02) calc(var(--tile-w) * 0.02) 0 0;
   pointer-events: none;
-  opacity: 0;
-  transition: opacity 120ms ease-out;
 
   &.is-visible {
+    display: flex;
     pointer-events: auto;
-    opacity: 1;
   }
 
   &::after {
@@ -108,7 +109,11 @@
   // max-content: size purely from the (--s scaled) content so the panel
   // keeps the same proportions at any tile size.
   width: max-content;
-  display: flex;
+  // Hidden via display:none, NOT opacity:0. This panel carries a
+  // backdrop-filter: blur(10px) — the single most expensive paint here — and an
+  // opacity:0 element still pays for it. At display:none it costs nothing until
+  // the gear is actually clicked open.
+  display: none;
   flex-direction: column;
   gap: 0;
   padding: calc(var(--s) * 0.01) 0;
@@ -119,16 +124,12 @@
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   pointer-events: none;
-  opacity: 0;
-  transform: translateX(6px);
-  transition: opacity 120ms ease-out, transform 120ms ease-out;
   z-index: 5;
   white-space: nowrap;
 
   &.is-open {
+    display: flex;
     pointer-events: auto;
-    opacity: 1;
-    transform: translateX(0);
   }
 }
 

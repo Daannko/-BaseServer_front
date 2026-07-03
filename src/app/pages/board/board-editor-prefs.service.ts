@@ -14,7 +14,36 @@ export class EditorPrefsService {
   /** Fallback before the user has set any size (matches the old base note size). */
   static readonly DEFAULT_FONT_SIZE = 25;
 
+  private static readonly DEFAULT_KEY = 'board.editor.defaultNoteFontSize';
+
   private _lastFontSize = this.load();
+  private _defaultNoteFontSize = this.loadDefault();
+
+  /** Base font size (px) for a note's text that carries no explicit size mark —
+   *  i.e. new notes / fresh lines. User-configurable (Options popup). */
+  get defaultNoteFontSize(): number {
+    return this._defaultNoteFontSize;
+  }
+
+  set defaultNoteFontSize(px: number) {
+    if (!Number.isFinite(px) || px <= 0) return;
+    this._defaultNoteFontSize = Math.round(px);
+    try {
+      localStorage.setItem(
+        EditorPrefsService.DEFAULT_KEY,
+        String(this._defaultNoteFontSize),
+      );
+    } catch {}
+  }
+
+  private loadDefault(): number {
+    try {
+      const raw = localStorage.getItem(EditorPrefsService.DEFAULT_KEY);
+      const px = raw ? parseInt(raw, 10) : NaN;
+      if (Number.isFinite(px) && px > 0) return px;
+    } catch {}
+    return EditorPrefsService.DEFAULT_FONT_SIZE;
+  }
 
   /** Last font size (px) applied by the user, anywhere. */
   get lastFontSize(): number {

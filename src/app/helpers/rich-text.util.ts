@@ -23,7 +23,10 @@ export function docFromText(text: string): JSONContent {
   };
 }
 
-export function docFromTextWithFontSize(text: string, fontSize: number): JSONContent {
+export function docFromTextWithFontSize(
+  text: string,
+  fontSize: number,
+): JSONContent {
   const safeText = String(text ?? '').trim();
   const sizeStr = `${Math.round(fontSize)}px`;
   const textStyleMark = { type: 'textStyle', attrs: { fontSize: sizeStr } };
