@@ -91,6 +91,10 @@ export class BoardMainService {
     if (!isFinite(nextZoom) || nextZoom <= 0) return;
     this._zoom = Math.max(0.01, Math.min(100, nextZoom));
     this.zoomSubject.next(this._zoom);
+    // Programmatic jumps (centerOnItem, board load) must drop a layer kept by
+    // the low-zoom freeze, or the board stays composited from a stale bitmap
+    // (visibly blurry when the jump scales it up).
+    this.syncViewportLayer();
   }
 
   /** Clamp + write zoom WITHOUT emitting. Returns the CLAMPED value — callers
@@ -134,6 +138,19 @@ export class BoardMainService {
   geometryVersion = 0;
   bumpGeometry(): void {
     this.geometryVersion++;
+    this.itemsChangedSubject.next();
+  }
+
+  // Element components are OnPush: they re-render on their OWN template events
+  // (their move/resize/click handlers mark them dirty automatically), but data
+  // mutated from OUTSIDE that path — group moves touching peer tiles, undo/
+  // redo, AI content edits, editor-prefs changes — updates no binding on its
+  // own. Every such path must call notifyItemsChanged(); components subscribe
+  // and markForCheck so the next change-detection pass refreshes them.
+  private readonly itemsChangedSubject = new Subject<void>();
+  readonly itemsChanged$ = this.itemsChangedSubject.asObservable();
+  notifyItemsChanged(): void {
+    this.itemsChangedSubject.next();
   }
 
   // Cached board viewport size in screen px. Reading offsetWidth/offsetHeight
@@ -188,6 +205,9 @@ export class BoardMainService {
       options.cameraY ?? this.cameraY,
     );
     this.onBackgroundMouseDown = options.onBackgroundMouseDown ?? null;
+    // Apply the layer policy from the start (permanent GPU layer / low-zoom
+    // freeze) so the first gesture doesn't begin with a promote-pop.
+    this.syncViewportLayer();
   }
 
   updateBoard() {
@@ -275,12 +295,12 @@ export class BoardMainService {
   }
   private endPanGesture() {
     if (!this.viewportRef) return;
-    const viewport = this.viewportRef.nativeElement as HTMLElement;
-    // Keep the layer briefly so a pan→pan sequence doesn't thrash the layer.
+    // Keep the layer briefly so a pan→pan sequence doesn't thrash the layer;
+    // syncViewportLayer keeps it entirely while below SHARP_TEXT_MIN_ZOOM.
     if (this.panSettleTimer !== null) clearTimeout(this.panSettleTimer);
     this.panSettleTimer = setTimeout(() => {
       this.panSettleTimer = null;
-      viewport.style.willChange = 'auto';
+      this.syncViewportLayer();
     }, 300);
   }
 
@@ -306,17 +326,68 @@ export class BoardMainService {
     );
   }
 
-  /** Gesture settled: emit the real zoom + camera so notes re-render sharp at the
-   *  final scale and re-cull, then drop the layer (frees VRAM, composites sharp). */
+  /** Below this zoom the viewport KEEPS its compositor layer after a zoom
+   *  settles: the browser goes on compositing the cached bitmap (scaled — soft
+   *  when upscaled, near-identical when downscaled) instead of re-rasterizing
+   *  every note's text sharp. Text at this scale is barely legible anyway, and
+   *  skipping the sharp re-render removes the settle hitch when zoomed far
+   *  out. Crossing back above the threshold drops the layer → one sharp
+   *  re-raster. Default note font (25px) is ~7px on screen here — tune to
+   *  taste. */
+  private static readonly SHARP_TEXT_MIN_ZOOM = 0.3;
+
+  /** Keep or drop the viewport's compositor layer. Called whenever a gesture
+   *  settles or the zoom is set programmatically — never mid-gesture (gestures
+   *  always promote). The layer is KEPT when either:
+   *  - debug.permanentGpuLayer (default): demoting re-rasterizes all text and
+   *    flips its antialiasing — the visible "font refresh" after every
+   *    interaction. Keeping the layer keeps rendering identical over time.
+   *  - zoom < SHARP_TEXT_MIN_ZOOM: far-out freeze on the scaled bitmap. */
+  private syncViewportLayer(): void {
+    if (!this.viewportRef) return;
+    const keep =
+      this.debug.permanentGpuLayer ||
+      this._zoom < BoardMainService.SHARP_TEXT_MIN_ZOOM;
+    (this.viewportRef.nativeElement as HTMLElement).style.willChange = keep
+      ? 'transform'
+      : 'auto';
+  }
+
+  /** Gesture settled: emit the real zoom + camera so app state (culling, drag
+   *  math, overlays) is exact, then drop the layer for a sharp re-render —
+   *  unless we're below SHARP_TEXT_MIN_ZOOM, where the scaled bitmap stays. */
   private commitZoom(): void {
     this.zoomSettleTimer = null;
     this.zoomSubject.next(this._zoom);
     this.cameraSubject.next({ x: this._camX, y: this._camY });
-    if (this.viewportRef) {
-      (this.viewportRef.nativeElement as HTMLElement).style.willChange = 'auto';
-    }
+    this.syncViewportLayer();
   }
 
+  // ── Two-tier culling ───────────────────────────────────────────────────────
+  // Tier 1 (inView, small margins): the component is DISPLAYED. Crossing this
+  // boundary is a display:none flip on an already-built component — near free.
+  // Tier 2 (mounted, wide margins): the component EXISTS in the DOM (hidden
+  // when not inView). Only crossing THIS boundary pays Angular component
+  // creation/destruction, and it happens far offscreen. Both tiers use
+  // enter/exit hysteresis so boundary jitter can't thrash state.
+
+  /** Display an element while within this fraction of a viewport outside the
+   *  visible area… */
+  private static readonly VIEW_MARGIN_IN = 0.15;
+  /** …and hide it again only past this one. */
+  private static readonly VIEW_MARGIN_OUT = 0.35;
+  /** Create the (hidden) component this far out — creation cost is paid while
+   *  the element is nowhere near the screen. */
+  private static readonly MOUNT_MARGIN_IN = 1.0;
+  /** Destroy it only beyond this — bounds DOM/memory growth on big boards
+   *  while keeping recently-visited areas warm. Hidden components cost no
+   *  layout/paint (display:none), but they DO run template bindings on every
+   *  change-detection pass — keep this moderate. */
+  private static readonly MOUNT_MARGIN_OUT = 2.0;
+
+  /** Recomputes item.inView and item.mounted; returns whether the component
+   *  should exist in the DOM (bound to *ngIf in the layer templates; the
+   *  display toggle binds item.inView directly). */
   isItemVisible(item: BoardItem): boolean {
     if (!this.boardRef) return true;
     // Use cached viewport size — never touch offsetWidth/offsetHeight here, or
@@ -325,23 +396,40 @@ export class BoardMainService {
     const viewW = this.vpW / this.zoom;
     const viewH = this.vpH / this.zoom;
 
-    const left = item.x;
-    const top = item.y;
-    const right = item.x + item.width;
-    const bottom = item.y + item.height;
+    item.inView = this.withinMargin(
+      item,
+      viewW,
+      viewH,
+      item.inView ? BoardMainService.VIEW_MARGIN_OUT : BoardMainService.VIEW_MARGIN_IN,
+    );
+    item.mounted =
+      item.inView ||
+      this.withinMargin(
+        item,
+        viewW,
+        viewH,
+        item.mounted ? BoardMainService.MOUNT_MARGIN_OUT : BoardMainService.MOUNT_MARGIN_IN,
+      );
 
-    const viewLeft = this.cameraX;
-    const viewTop = this.cameraY;
-    const viewRight = this.cameraX + viewW;
-    const viewBottom = this.cameraY + viewH;
+    return item.forceToRender || item.mounted;
+  }
 
-    item.inView =
-      right > viewLeft &&
-      left < viewRight &&
-      bottom > viewTop &&
-      top < viewBottom;
-
-    return item.forceToRender || item.inView;
+  /** True when the item's rect intersects the viewport expanded by `margin`
+   *  viewports on every side (world coordinates). */
+  private withinMargin(
+    item: BoardItem,
+    viewW: number,
+    viewH: number,
+    margin: number,
+  ): boolean {
+    const mx = viewW * margin;
+    const my = viewH * margin;
+    return (
+      item.x + item.width > this.cameraX - mx &&
+      item.x < this.cameraX + viewW + mx &&
+      item.y + item.height > this.cameraY - my &&
+      item.y < this.cameraY + viewH + my
+    );
   }
 
   /** Resolve an element by its board-link targetId. Matches serverId first

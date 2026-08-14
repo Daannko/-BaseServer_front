@@ -1,4 +1,5 @@
 import {
+  ChangeDetectionStrategy,
   Component,
   ElementRef,
   Input,
@@ -12,6 +13,7 @@ import {
   HostBinding,
   ChangeDetectorRef,
 } from '@angular/core';
+import { merge, Subscription } from 'rxjs';
 import { BoardItem } from '../board-item/board-item.data';
 import { BoardNote, NoteOptions, DEFAULT_NOTE_OPTIONS } from './board-note.data';
 import { CommonModule } from '@angular/common';
@@ -48,6 +50,11 @@ import type { SafeHtml } from '@angular/platform-browser';
   providers: [TiptapService],
   templateUrl: './board-note.component.html',
   styleUrl: './board-note.component.scss',
+  // OnPush: this component re-renders only when its own template/host events
+  // fire, its inputs change, or it's explicitly marked. External mutations
+  // (group moves, undo, AI edits) flow through main.itemsChanged$ /
+  // selection.changed$ → markForCheck (see constructor).
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BoardNoteComponent implements OnDestroy, AfterViewInit {
   @Input() tile!: BoardItem;
@@ -267,7 +274,17 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     private noteRender: NoteRenderService,
     private editorPrefs: EditorPrefsService,
     private cdr: ChangeDetectorRef,
-  ) {}
+  ) {
+    // OnPush escape hatch: peer-driven changes (another element's drag moving
+    // this note in a group / squaring its corners, undo/redo, AI content
+    // edits, selection changes) don't touch this component's inputs or events.
+    this.externalChanges = merge(
+      this.main.itemsChanged$,
+      this.selection.changed$,
+    ).subscribe(() => this.cdr.markForCheck());
+  }
+
+  private externalChanges: Subscription;
 
   /** Base font size for text with no explicit size mark — the user-configurable
    *  default (Options popup). Explicit per-run fontSize marks still override it. */
@@ -581,6 +598,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
 
   ngOnDestroy() {
     this.debug.tickDestroy();
+    this.externalChanges.unsubscribe();
     clearTimeout(this.deleteConfirmTimeout);
     this.removeDocumentMouseUp?.();
     this.resizeObserver?.disconnect();

@@ -106,6 +106,13 @@
   display: flex;
   min-height: 0;
   cursor: text;
+  // Browser-native culling of the note INTERNALS: offscreen note bodies skip
+  // style/layout/paint of their (potentially large) rich-text DOM. Safe here
+  // because .note-body is sized by the note (height: 100%), so skipping its
+  // contents can't shift layout. Deliberately NOT on .board-item / :host —
+  // content-visibility implies paint containment, which would clip the
+  // controls bar and options panel that overhang the note's box.
+  content-visibility: auto;
 }
 
 ::ng-deep .content-editor .ProseMirror p.is-editor-empty:first-child::before {

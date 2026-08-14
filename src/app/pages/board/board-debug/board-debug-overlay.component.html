@@ -45,6 +45,15 @@
   <label class="dbg-toggle">
     <input
       type="checkbox"
+      [checked]="debug.permanentGpuLayer"
+      (change)="debug.setLive('permanentGpuLayer', $any($event.target).checked)"
+    />
+    <span>Permanent GPU layer (no text re-render pops)</span>
+  </label>
+
+  <label class="dbg-toggle">
+    <input
+      type="checkbox"
       [checked]="debug.freezeGridOnPan"
       (change)="debug.setLive('freezeGridOnPan', $any($event.target).checked)"
     />

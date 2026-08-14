@@ -1,4 +1,6 @@
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
@@ -9,6 +11,7 @@ import {
   Output,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { merge, Subscription } from 'rxjs';
 import { BoardDrawing, SubStroke } from '../board-draw.data';
 import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
 import { BoardSnapService } from '../board-snap.service';
@@ -29,6 +32,9 @@ import { SvgIconComponent } from '../../../helpers/svg-icon/svg-icon.component';
   imports: [CommonModule, ItemMoveDirective, SvgIconComponent],
   templateUrl: './board-drawing.component.html',
   styleUrl: './board-drawing.component.scss',
+  // OnPush — external mutations arrive via main.itemsChanged$ /
+  // selection.changed$ → markForCheck (see constructor).
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BoardDrawingComponent implements OnDestroy {
   @Input() tile!: BoardDrawing;
@@ -58,13 +64,22 @@ export class BoardDrawingComponent implements OnDestroy {
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
     private main: BoardMainService,
-  ) {}
+    private cdr: ChangeDetectorRef,
+  ) {
+    this.externalChanges = merge(
+      this.main.itemsChanged$,
+      this.selection.changed$,
+    ).subscribe(() => this.cdr.markForCheck());
+  }
+
+  private externalChanges: Subscription;
 
   private rectSnapshot() {
     return { x: this.tile.x, y: this.tile.y, width: this.tile.width, height: this.tile.height };
   }
 
   ngOnDestroy() {
+    this.externalChanges.unsubscribe();
     clearTimeout(this.deleteConfirmTimeout);
   }
 
@@ -101,6 +116,7 @@ export class BoardDrawingComponent implements OnDestroy {
         p.lockedAxis,
       );
       this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy, p.lockedAxis);
+      this.main.bumpGeometry();
       return;
     }
     const s = this.snap.snapMove(
@@ -109,6 +125,7 @@ export class BoardDrawingComponent implements OnDestroy {
       p.lockedAxis,
     );
     this.tile.x = s.x; this.tile.y = s.y;
+    this.main.bumpGeometry();
   }
 
   onMoveStart() {

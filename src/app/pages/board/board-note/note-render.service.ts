@@ -1,6 +1,7 @@
 import { Injectable } from '@angular/core';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
-import { generateHTML, JSONContent } from '@tiptap/core';
+import { getSchema, JSONContent } from '@tiptap/core';
+import { DOMSerializer, Node as PMNode, Schema } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import { Code } from '@tiptap/extension-code';
 import { Table } from '@tiptap/extension-table';
@@ -49,25 +50,67 @@ export class NoteRenderService {
     BoardLink,
   ];
 
+  // Schema + serializer are built ONCE. generateHTML() would rebuild the whole
+  // schema from the extension list on every call — a measurable cost paid per
+  // note as it scrolls into view.
+  private readonly schema: Schema = getSchema(this.extensions as any);
+  private readonly serializer = DOMSerializer.fromSchema(this.schema);
+
+  // Rendered-HTML cache keyed by the content document's object identity. Lives
+  // on the (root-provided) service, so it survives note components being
+  // destroyed/recreated by viewport culling — re-entering the viewport is a
+  // cache hit instead of a full re-render. Content edits always assign a fresh
+  // doc object (editor.getJSON()), which naturally invalidates the entry.
+  private readonly cache = new WeakMap<object, SafeHtml>();
+
   constructor(private sanitizer: DomSanitizer) {}
 
   /** Render note content to sanitized SafeHtml, identical to the editor. */
   render(content: unknown): SafeHtml {
+    const cacheable = typeof content === 'object' && content !== null;
+    if (cacheable) {
+      const hit = this.cache.get(content as object);
+      if (hit !== undefined) return hit;
+    }
+
     const doc = getDoc(content);
-    let html: string;
+    let html = '';
     try {
-      html = generateHTML(doc, this.extensions as any);
+      html = this.toHtml(doc);
     } catch {
       html = '';
     }
     html = this.postProcess(html);
-    return this.sanitizer.bypassSecurityTrustHtml(this.sanitize(html));
+    const safe = this.sanitizer.bypassSecurityTrustHtml(this.sanitize(html));
+    if (cacheable) this.cache.set(content as object, safe);
+    return safe;
   }
+
+  /** JSON doc → HTML string via the cached schema/serializer (what
+   *  generateHTML() does internally, minus the per-call schema build). */
+  private toHtml(doc: JSONContent): string {
+    const node = PMNode.fromJSON(this.schema, doc);
+    const fragment = this.serializer.serializeFragment(node.content);
+    const div = document.createElement('div');
+    div.appendChild(fragment);
+    return div.innerHTML;
+  }
+
+  /** Matches paragraphs that would collapse to zero height: empty, or holding
+   *  only whitespace / zero-width spaces / empty styled spans. Deliberately
+   *  broad — a false positive just runs the (correct) DOM pass. */
+  private static readonly EMPTY_P_RE =
+    /<p[^>]*>(?:\s|​|<span[^>]*>|<\/span>)*<\/p>/;
 
   /** Single DOM pass over the generated HTML: keep empty paragraphs visible
    *  (blank lines) and re-apply code syntax colors. */
   private postProcess(html: string): string {
     if (!html) return html;
+    // The DOM pass only ever changes empty paragraphs and <pre> code blocks.
+    // Most notes have neither — skip the DOMParser round-trip for those.
+    if (!html.includes('<pre') && !NoteRenderService.EMPTY_P_RE.test(html)) {
+      return html;
+    }
     const doc = new DOMParser().parseFromString(`<body>${html}</body>`, 'text/html');
 
     // Empty paragraphs collapse to zero height as <p></p>; the editor keeps them

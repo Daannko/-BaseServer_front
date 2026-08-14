@@ -51,6 +51,7 @@ import { QuizAnswerEditorComponent } from './quiz-answer-editor/quiz-answer-edit
 import type { SafeHtml } from '@angular/platform-browser';
 import { BoardLinkService } from './board-link.service';
 import { BoardPersistenceService } from './board-persistence.service';
+import { SecureStorageService } from '../../service/secure-storage.service';
 import { EditorPrefsService } from './board-editor-prefs.service';
 import { BoardDebugService } from './board-debug.service';
 import { BoardDebugOverlayComponent } from './board-debug/board-debug-overlay.component';
@@ -244,16 +245,22 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   private lastWorldX = 0;
   private lastWorldY = 0;
   private zCounter = 1;
-  private sectionZCounter = 1;
 
   bringToFront(tile: BoardItem) {
     tile.zIndex = ++this.zCounter;
   }
 
-  // Sections stack among themselves; the sections layer always renders
-  // below the notes layer, so they can never cover a note.
-  bringSectionToFront(section: BoardItem) {
-    section.zIndex = ++this.sectionZCounter;
+  /** Sections stack among themselves (their layer always renders below the
+   *  notes layer) and their order is purely area-based: smaller sections sit
+   *  above bigger ones. Each section host is its own stacking context, so if a
+   *  bigger section ever stacked above one nested inside it, the outer frame
+   *  would swallow every click meant for the inner section — no CSS inside the
+   *  component can win that. Never hand-raise a section's zIndex. */
+  private restackSections(): void {
+    const byAreaDesc = [...this.sections].sort(
+      (a, b) => b.width * b.height - a.width * a.height,
+    );
+    byAreaDesc.forEach((s, i) => (s.zIndex = i + 1));
   }
 
   private buildDefaultNavbarContext() {
@@ -363,6 +370,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     private noteRender: NoteRenderService,
     private linkService: BoardLinkService,
     private persistence: BoardPersistenceService,
+    private secureStorage: SecureStorageService,
     private editorPrefs: EditorPrefsService,
     public debug: BoardDebugService,
     private router: Router,
@@ -371,7 +379,12 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.snapGuides$ = this.snapService.guides$;
     this.aspectGuide$ = this.snapService.aspectGuide$;
     this.dragging$ = this.mainBoardService.dragging$;
-    this.history.onChange = () => this.cdr.detectChanges();
+    // Undo/redo mutates arbitrary tiles directly — mark the (OnPush) element
+    // components before refreshing, or the change stays invisible.
+    this.history.onChange = () => {
+      this.mainBoardService.notifyItemsChanged();
+      this.cdr.detectChanges();
+    };
 
     // Wire serializable history callbacks
     this.history.getItemById = (id: string) => this.itemByIdMap(id);
@@ -502,7 +515,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       } else if (src instanceof BoardSection) {
         copy = src.clone(dx, dy);
         this.sections.push(copy as BoardSection);
-        this.bringSectionToFront(copy);
+        this.restackSections();
       } else if (src instanceof BoardImage) {
         copy = src.clone(dx, dy);
         this.images.push(copy as BoardImage);
@@ -723,6 +736,11 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       const board = await this.boardSearchService.getBoard(id);
       this.selectedBoard = board;
 
+      // Don't let camera emissions during load clobber the saved view before
+      // it's re-applied below.
+      this.viewStateReady = false;
+      const savedView = this.loadViewState(board.id);
+
       const defaultNavbarContext = this.buildDefaultNavbarContext();
 
       // Drop history from previous board, then reset local state
@@ -736,6 +754,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       for (const section of elements.sections) {
         this.addBoardSection(section);
       }
+      this.restackSections();
       for (const image of elements.images) {
         this.addBoardImage(image);
       }
@@ -747,10 +766,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       this.history.restore();
 
       // Offer to recover any local changes that never reached the DB.
-      this.maybeOfferRestore(board.id);
+      await this.maybeOfferRestore(board.id);
 
       // Restore an in-progress quiz (answers survive a page refresh).
-      this.restoreQuizState();
+      await this.restoreQuizState();
+
+      // Pre-render every note's static HTML into the NoteRenderService cache
+      // during idle time, so the first pan over any area hits warm cache
+      // instead of paying generateHTML + sanitize per note as it appears.
+      this.warmRenderCache();
 
       await Promise.resolve();
       this.cdr.detectChanges();
@@ -778,12 +802,49 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.defaultNavbarTemplate,
         defaultNavbarContext,
       );
-      if (this.notes.length > 0) {
+      if (savedView) {
+        // Return to where the user left off (this session only).
+        this.mainBoardService.setZoom(savedView.zoom);
+        this.mainBoardService.setCamera(savedView.x, savedView.y);
+        this.mainBoardService.updateBoard();
+      } else if (this.notes.length > 0) {
         this.mainBoardService.centerOnItem(this.notes[0]);
       }
+      this.viewStateReady = true;
+      this.saveViewState();
     } catch (e) {
       console.error('Failed to load board', e);
     }
+  }
+
+  /** Invalidates an in-flight warm-up when the board changes / page closes. */
+  private warmRenderToken = 0;
+
+  /** Walk all notes through NoteRenderService.render() in idle-time chunks.
+   *  Populates the service's content-keyed cache; notes scrolling into view
+   *  later get a cache hit instead of a cold render. Never blocks: runs in
+   *  requestIdleCallback slices (setTimeout fallback), yielding whenever the
+   *  frame budget runs out. */
+  private warmRenderCache(): void {
+    const token = ++this.warmRenderToken;
+    const queue = this.notes.slice();
+    const schedule: (cb: (d?: IdleDeadline) => void) => unknown =
+      typeof requestIdleCallback === 'function'
+        ? (cb) => requestIdleCallback(cb, { timeout: 2000 })
+        : (cb) => setTimeout(() => cb(), 50);
+    const step = (deadline?: IdleDeadline) => {
+      if (token !== this.warmRenderToken) return; // board changed — abandon
+      let done = 0;
+      while (
+        queue.length &&
+        (deadline ? deadline.timeRemaining() > 3 : done < 5)
+      ) {
+        this.noteRender.render(queue.shift()!.content);
+        done++;
+      }
+      if (queue.length) schedule(step);
+    };
+    schedule(step);
   }
 
   filteredBoards(boards: any[] | null | undefined): any[] {
@@ -803,6 +864,11 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       ? this.mainBoardService.isItemVisible(item)
       : false;
   }
+
+  /** trackBy for the element layers — keeps components alive when an array is
+   *  replaced wholesale (load, restore, AI actions), instead of destroying and
+   *  recreating every on-screen element. */
+  trackById = (_: number, item: BoardItem): string => item.id;
 
   /** Outlines of every on-screen element not currently being dragged. */
   peerOutlines(): Array<{ x: number; y: number; width: number; height: number }> {
@@ -1106,7 +1172,6 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     if (result.kind === 'note') {
       this.mainBoardService.moveToItem(result.item);
     } else {
-      this.bringSectionToFront(result.item);
       result.item.forceToRender = true;
       this.mainBoardService.centerOnItem(result.item);
       Promise.resolve().then(() => (result.item.forceToRender = false));
@@ -1123,11 +1188,18 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   ngOnInit() {
+    // Any geometry change (create, move, resize, undo/redo) may nest a section
+    // inside another — keep the smaller-above-bigger stacking rule enforced.
+    this.mainBoardService.itemsChanged$
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(() => this.restackSections());
+
     this.mainBoardService.zoom$
       .pipe(takeUntil(this.destroy$))
       .subscribe((z) => {
         this.zoom = z;
         this.showCameraZoom(this.zoom);
+        this.saveViewState();
         this.cdr.detectChanges();
       });
 
@@ -1140,6 +1212,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
           this.mainBoardService.cameraX,
           this.mainBoardService.cameraY,
         );
+        this.saveViewState();
         this.cdr.detectChanges();
       });
 
@@ -1189,6 +1262,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   private boardResizeObserver?: ResizeObserver;
 
   ngOnDestroy(): void {
+    this.warmRenderToken++; // cancel any in-flight cache warm-up
     this.boardResizeObserver?.disconnect();
     this.stopSaveDots();
     this.stopDeleteHold();
@@ -1260,7 +1334,10 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     });
     this.boardResizeObserver.observe(boardEl);
 
-    if (this.notes.length > 0) {
+    if (
+      this.notes.length > 0 &&
+      !(this.selectedBoard && this.loadViewState(this.selectedBoard.id))
+    ) {
       this.mainBoardService.centerOnItem(this.notes[0]);
     }
 
@@ -1304,7 +1381,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     );
 
     this.sections.push(section);
-    this.bringSectionToFront(section);
+    this.restackSections();
     this.recordCreate(section, this.sections);
     this.mainBoardService.bumpGeometry();
     this.cdr.detectChanges();
@@ -1640,11 +1717,54 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.persistence.flush();
   }
 
+  // ── Camera/zoom view state (per board, session-only) ─────────────────────
+  // Deliberately sessionStorage: survives a refresh, gone when the browser
+  // closes. Coordinates aren't content, so no encryption needed.
+
+  private readonly VIEW_STATE_KEY = 'board_view';
+  private viewStateReady = false;
+
+  private viewStateKey(boardId: string): string {
+    return `${this.VIEW_STATE_KEY}:${boardId}`;
+  }
+
+  private saveViewState(): void {
+    if (!this.viewStateReady || !this.selectedBoard) return;
+    this.storageSerice.setVariable(this.viewStateKey(this.selectedBoard.id), {
+      x: this.mainBoardService.cameraX,
+      y: this.mainBoardService.cameraY,
+      zoom: this.mainBoardService.zoom,
+    });
+  }
+
+  private loadViewState(
+    boardId: string,
+  ): { x: number; y: number; zoom: number } | null {
+    const v = this.storageSerice.getVariable<{
+      x: number;
+      y: number;
+      zoom: number;
+    }>(this.viewStateKey(boardId));
+    if (
+      !v ||
+      !isFinite(v.x) ||
+      !isFinite(v.y) ||
+      !isFinite(v.zoom) ||
+      v.zoom <= 0
+    ) {
+      return null;
+    }
+    return v;
+  }
+
   /** After server elements load, offer to restore any newer local changes that
    *  never reached the DB (e.g. saves that failed on an expired token). */
-  private maybeOfferRestore(boardId: string): void {
-    const local = this.persistence.load(boardId);
+  private async maybeOfferRestore(boardId: string): Promise<void> {
+    const local = await this.persistence.load(boardId);
     if (!local) return;
+    // Board switched while the snapshot was being decrypted — don't offer a
+    // stale prompt for the wrong board.
+    if (this.selectedBoard?.id !== boardId) return;
     const hasUnsynced = local.items.some((i) => i.syncState !== 'synced');
     if (!hasUnsynced) {
       this.persistence.clear(boardId);
@@ -1711,6 +1831,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     item.contentUpdated = s.contentUpdated;
     item.nameUpdated = s.nameUpdated;
     item.syncState = s.syncState;
+    // Mutated outside any component event — mark OnPush components.
+    this.mainBoardService.notifyItemsChanged();
   }
 
   private itemFromSnapshot(s: BoardItemSnapshot): BoardItem | null {
@@ -2016,6 +2138,15 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   private onBoardPointerDownCapture = (ev: PointerEvent): void => {
     if (ev.button !== 0 || this.drawMode) return;
+
+    // Resize handles own their gesture: let the resize directive take over
+    // instead of hijacking the press into a group drag / selection change.
+    if (
+      ev.target instanceof HTMLElement &&
+      ev.target.closest('.resize-handle')
+    ) {
+      return;
+    }
 
     // Link-picking mode: a left click on an element chooses it as the link
     // target instead of panning/selecting/focusing.
@@ -3042,12 +3173,14 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       : null;
   }
 
-  /** Persist the active quiz + answers so a refresh keeps progress. */
+  /** Persist the active quiz + answers so a refresh keeps progress.
+   *  Encrypted at rest, same as board snapshots — quiz questions/answers are
+   *  board content too. */
   private persistQuizState(): void {
     const key = this.quizStateKey();
     if (!key) return;
     if (!this.quiz) {
-      localStorage.removeItem(key);
+      this.secureStorage.remove(key);
       return;
     }
     const state = {
@@ -3061,41 +3194,34 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       // Pop-out window geometry is intentionally NOT persisted — short-lived,
       // per-quiz only.
     };
-    try {
-      localStorage.setItem(key, JSON.stringify(state));
-    } catch {
-      /* storage full / unavailable — non-fatal */
-    }
+    // Fire-and-forget: encryption is async, failure is non-fatal (storage
+    // full / crypto unavailable) and must never block quiz interaction.
+    void this.secureStorage.setJson(key, state);
   }
 
   private clearQuizState(): void {
     const key = this.quizStateKey();
-    if (key) localStorage.removeItem(key);
+    if (key) this.secureStorage.remove(key);
   }
 
   /** Restore an in-progress quiz for the current board (after a refresh). */
-  private restoreQuizState(): void {
+  private async restoreQuizState(): Promise<void> {
     const key = this.quizStateKey();
     if (!key) return;
-    const raw = localStorage.getItem(key);
-    if (!raw) return;
-    try {
-      const s = JSON.parse(raw);
-      if (!s?.quiz?.questions?.length) return;
-      this.quiz = s.quiz;
-      this.quizAnswers = new Map(s.answers ?? []);
-      this.quizOpenDocs = new Map(s.openDocs ?? []);
-      this.quizResults = new Map(s.results ?? []);
-      this.quizIndex = s.index ?? 0;
-      this.quizSubmitted = !!s.submitted;
-      this.quizScore = s.score ?? null;
-      this.quizPos = null;
-      // Restore silently — the AI panel stays closed on reload; the quiz is
-      // waiting on the Quiz tab when the user opens the panel.
-      this.aiTab = 'quiz';
-    } catch {
-      /* corrupt state — ignore */
-    }
+    const s = await this.secureStorage.getJson<any>(key);
+    if (!s?.quiz?.questions?.length) return;
+    if (this.quizStateKey() !== key) return; // board switched mid-decrypt
+    this.quiz = s.quiz;
+    this.quizAnswers = new Map(s.answers ?? []);
+    this.quizOpenDocs = new Map(s.openDocs ?? []);
+    this.quizResults = new Map(s.results ?? []);
+    this.quizIndex = s.index ?? 0;
+    this.quizSubmitted = !!s.submitted;
+    this.quizScore = s.score ?? null;
+    this.quizPos = null;
+    // Restore silently — the AI panel stays closed on reload; the quiz is
+    // waiting on the Quiz tab when the user opens the panel.
+    this.aiTab = 'quiz';
   }
 
   // ── AI chat (conversational assistant) ────────────────────────────────────
@@ -3548,6 +3674,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const px = typeof v === 'number' ? v : parseInt(v, 10);
     if (Number.isFinite(px) && px > 0) {
       this.editorPrefs.defaultNoteFontSize = px;
+      // The size is a host binding on every (OnPush) note — mark them all.
+      this.mainBoardService.notifyItemsChanged();
       this.cdr.detectChanges();
     }
   }
@@ -3774,6 +3902,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
 
     pa.status = 'applied';
     this.persistActionStatus(pa);
+    // AI actions mutate tiles outside their components — mark OnPush views.
+    this.mainBoardService.notifyItemsChanged();
     this.cdr.detectChanges();
   }
 
@@ -3793,6 +3923,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       if (note) note.content = pa.prevContent;
       pa.status = 'pending';
       this.persistActionStatus(pa);
+      this.mainBoardService.notifyItemsChanged();
       this.cdr.detectChanges();
     }
   }

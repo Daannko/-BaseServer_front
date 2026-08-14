@@ -893,12 +893,12 @@
     <div class="board-viewport" #viewport>
       <!-- Sections always render below notes (separate stacking context) -->
       <div class="sections-layer">
-        <ng-container *ngFor="let section of sections">
+        <ng-container *ngFor="let section of sections; trackBy: trackById">
           <app-board-section
             [tile]="section"
             [zoom]="zoom"
             [attr.data-sync]="section.syncState"
-            (mousedown)="bringSectionToFront(section)"
+            [style.display]="section.inView || section.forceToRender ? null : 'none'"
             (navbarChange)="onNoteNavbarChange($event)"
             (deleteSection)="onDeleteSection(section)"
             *ngIf="isItemVisible(section)"
@@ -908,11 +908,12 @@
       </div>
 
       <div #itemsContainer class="notes-layer">
-        <ng-container *ngFor="let item of notes">
+        <ng-container *ngFor="let item of notes; trackBy: trackById">
           <app-board-note
             [tile]="item"
             [zoom]="zoom"
             [attr.data-sync]="item.syncState"
+            [style.display]="item.inView || item.forceToRender ? null : 'none'"
             (mousedown)="bringToFront(item)"
             (navbarChange)="onNoteNavbarChange($event)"
             (deleteTile)="onDeleteNote(item)"
@@ -950,11 +951,12 @@
       </div>
 
       <div class="images-layer">
-        <ng-container *ngFor="let image of images">
+        <ng-container *ngFor="let image of images; trackBy: trackById">
           <app-board-image
             [tile]="image"
             [zoom]="zoom"
             [attr.data-sync]="image.syncState"
+            [style.display]="image.inView || image.forceToRender ? null : 'none'"
             (mousedown)="bringToFront(image)"
             (deleteImage)="onDeleteImage(image)"
             *ngIf="isItemVisible(image)"
@@ -965,11 +967,12 @@
 
       <!-- Drawings: each freehand stroke is a movable/deletable element. -->
       <div class="drawings-layer">
-        <ng-container *ngFor="let drawing of drawings">
+        <ng-container *ngFor="let drawing of drawings; trackBy: trackById">
           <app-board-drawing
             [tile]="drawing"
             [zoom]="zoom"
             [attr.data-sync]="drawing.syncState"
+            [style.display]="drawing.inView || drawing.forceToRender ? null : 'none'"
             (mousedown)="bringToFront(drawing)"
             (deleteDrawing)="onDeleteDrawing(drawing)"
             *ngIf="isItemVisible(drawing)"

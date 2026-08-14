@@ -32,6 +32,14 @@ export class BoardDebugOverlayComponent implements AfterViewInit, OnDestroy {
   @ViewChild('destroyEl') destroyEl!: ElementRef<HTMLElement>;
 
   private rafId = 0;
+  private lastPaintTs = 0;
+
+  /** Overlay refresh period. The old per-frame DOM writes meant the browser
+   *  could never produce an "unchanged" frame — style/layout/paint ran every
+   *  vsync forever, so an idle board still paid full rendering cost each frame
+   *  (and the fps readout punished big DOMs even at rest). 4 Hz is plenty for
+   *  reading numbers and leaves idle frames genuinely empty. */
+  private static readonly PAINT_INTERVAL_MS = 250;
 
   constructor(
     public debug: BoardDebugService,
@@ -40,20 +48,21 @@ export class BoardDebugOverlayComponent implements AfterViewInit, OnDestroy {
 
   ngAfterViewInit(): void {
     this.zone.runOutsideAngular(() => {
-      const paint = () => {
-        if (this.debug.overlayVisible && this.fpsEl) {
-          this.setText(this.fpsEl, String(this.debug.fps));
-          this.setColor(this.fpsEl, this.fpsColor(this.debug.fps));
-          this.setText(this.frameEl, this.debug.frameMs.toFixed(1) + ' ms');
-          this.setText(this.cdBoardEl, String(this.debug.cdBoard) + '/s');
-          this.setText(this.cdNotesEl, String(this.debug.cdNotes) + '/s');
-          this.setText(this.liveEl, String(this.debug.notesLive));
-          this.setText(this.mountEl, String(this.debug.noteMounts) + '/s');
-          this.setText(this.destroyEl, String(this.debug.noteDestroys) + '/s');
-          this.setColor(this.mountEl, this.debug.noteMounts > 0 ? '#ff6b6b' : '#7ee787');
-          this.setColor(this.destroyEl, this.debug.noteDestroys > 0 ? '#ff6b6b' : '#7ee787');
-        }
+      const paint = (ts: number) => {
         this.rafId = requestAnimationFrame(paint);
+        if (!this.debug.overlayVisible || !this.fpsEl) return;
+        if (ts - this.lastPaintTs < BoardDebugOverlayComponent.PAINT_INTERVAL_MS) return;
+        this.lastPaintTs = ts;
+        this.setText(this.fpsEl, String(this.debug.fps));
+        this.setColor(this.fpsEl, this.fpsColor(this.debug.fps));
+        this.setText(this.frameEl, this.debug.frameMs.toFixed(1) + ' ms');
+        this.setText(this.cdBoardEl, String(this.debug.cdBoard) + '/s');
+        this.setText(this.cdNotesEl, String(this.debug.cdNotes) + '/s');
+        this.setText(this.liveEl, String(this.debug.notesLive));
+        this.setText(this.mountEl, String(this.debug.noteMounts) + '/s');
+        this.setText(this.destroyEl, String(this.debug.noteDestroys) + '/s');
+        this.setColor(this.mountEl, this.debug.noteMounts > 0 ? '#ff6b6b' : '#7ee787');
+        this.setColor(this.destroyEl, this.debug.noteDestroys > 0 ? '#ff6b6b' : '#7ee787');
       };
       this.rafId = requestAnimationFrame(paint);
     });

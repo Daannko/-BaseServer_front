@@ -1,5 +1,7 @@
 import {
   AfterViewInit,
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
@@ -11,6 +13,7 @@ import {
   TemplateRef,
   ViewChild,
 } from '@angular/core';
+import { merge, Subscription } from 'rxjs';
 import { CommonModule } from '@angular/common';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
@@ -43,6 +46,9 @@ import { ColorPaletteComponent } from '../../common/color-palette/color-palette.
   providers: [TiptapService],
   templateUrl: './board-section.component.html',
   styleUrl: './board-section.component.scss',
+  // OnPush — external mutations arrive via main.itemsChanged$ /
+  // selection.changed$ → markForCheck (see constructor).
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BoardSectionComponent implements AfterViewInit, OnDestroy {
   @Input() tile!: BoardSection;
@@ -80,7 +86,15 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
     private main: BoardMainService,
-  ) {}
+    private cdr: ChangeDetectorRef,
+  ) {
+    this.externalChanges = merge(
+      this.main.itemsChanged$,
+      this.selection.changed$,
+    ).subscribe(() => this.cdr.markForCheck());
+  }
+
+  private externalChanges: Subscription;
 
   // Rect snapshot at the start of a move/resize gesture, for history.
   private gestureBefore: { x: number; y: number; width: number; height: number } | null = null;
@@ -197,6 +211,7 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
   }
 
   ngOnDestroy() {
+    this.externalChanges.unsubscribe();
     clearTimeout(this.deleteConfirmTimeout);
     try {
       this.nameEditor?.destroy();
@@ -250,6 +265,7 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
     const s = this.snap.snapResize(r, prev, this.tile.id);
     this.tile.x = s.x; this.tile.y = s.y;
     this.tile.width = s.width; this.tile.height = s.height;
+    this.main.bumpGeometry();
   }
 
   onResizeEnd() {
@@ -266,6 +282,7 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
         p.lockedAxis,
       );
       this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy, p.lockedAxis);
+      this.main.bumpGeometry();
       return;
     }
     const s = this.snap.snapMove(
@@ -274,6 +291,7 @@ export class BoardSectionComponent implements AfterViewInit, OnDestroy {
       p.lockedAxis,
     );
     this.tile.x = s.x; this.tile.y = s.y;
+    this.main.bumpGeometry();
   }
 
   onMoveStart() {

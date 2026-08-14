@@ -1,4 +1,6 @@
 import {
+  ChangeDetectionStrategy,
+  ChangeDetectorRef,
   Component,
   ElementRef,
   EventEmitter,
@@ -9,6 +11,7 @@ import {
   Output,
 } from '@angular/core';
 import { CommonModule } from '@angular/common';
+import { merge, Subscription } from 'rxjs';
 import { BoardImage } from './board-image.data';
 import { ItemRect, ItemResizeDirective } from '../board-item/item.resize.directive';
 import { ItemMoveDirective, Position } from '../board-item/item.move.directive';
@@ -30,6 +33,9 @@ import { environment } from '../../../../environments/environment';
   ],
   templateUrl: './board-image.component.html',
   styleUrl: './board-image.component.scss',
+  // OnPush — external mutations arrive via main.itemsChanged$ /
+  // selection.changed$ → markForCheck (see constructor).
+  changeDetection: ChangeDetectionStrategy.OnPush,
 })
 export class BoardImageComponent implements OnDestroy {
   @Input() tile!: BoardImage;
@@ -71,7 +77,15 @@ export class BoardImageComponent implements OnDestroy {
     private history: BoardHistoryService,
     private selection: BoardSelectionService,
     private main: BoardMainService,
-  ) {}
+    private cdr: ChangeDetectorRef,
+  ) {
+    this.externalChanges = merge(
+      this.main.itemsChanged$,
+      this.selection.changed$,
+    ).subscribe(() => this.cdr.markForCheck());
+  }
+
+  private externalChanges: Subscription;
 
   // Rect snapshot at the start of a move/resize gesture, for history.
   private gestureBefore: { x: number; y: number; width: number; height: number } | null = null;
@@ -80,6 +94,7 @@ export class BoardImageComponent implements OnDestroy {
   }
 
   ngOnDestroy() {
+    this.externalChanges.unsubscribe();
     clearTimeout(this.deleteConfirmTimeout);
   }
 
@@ -127,6 +142,7 @@ export class BoardImageComponent implements OnDestroy {
     const s = this.snap.snapImageAspect(r, prev, this.tile.naturalRatio, 'original ratio');
     this.tile.x = s.x; this.tile.y = s.y;
     this.tile.width = s.width; this.tile.height = s.height;
+    this.main.bumpGeometry();
   }
 
   onResizeEnd() {
@@ -143,6 +159,7 @@ export class BoardImageComponent implements OnDestroy {
         p.lockedAxis,
       );
       this.selection.moveGroupTo(this.tile, this.tile.x + c.dx, this.tile.y + c.dy, p.lockedAxis);
+      this.main.bumpGeometry();
       return;
     }
     const s = this.snap.snapMove(
@@ -151,6 +168,7 @@ export class BoardImageComponent implements OnDestroy {
       p.lockedAxis,
     );
     this.tile.x = s.x; this.tile.y = s.y;
+    this.main.bumpGeometry();
   }
 
   onMoveStart() {

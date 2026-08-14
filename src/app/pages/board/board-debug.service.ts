@@ -22,6 +22,7 @@ export class BoardDebugService {
    *  restored on load via setLive() / the constructor loop. */
   private static readonly LIVE_FLAGS = {
     panGpuLayer: 'BOARD_DEBUG_GPU',
+    permanentGpuLayer: 'BOARD_DEBUG_PERM_GPU',
     freezeGridOnPan: 'BOARD_DEBUG_FREEZE_GRID',
     disableRadius: 'BOARD_DEBUG_NO_RADIUS',
     disableDashedBorder: 'BOARD_DEBUG_SOLID_BORDER',
@@ -34,6 +35,12 @@ export class BoardDebugService {
   overlayVisible = true;
   /** When true, promote the viewport to a GPU layer during pan (will-change). */
   panGpuLayer = true;
+  /** When true, the viewport KEEPS its GPU layer permanently instead of
+   *  promoting/demoting per gesture. Each promote/demote re-rasterizes all
+   *  text and flips its antialiasing (subpixel ↔ grayscale) — the visible
+   *  "font refresh" pop after every pan/zoom. Permanent layer = consistent
+   *  rendering, no pops, gestures always start composited. */
+  permanentGpuLayer = true;
   /** When true, skip the grid-background repaint while panning (diagnostic). */
   freezeGridOnPan = false;
   /** When true, render the real note shell (border/background/radius/glow) but

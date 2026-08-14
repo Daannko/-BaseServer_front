@@ -13,7 +13,13 @@ export class BoardItem {
   private _content: JSONContent = docFromText('Content');
   zIndex: number = 1;
   forceToRender: boolean = false;
+  /** Near the viewport (small overscan): the component is DISPLAYED.
+   *  Also feeds snap candidates and drag peer-outlines. */
   inView = false;
+  /** Within the (much wider) mount range: the component exists in the DOM,
+   *  hidden via display:none when not inView — so scrolling it back in is a
+   *  style flip, not a component re-creation. */
+  mounted = false;
   positionUpdated = false;
   sizeUpdated = false;
   contentUpdated = false;
