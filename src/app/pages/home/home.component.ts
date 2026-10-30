@@ -46,6 +46,7 @@ export class HomeComponent implements AfterViewInit, OnInit, OnDestroy {
     name: 'Board',
     description: 'Notes, drawings and quizzes on one canvas.',
     icon: 'general/service-board',
+    art: 'board',
     url: '../board',
   };
   // A tile with an empty url stays visible but can't be opened.
@@ -53,13 +54,14 @@ export class HomeComponent implements AfterViewInit, OnInit, OnDestroy {
     name: string;
     description: string;
     icon: string;
+    art: string;
     url: string;
   }[] = [
-    { name: 'Home Assistant', description: 'Home and farm sensors', icon: 'general/service-home', url: '' },
-    { name: 'Vaultwarden', description: 'Passwords', icon: 'general/service-vault', url: '' },
-    { name: 'Cameras', description: 'Live streams', icon: 'general/service-camera', url: '' },
-    { name: 'RacketWatch', description: 'OLX listings', icon: 'general/service-racket', url: '' },
-    { name: 'Free slot', description: 'Room for one more', icon: 'general/service-plus', url: '' },
+    { name: 'Home Assistant', description: 'Home and farm sensors', icon: 'general/service-home', art: 'home', url: '' },
+    { name: 'Vaultwarden', description: 'Passwords', icon: 'general/service-vault', art: 'vault', url: '' },
+    { name: 'Cameras', description: 'Live streams', icon: 'general/service-camera', art: 'camera', url: '' },
+    { name: 'RacketWatch', description: 'OLX listings', icon: 'general/service-racket', art: 'racket', url: '' },
+    { name: 'Free slot', description: 'Room for one more', icon: 'general/service-plus', art: 'slot', url: '' },
   ];
 
   ngOnInit(): void {

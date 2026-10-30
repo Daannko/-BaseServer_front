@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- viewfinder corners -->
+  <path d="M26 62V36h28M186 36h28v26M214 178v26h-28M54 204H26v-26" stroke-width="2.6"/>
+
+  <!-- recording indicator -->
+  <circle cx="48" cy="58" r="6" fill="#f0803c" stroke="none"/>
+  <path d="M62 58h34" opacity=".7"/>
+
+  <!-- scene behind the lens -->
+  <path d="M26 170l44-46 30 30 34-44 80 78" opacity=".5"/>
+
+  <!-- motion detection box around a bird -->
+  <rect x="112" y="72" width="66" height="56" rx="6" stroke="#f0803c" stroke-dasharray="6 6"/>
+  <path d="M128 106c8-12 20-12 26-4 4-2 8-2 10-1-4 2-6 5-8 9-8 6-20 4-28-4z" stroke="#f0803c"/>
+
+  <!-- crosshair -->
+  <path d="M120 186v-12M114 180h12" opacity=".7"/>
+</svg>

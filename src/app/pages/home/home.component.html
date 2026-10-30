@@ -29,9 +29,9 @@
     </section>
 
     <section class="bento">
-      <app-page-tile class="bento-lead" [featured]="true" [name]="boardTile.name" [description]="boardTile.description" [icon]="boardTile.icon" [url]="boardTile.url"></app-page-tile>
+      <app-page-tile class="bento-lead" [featured]="true" [name]="boardTile.name" [description]="boardTile.description" [icon]="boardTile.icon" [art]="boardTile.art" [url]="boardTile.url"></app-page-tile>
       <div class="bento-rest">
-        <app-page-tile *ngFor="let item of gridItems" [name]="item.name" [description]="item.description" [icon]="item.icon" [url]="item.url"></app-page-tile>
+        <app-page-tile *ngFor="let item of gridItems" [name]="item.name" [description]="item.description" [icon]="item.icon" [art]="item.art" [url]="item.url"></app-page-tile>
       </div>
     </section>
   </div>

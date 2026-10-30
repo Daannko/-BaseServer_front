@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- vault dial -->
+  <circle cx="138" cy="88" r="62"/>
+  <circle cx="138" cy="88" r="46" stroke-dasharray="2 9" stroke-width="3"/>
+  <circle cx="138" cy="88" r="20"/>
+  <path d="M138 68V50M158 88h18M138 108v18M118 88h-18"/>
+  <circle cx="138" cy="88" r="4" fill="#f0803c" stroke="none"/>
+
+  <!-- masked password field -->
+  <rect x="44" y="172" width="184" height="42" rx="21" fill="#fff" fill-opacity=".07"/>
+  <g fill="#fff" stroke="none">
+    <circle cx="70" cy="193" r="4.5"/>
+    <circle cx="90" cy="193" r="4.5"/>
+    <circle cx="110" cy="193" r="4.5"/>
+    <circle cx="130" cy="193" r="4.5"/>
+    <circle cx="150" cy="193" r="4.5"/>
+    <circle cx="170" cy="193" r="4.5"/>
+  </g>
+  <path d="M192 182v22" stroke="#f0803c"/>
+</svg>

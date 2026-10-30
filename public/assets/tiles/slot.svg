@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- server rack with one empty bay -->
+  <rect x="36" y="32" width="176" height="46" rx="10" fill="#fff" fill-opacity=".06"/>
+  <circle cx="58" cy="55" r="4" fill="#f0803c" stroke="none"/>
+  <path d="M76 55h44M170 46v18M182 46v18M194 46v18" opacity=".7"/>
+
+  <rect x="36" y="94" width="176" height="46" rx="10" fill="#fff" fill-opacity=".06"/>
+  <circle cx="58" cy="117" r="4" fill="#fff" stroke="none"/>
+  <path d="M76 117h60M170 108v18M182 108v18M194 108v18" opacity=".7"/>
+
+  <rect x="36" y="156" width="176" height="46" rx="10" stroke-dasharray="7 7"/>
+  <path d="M124 170v18M115 179h18"/>
+</svg>

@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 240" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <!-- floor plan -->
+  <path d="M34 44h172v152h-84v-52H34z"/>
+  <path d="M122 44v44M122 112v32M122 144h22M170 144h36"/>
+  <path d="M122 88a24 24 0 0 1 24 24" stroke-dasharray="4 5" opacity=".7"/>
+
+  <!-- sensors -->
+  <circle cx="76" cy="92" r="4" fill="#f0803c" stroke="none"/>
+  <circle cx="76" cy="92" r="13" stroke="#f0803c" opacity=".6"/>
+  <circle cx="76" cy="92" r="24" stroke="#f0803c" opacity=".25"/>
+  <circle cx="168" cy="92" r="4" fill="#fff" stroke="none"/>
+  <circle cx="168" cy="92" r="13" opacity=".4"/>
+  <circle cx="164" cy="172" r="4" fill="#fff" stroke="none"/>
+  <circle cx="164" cy="172" r="13" opacity=".4"/>
+</svg>

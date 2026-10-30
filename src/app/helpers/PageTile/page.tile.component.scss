@@ -3,10 +3,13 @@
 :host {
   display: block;
   height: 100%;
+  container-type: inline-size;
 }
 
 .tile {
   @include glass.glass;
+  position: relative;
+  overflow: hidden;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
@@ -64,7 +67,37 @@
     .description {
       font-size: 1.0625rem;
     }
+
+    .art {
+      inset: 0;
+      background-size: cover;
+      mask-image: linear-gradient(to top right, transparent 32%, #000 64%);
+    }
   }
+}
+
+// Line drawing of what the service does, faded out toward the text on the left.
+.art {
+  position: absolute;
+  inset: 0.5rem 0.5rem 0.5rem 0;
+  background-position: right center;
+  background-repeat: no-repeat;
+  background-size: auto 100%;
+  opacity: 0.5;
+  pointer-events: none;
+  mask-image: linear-gradient(90deg, transparent 18%, #000 72%);
+}
+
+// Narrow tiles have no free side, so the art keeps to the top right corner.
+@container (max-width: 20rem) {
+  .tile:not(.featured) .art {
+    mask-image: linear-gradient(to top right, transparent 46%, #000 74%);
+  }
+}
+
+.tile-top,
+.content {
+  position: relative;
 }
 
 .tile-top {
