@@ -1,19 +1,12 @@
 <div class="scene"></div>
 <div class="outer">
-  <div class="brand">
-    <img class="brand-mark" src="assets/general/base-mark.svg" alt="" />
-    BaseServer
-  </div>
-
-  <div class="intro">
-    <h1>{{ isLoginPage ? 'Welcome back.' : 'Make it yours.' }}</h1>
-    <p>Your boards and notes, all in one place.</p>
-  </div>
-
   <div class="middle">
     <div *ngIf="isLoginPage; else registrationBlock">
       <form class="auth-form" [class.leaving]="leavingLogin" [formGroup]="loginForm">
-        <h2 class="auth-title">Sign in</h2>
+        <div class="auth-header">
+          <h1>Welcome</h1>
+          <p>Please sign in to continue</p>
+        </div>
 
         <div class="form-center">
           <div class="input-group">
@@ -44,7 +37,10 @@
 
     <ng-template #registrationBlock>
       <form class="auth-form registration-form" [class.leaving]="leavingRegistration" [formGroup]="registrationForm">
-        <h2 class="auth-title">Create account</h2>
+        <div class="auth-header">
+          <h1>Create account</h1>
+          <p>Please fill in your details</p>
+        </div>
 
         <div class="form-center">
           <div class="input-group">

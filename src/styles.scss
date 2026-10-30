@@ -106,13 +106,13 @@ a {
   inset: 0;
   z-index: 0;
   pointer-events: none;
-  backdrop-filter: brightness(1.6) saturate(1.2); // undoes .underlay-black here
+  backdrop-filter: brightness(1.15); // eases .underlay-black a little
   background:
-    radial-gradient(52% 46% at 84% 70%, rgba(181, 43, 29, 0.62), transparent 72%),
-    radial-gradient(38% 34% at 62% 92%, rgba(240, 128, 60, 0.3), transparent 72%),
+    radial-gradient(52% 46% at 84% 70%, rgba(181, 43, 29, 0.26), transparent 72%),
+    radial-gradient(38% 34% at 62% 92%, rgba(240, 128, 60, 0.1), transparent 72%),
     linear-gradient(
       180deg,
-      rgba(60, 102, 147, 0.2) 0%,
+      rgba(60, 102, 147, 0.06) 0%,
       rgba(5, 2, 3, 0.12) 38%,
       rgba(5, 2, 3, 0.8) 72%,
       var(--bp-ink) 100%
