@@ -42,17 +42,25 @@ export class HomeComponent implements AfterViewInit, OnInit, OnDestroy {
   @ViewChild('clockElement') clockElement!: ElementRef; // Reference to the clock element
   observer!: IntersectionObserver;
   isClockVisible: boolean = false;
+  boardTile = {
+    name: 'Board',
+    description: 'Notes, drawings and quizzes on one canvas.',
+    icon: 'general/service-board',
+    url: '../board',
+  };
+  // A tile with an empty url stays visible but can't be opened.
   gridItems: {
     name: string;
     description: string;
     icon: string;
     url: string;
-  }[] = Array.from({ length: 60 }, (_, i) => ({
-    name: `Name${i}`,
-    description: `Description${i}`,
-    icon: `https://upload.wikimedia.org/wikipedia/en/4/49/Home_Assistant_logo_%282023%29.svg`,
-    url: `../board`,
-  }));
+  }[] = [
+    { name: 'Home Assistant', description: 'Home and farm sensors', icon: 'general/service-home', url: '' },
+    { name: 'Vaultwarden', description: 'Passwords', icon: 'general/service-vault', url: '' },
+    { name: 'Cameras', description: 'Live streams', icon: 'general/service-camera', url: '' },
+    { name: 'RacketWatch', description: 'OLX listings', icon: 'general/service-racket', url: '' },
+    { name: 'Free slot', description: 'Room for one more', icon: 'general/service-plus', url: '' },
+  ];
 
   ngOnInit(): void {
     this.dateTime = new Date(); // Initialize dateTime

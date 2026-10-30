@@ -12,11 +12,12 @@ import { Router, RouterModule } from '@angular/router';
 import { SnackBarService } from '../../service/snackbar.service';
 import { NgIf } from '@angular/common'; // Updated import path
 import { environment } from '../../../environments/environment';
+import { SvgIconComponent } from '../../helpers/svg-icon/svg-icon.component';
 
 @Component({
   selector: 'app-auth',
   standalone: true,
-  imports: [RouterModule, FormsModule, ReactiveFormsModule, NgIf],
+  imports: [RouterModule, FormsModule, ReactiveFormsModule, NgIf, SvgIconComponent],
   templateUrl: './auth.component.html', // Updated template file name
   styleUrl: './auth.component.scss', // Updated style file name
 })

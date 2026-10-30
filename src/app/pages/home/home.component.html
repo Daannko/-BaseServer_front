@@ -1,24 +1,38 @@
+<div class="scene"></div>
 <app-navbar [isClockVisible]="isClockVisible" [isLogoutVisible]="true"></app-navbar>
 <div id="scrollable">
   <div id="content">
-    <div  #clockElement class="dateInfo">
-      <div class="date-time-container">
-      <div class="clock">{{dateTime | date:'H:mm'}}</div>
-      <br>
-      <div class="date">{{dateTime | date:'fullDate'}}</div>
-      <div class="date" *ngIf="(weather$ | async) as weather">
-        {{location.city}} {{ weather.data.values.temperature | number:'1.0-0' }} °C
+    <section class="hero">
+      <div #clockElement class="dateInfo">
+        <div class="clock">{{dateTime | date:'H:mm'}}</div>
+        <div class="date">{{dateTime | date:'fullDate'}}</div>
       </div>
 
-      </div>
+      <aside class="weather-card" *ngIf="(weather$ | async) as weather">
+        <div class="weather-city">{{location.city}}</div>
+        <div class="weather-temp">{{ weather.data.values.temperature | number:'1.0-0' }}°</div>
+        <dl class="weather-stats">
+          <div>
+            <dt>Feels like</dt>
+            <dd>{{ weather.data.values.temperatureApparent | number:'1.0-0' }}°</dd>
+          </div>
+          <div>
+            <dt>Humidity</dt>
+            <dd>{{ weather.data.values.humidity | number:'1.0-0' }}%</dd>
+          </div>
+          <div>
+            <dt>Wind</dt>
+            <dd>{{ weather.data.values.windSpeed | number:'1.0-0' }} m/s</dd>
+          </div>
+        </dl>
+      </aside>
+    </section>
 
-    </div>
-
-    <div class="grid-container">
-      <div class="grid-item" *ngFor="let item of gridItems">
-        <app-page-tile [name]="item.name" [description]="item.description" [icon]="item.icon" [url]="item.url"></app-page-tile>
+    <section class="bento">
+      <app-page-tile class="bento-lead" [featured]="true" [name]="boardTile.name" [description]="boardTile.description" [icon]="boardTile.icon" [url]="boardTile.url"></app-page-tile>
+      <div class="bento-rest">
+        <app-page-tile *ngFor="let item of gridItems" [name]="item.name" [description]="item.description" [icon]="item.icon" [url]="item.url"></app-page-tile>
       </div>
-    </div>
+    </section>
   </div>
-  
 </div>

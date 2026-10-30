@@ -99,6 +99,26 @@ a {
   z-index: -1;
 }
 
+// Regrades the html photo for the login and home screens: dark at the base with
+// an ember glow for the glass to blur. Board doesn't render it.
+.scene {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  backdrop-filter: brightness(1.6) saturate(1.2); // undoes .underlay-black here
+  background:
+    radial-gradient(52% 46% at 84% 70%, rgba(181, 43, 29, 0.62), transparent 72%),
+    radial-gradient(38% 34% at 62% 92%, rgba(240, 128, 60, 0.3), transparent 72%),
+    linear-gradient(
+      180deg,
+      rgba(60, 102, 147, 0.2) 0%,
+      rgba(5, 2, 3, 0.12) 38%,
+      rgba(5, 2, 3, 0.8) 72%,
+      var(--bp-ink) 100%
+    );
+}
+
 .glass-button {
   border: 1px solid rgba(white, 0.1);
   background-color: rgba(255, 255, 255, 0.1);

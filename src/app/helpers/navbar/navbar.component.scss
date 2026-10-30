@@ -1,9 +1,9 @@
 .navbar-container {
   width: 100vw;
-  background: rgba(255, 255, 255, 0.08);
-  backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.09), rgba(255, 255, 255, 0.04));
+  backdrop-filter: blur(20px) saturate(150%);
+  border-bottom: 1px solid var(--bp-border);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .top-bar {
@@ -27,28 +27,47 @@
 }
 
 .navbar-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.25rem 0.4rem 0.25rem 0;
   background: transparent;
   border: none;
-  color: white;
-  font-size: 1.5rem;
-  font-weight: 600;
+  border-radius: 8px;
+  color: var(--bp-mist);
+  font-family: var(--bp-font-display);
+  font-size: 1.25rem;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
   cursor: pointer;
-  transition:
-    color 0.3s,
-    text-shadow 0.3s;
+  transition: opacity 0.2s;
 
   &:hover {
-    color: rgba(255, 255, 255, 0.8);
-    text-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+    opacity: 0.8;
   }
 }
 
+.navbar-mark {
+  width: 1.4rem;
+  height: 1.4rem;
+  filter: invert(1);
+}
+
 .clock-small {
-  color: white;
-  font-size: 1.2rem;
+  color: var(--bp-mist);
+  font-family: var(--bp-font-display);
+  font-size: 1.125rem;
   margin-right: 1rem;
   font-weight: 500;
-  text-shadow: 0 0 8px rgba(0, 0, 0, 0.2);
+  font-variant-numeric: tabular-nums;
+}
+
+.navbar-logo:focus-visible,
+.navbar-logout-button:focus-visible,
+.navbar-options-button:focus-visible {
+  outline: 2px solid var(--bp-flare);
+  outline-offset: 2px;
 }
 
 .up-right {
@@ -78,36 +97,40 @@
 }
 
 .navbar-logout-button {
-  background: rgba(255, 80, 80, 0.1);
-  border: 1px solid rgba(255, 80, 80, 0.3);
-  border-radius: 12px;
-  color: white;
-  font-size: 1rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid var(--bp-border-hi);
+  border-radius: 100px;
+  color: var(--bp-mist);
+  font-family: var(--bp-font-display);
+  font-size: 0.9375rem;
   font-weight: 500;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1.1rem;
+  white-space: nowrap;
   cursor: pointer;
   transition:
-    background 0.3s,
-    border 0.3s;
+    background 0.2s,
+    border 0.2s;
 
   &:hover {
-    background: rgba(255, 80, 80, 0.2);
-    border-color: rgba(255, 80, 80, 0.5);
+    background: var(--bp-ember);
+    border-color: rgba(255, 200, 170, 0.35);
   }
 }
 
 .navbar-options-button {
   background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 12px;
-  color: white;
-  font-size: 1rem;
+  border: 1px solid var(--bp-border-hi);
+  border-radius: 100px;
+  color: var(--bp-mist);
+  font-family: var(--bp-font-display);
+  font-size: 0.9375rem;
   font-weight: 500;
-  padding: 0.5rem 1rem;
+  padding: 0.5rem 1.1rem;
+  white-space: nowrap;
   cursor: pointer;
   transition:
-    background 0.3s,
-    border 0.3s;
+    background 0.2s,
+    border 0.2s;
 
   &:hover {
     background: rgba(255, 255, 255, 0.16);

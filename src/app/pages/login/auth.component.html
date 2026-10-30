@@ -1,73 +1,80 @@
+<div class="scene"></div>
 <div class="outer">
+  <div class="brand">
+    <img class="brand-mark" src="assets/general/base-mark.svg" alt="" />
+    BaseServer
+  </div>
+
+  <div class="intro">
+    <h1>{{ isLoginPage ? 'Welcome back.' : 'Make it yours.' }}</h1>
+    <p>Your boards and notes, all in one place.</p>
+  </div>
+
   <div class="middle">
     <div *ngIf="isLoginPage; else registrationBlock">
       <form class="auth-form" [class.leaving]="leavingLogin" [formGroup]="loginForm">
-        <div class="auth-header">
-          <h1>Welcome</h1>
-          <p>Please sign in to continue</p>
-        </div>
-        
+        <h2 class="auth-title">Sign in</h2>
+
         <div class="form-center">
           <div class="input-group">
-            <input type="email" [(ngModel)]="email" formControlName="email" 
-                   class="auth-input" autofocus required 
-                   placeholder="Email" />
+            <label for="login-email">Email</label>
+            <input id="login-email" type="email" [(ngModel)]="email" formControlName="email"
+                   class="auth-input" autocomplete="email" autofocus required />
           </div>
-          
+
           <div class="input-group">
-            <input type="password" [(ngModel)]="password" formControlName="password" 
-                   class="auth-input" required 
-                   placeholder="Password" />
+            <label for="login-password">Password</label>
+            <input id="login-password" type="password" [(ngModel)]="password" formControlName="password"
+                   class="auth-input" autocomplete="current-password" required />
           </div>
           <button type="submit" (click)="login()" class="auth-submit">
-            Sign In
+            Sign in
+            <span class="knob"><app-svg-icon icon="general/arrow-up-right"></app-svg-icon></span>
           </button>
-  
+
           <div *ngIf="signUpEnabled" class="auth-info-container">
-            <span class="auth-info" (click)="changeAuthForm()">
+            <button type="button" class="auth-info" (click)="changeAuthForm()">
               Don't have an account? <span class="auth-link">Sign up</span>
-            </span>
+            </button>
           </div>
         </div>
-        
-      </form> 
+
+      </form>
     </div>
-    
+
     <ng-template #registrationBlock>
       <form class="auth-form registration-form" [class.leaving]="leavingRegistration" [formGroup]="registrationForm">
-        <div class="auth-header">
-          <h1>Create Account</h1>
-          <p>Please fill in your details</p>
-        </div>
-        
+        <h2 class="auth-title">Create account</h2>
+
         <div class="form-center">
           <div class="input-group">
-            <input type="text" [(ngModel)]="name" formControlName="name" 
-                   class="auth-input" required 
-                   placeholder="Name" />
+            <label for="register-name">Name</label>
+            <input id="register-name" type="text" [(ngModel)]="name" formControlName="name"
+                   class="auth-input" autocomplete="name" required />
           </div>
-  
+
           <div class="input-group">
-            <input type="email" [(ngModel)]="email" formControlName="email" 
-                   class="auth-input" required 
-                   placeholder="Email" />
+            <label for="register-email">Email</label>
+            <input id="register-email" type="email" [(ngModel)]="email" formControlName="email"
+                   class="auth-input" autocomplete="email" required />
           </div>
-          
+
           <div class="input-group">
-            <input type="password" [(ngModel)]="password" formControlName="password" 
-                   class="auth-input" required 
-                   placeholder="Password" />
+            <label for="register-password">Password</label>
+            <input id="register-password" type="password" [(ngModel)]="password" formControlName="password"
+                   class="auth-input" autocomplete="new-password" required />
           </div>
         </div>
-  
+
         <button type="submit" (click)="register()" class="auth-submit">
-          Create Account
+          Create account
+          <span class="knob"><app-svg-icon icon="general/arrow-up-right"></app-svg-icon></span>
         </button>
-        
+
         <div class="auth-info-container">
-          <span class="auth-info" (click)="changeAuthForm()">
+          <button type="button" class="auth-info" (click)="changeAuthForm()">
             Already have an account? <span class="auth-link">Sign in</span>
-          </span>
+          </button>
         </div>
       </form>
     </ng-template>
