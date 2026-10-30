@@ -135,7 +135,7 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
 
   private computeNoteRadius(): string {
     const a = this.tile;
-    const R = (a?.width ?? 0) * 0.02;
+    const R = Math.min(28, Math.max(10, (a?.width ?? 0) * 0.03));
     if (!a) return `${R}px`;
     const px = (square: boolean) => (square ? '0px' : `${R}px`);
 

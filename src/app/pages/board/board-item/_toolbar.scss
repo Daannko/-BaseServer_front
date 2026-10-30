@@ -26,12 +26,13 @@
   align-items: center;
   justify-content: center;
   width: fit-content;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 6px 10px;
+  border-radius: 16px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.95rem;
-  background: rgb(30, 30, 30);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bp-surface-hi);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--bp-border);
   transition:
     transform 200ms ease-out,
     color 200ms ease-out,
@@ -70,7 +71,7 @@
   padding: 4px 8px;
   width: 32px;
   height: 32px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   font-weight: 500;
   display: flex;
@@ -106,7 +107,7 @@
 
   .query-input {
     height: 32px;
-    border-radius: 6px;
+    border-radius: 8px;
   }
 }
 
@@ -119,9 +120,9 @@
 
 ::ng-deep .color-palette {
   position: absolute;
-  background: rgba(30, 30, 40, 0.95);
+  background: var(--bp-surface-hi);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 8px;
   display: none;
   z-index: 1000;

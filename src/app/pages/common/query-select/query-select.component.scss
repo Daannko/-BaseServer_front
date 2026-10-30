@@ -34,7 +34,7 @@
   &:focus {
     outline: none;
     background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 213, 79, 0.55);
+    border-color: rgba(240, 150, 90, 0.55);
     cursor: text;
   }
 }
@@ -81,7 +81,7 @@
 
 .query-select.open .query-chevron {
   transform: rotate(180deg);
-  color: rgba(255, 213, 79, 0.75);
+  color: rgba(240, 150, 90, 0.75);
 }
 
 /* ── Dropdown ─────────────────────────────────────────────────── */
@@ -100,7 +100,7 @@
 
   background: rgba(30, 30, 40, 0.98);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  border-radius: 12px;
   box-shadow: 0 12px 30px rgba(0, 0, 0, 0.45);
   padding: 6px;
 
@@ -133,16 +133,16 @@
   background: transparent;
   color: rgba(230, 235, 240, 0.9);
   padding: 8px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
 
   &:hover {
     background: rgba(255, 255, 255, 0.06);
-    color: #ffd54f;
+    color: #f0a36b;
   }
 
   &.selected {
-    color: #ffd54f;
+    color: #f0a36b;
   }
 
   &.dimmed {

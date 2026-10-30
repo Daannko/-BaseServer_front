@@ -1,3 +1,5 @@
+@use '../../../styles/glass';
+
 /* Debug overlay for camera/zoom info */
 .debug-overlay {
   position: fixed;
@@ -78,8 +80,8 @@
   align-items: center;
   gap: 6px;
   padding: 10px 14px;
-  border-radius: 10px;
-  border: 1px solid var(--bp-amber-border, rgba(255, 213, 79, 0.5));
+  border-radius: 14px;
+  border: 1px solid var(--bp-amber-border, rgba(240, 150, 90, 0.5));
   background: var(--bp-surface-hi, rgba(28, 28, 32, 0.95));
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
 }
@@ -98,7 +100,7 @@
 .link-pick-confirm,
 .link-pick-cancel {
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: var(--bp-surface-ctrl, rgba(255, 255, 255, 0.06));
   color: var(--bp-text, #eee);
@@ -106,8 +108,8 @@
   cursor: pointer;
 
   &:hover:not(:disabled) {
-    border-color: var(--bp-amber, #ffd54f);
-    color: var(--bp-amber, #ffd54f);
+    border-color: var(--bp-amber, #f0a36b);
+    color: var(--bp-amber, #f0a36b);
   }
 
   &:disabled {
@@ -117,8 +119,8 @@
 }
 
 .link-pick-confirm {
-  border-color: var(--bp-amber-border, rgba(255, 213, 79, 0.5));
-  color: var(--bp-amber, #ffd54f);
+  border-color: var(--bp-amber-border, rgba(240, 150, 90, 0.5));
+  color: var(--bp-amber, #f0a36b);
 }
 
 .link-pick-hint {
@@ -137,7 +139,7 @@
 .link-pick-progress-fill {
   height: 100%;
   border-radius: 2px;
-  background: var(--bp-amber, #ffd54f);
+  background: var(--bp-amber, #f0a36b);
   transition: width 50ms linear;
 }
 
@@ -146,8 +148,8 @@
   position: absolute;
   z-index: 400;
   pointer-events: none;
-  border: solid var(--bp-amber, #ffd54f);
-  border-radius: 6px;
+  border: solid var(--bp-amber, #f0a36b);
+  border-radius: 8px;
   box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.18);
 }
 
@@ -192,14 +194,14 @@
   align-items: center;
   gap: 8px;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: 12px;
   cursor: pointer;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: var(--bp-surface-hi, rgba(28, 28, 32, 0.95));
   color: var(--bp-text, #eee);
   transition: border-color 200ms ease, color 200ms ease;
 
-  &--dirty { border-color: var(--bp-amber-border, rgba(255, 213, 79, 0.5)); }
+  &--dirty { border-color: var(--bp-amber-border, rgba(240, 150, 90, 0.5)); }
   &--error { border-color: #ef5350; color: #ef5350; }
 }
 
@@ -219,7 +221,7 @@
   width: 320px;
   max-height: 60vh;
   overflow-y: auto;
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 10px;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: var(--bp-surface-hi, rgba(28, 28, 32, 0.97));
@@ -238,16 +240,16 @@
 
 .sync-panel-save {
   padding: 3px 10px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
-  border: 1px solid var(--bp-amber-border, rgba(255, 213, 79, 0.5));
+  border: 1px solid var(--bp-amber-border, rgba(240, 150, 90, 0.5));
   background: transparent;
-  color: var(--bp-amber, #ffd54f);
+  color: var(--bp-amber, #f0a36b);
 }
 
 .sync-panel-close {
   padding: 3px 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: transparent;
@@ -265,7 +267,7 @@
 
   &--error { color: #ef5350; }
   &--local { color: #9e9e9e; }
-  &--modified { color: var(--bp-amber, #ffd54f); }
+  &--modified { color: var(--bp-amber, #f0a36b); }
   &--synced { color: #4caf50; }
 }
 
@@ -283,7 +285,7 @@
   text-align: left;
   padding: 5px 6px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   background: transparent;
   color: var(--bp-text, #eee);
@@ -327,7 +329,7 @@
 
 .restore-modal {
   width: min(440px, 90vw);
-  border-radius: 12px;
+  border-radius: 16px;
   padding: 20px;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: var(--bp-surface-hi, rgba(28, 28, 32, 0.98));
@@ -338,6 +340,9 @@
 .restore-modal-title {
   margin: 0 0 8px;
   font-size: 1.05rem;
+  font-family: inherit;
+  color: var(--bp-mist);
+  font-weight: 500;
 }
 
 .restore-modal-hint {
@@ -355,17 +360,17 @@
 
 .restore-modal-restore {
   padding: 7px 16px;
-  border-radius: 7px;
+  border-radius: 100px;
   cursor: pointer;
-  border: 1px solid var(--bp-amber-border, rgba(255, 213, 79, 0.5));
-  background: var(--bp-amber, #ffd54f);
-  color: #1c1c20;
-  font-weight: 600;
+  border: 1px solid rgba(255, 200, 170, 0.2);
+  background: linear-gradient(100deg, var(--bp-oxblood) 0%, #8c2a20 100%);
+  color: var(--bp-mist);
+  font-weight: 500;
 }
 
 .restore-modal-discard {
   padding: 7px 16px;
-  border-radius: 7px;
+  border-radius: 100px;
   cursor: pointer;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: transparent;
@@ -508,11 +513,15 @@ app-board-drawing {
 }
 
 .trail-dot {
-  filter: drop-shadow(0 0 7px rgba(255, 213, 79, 0.95));
+  filter: drop-shadow(0 0 7px rgba(240, 150, 90, 0.95));
 }
 
 #background {
-  background-color: black;
+  background-color: var(--bp-ink);
+  background-image:
+    radial-gradient(60% 55% at 92% 100%, rgba(181, 43, 29, 0.1), transparent 70%),
+    radial-gradient(50% 50% at 6% 0%, rgba(60, 102, 147, 0.12), transparent 70%);
+  font-family: var(--bp-font-display);
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -579,9 +588,9 @@ app-board-drawing {
   width: 340px;
   max-height: 320px;
   overflow-y: auto;
-  background: rgba(30, 30, 40, 0.95);
+  background: var(--bp-surface-hi);
   border: 1px solid var(--bp-border);
-  border-radius: 8px;
+  border-radius: 12px;
   backdrop-filter: blur(10px);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
   z-index: 1001;
@@ -597,7 +606,7 @@ app-board-drawing {
   width: 100%;
   padding: 7px 8px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--bp-text);
   font-size: 0.82rem;
@@ -664,19 +673,19 @@ app-board-drawing {
 }
 
 ::ng-deep .board-search-button {
-  background: rgb(30, 30, 30);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-  color: #e6ebf0;
+  background: var(--bp-surface-ctrl);
+  border: 1px solid var(--bp-border);
+  color: var(--bp-mist);
   padding: 12px 16px;
   cursor: pointer;
   font-weight: 500;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 8px;
-  font-size: 0.95rem;
+  border-radius: 100px;
+  font-size: 0.9rem;
   gap: 8px;
-  height: 36px;
+  height: 34px;
   letter-spacing: 0.2px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
   transition:
@@ -689,21 +698,21 @@ app-board-drawing {
 }
 
 ::ng-deep .board-search-button:hover {
-  color: #ffd54f !important;
+  color: #f0a36b !important;
   transform: translateY(-1px);
-  background: rgba(55, 55, 55, 0.92);
+  background: rgba(255, 255, 255, 0.12);
 }
 
 ::ng-deep .board-search-button:active {
-  color: #ffb300 !important;
+  color: #e8894a !important;
   transform: translateY(0);
 }
 
 ::ng-deep .board-search-button:focus-visible {
   outline: none;
-  border-color: rgba(255, 213, 79, 0.38);
+  border-color: rgba(240, 150, 90, 0.38);
   box-shadow:
-    0 0 0 3px rgba(255, 213, 79, 0.12),
+    0 0 0 3px rgba(240, 150, 90, 0.12),
     0 2px 8px rgba(0, 0, 0, 0.2);
 }
 
@@ -717,14 +726,14 @@ app-board-drawing {
 
 ::ng-deep .board-search-button:hover app-svg-icon {
   transform: translateY(-2px);
-  color: #ffd54f;
-  filter: drop-shadow(0 0 8px rgba(255, 213, 79, 0.22));
+  color: #f0a36b;
+  filter: drop-shadow(0 0 8px rgba(240, 150, 90, 0.22));
 }
 
 ::ng-deep .board-search-button:active app-svg-icon {
   transform: translateY(0);
-  color: #ffb300;
-  filter: drop-shadow(0 0 8px rgba(255, 179, 0, 0.18));
+  color: #e8894a;
+  filter: drop-shadow(0 0 8px rgba(232, 137, 74, 0.18));
 }
 
 .board-container {
@@ -735,18 +744,15 @@ app-board-drawing {
   // frustum-cull camera (which made on-screen notes vanish).
   overflow: clip;
   position: relative;
-  // Infinite grid drawn with CSS line gradients (fine + major). Size and
+  // Infinite dot grid drawn with CSS gradients (fine + major). Size and
   // position are set in BoardMainService.updateBoard() so the grid scales and
-  // pans exactly with the content — no wiggle on zoom. Vector lines stay crisp
-  // at any zoom level, unlike the old raster pattern.
-  --grid-fine: rgba(255, 255, 255, 0.05);
-  --grid-major: rgba(255, 255, 255, 0.1);
-  background-color: rgba(0, 0, 0, 0.9);
+  // pans exactly with the content — no wiggle on zoom. The page behind it
+  // carries the color, so the repainted layer is only the dots.
+  --grid-fine: rgba(255, 255, 255, 0.09);
+  --grid-major: rgba(255, 255, 255, 0.2);
   background-image:
-    linear-gradient(to right, var(--grid-fine) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-fine) 1px, transparent 1px),
-    linear-gradient(to right, var(--grid-major) 1px, transparent 1px),
-    linear-gradient(to bottom, var(--grid-major) 1px, transparent 1px);
+    radial-gradient(circle, var(--grid-fine) 1px, transparent 1.5px),
+    radial-gradient(circle, var(--grid-major) 1.5px, transparent 2px);
   background-repeat: repeat;
   align-items: center;
 }
@@ -758,8 +764,8 @@ app-board-drawing {
   justify-content: center;
   padding: 4.5rem 1.5rem 1.5rem;
   z-index: 10;
-  background: rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(2px);
+  background: rgba(5, 2, 3, 0.5);
+  backdrop-filter: blur(6px);
   overscroll-behavior: contain;
 }
 
@@ -822,7 +828,7 @@ app-board-drawing {
   position: absolute;
   border-style: solid;
   border-color: var(--bp-border-hi);
-  border-radius: 6px;
+  border-radius: 8px;
   box-sizing: border-box;
   pointer-events: none;
   opacity: 0.5;
@@ -863,8 +869,8 @@ p {
   max-height: var(--window-max-height);
   min-height: calc(var(--panel-min-height) + var(--command-bar-height));
   box-sizing: border-box;
-  border-radius: 18px;
-  background: rgba(16, 16, 16, 0.92);
+  border-radius: 24px;
+  background: var(--bp-surface-hi);
   backdrop-filter: blur(22px);
   box-shadow: 0 40px 120px rgba(0, 0, 0, 0.7);
   overflow: hidden;
@@ -928,7 +934,7 @@ p {
 .command-import {
   background: none;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
-  border-radius: 8px;
+  border-radius: 100px;
   color: rgba(255, 255, 255, 0.8);
   font-size: 0.9rem;
   cursor: pointer;
@@ -939,8 +945,8 @@ p {
 }
 
 .command-import:hover {
-  color: var(--bp-amber, #ffd54f);
-  border-color: var(--bp-amber-border, rgba(255, 213, 79, 0.5));
+  color: var(--bp-amber, #f0a36b);
+  border-color: var(--bp-amber-border, rgba(240, 150, 90, 0.5));
 }
 
 /* ---------- Options popup ---------- */
@@ -960,7 +966,7 @@ p {
   width: 320px;
   max-width: calc(100vw - 3rem);
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
-  border-radius: 14px;
+  border-radius: 20px;
   background: var(--bp-surface-hi, rgba(28, 28, 32, 0.98));
   color: var(--bp-text, #eee);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.5);
@@ -1008,7 +1014,7 @@ p {
   gap: 0.15rem;
   text-align: left;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.12));
-  border-radius: 10px;
+  border-radius: 14px;
   background: var(--bp-surface-ctrl, rgba(255, 255, 255, 0.04));
   color: var(--bp-text, #eee);
   padding: 0.6rem 0.75rem;
@@ -1019,7 +1025,7 @@ p {
 }
 
 .options-item:hover:not(:disabled) {
-  border-color: var(--bp-amber-border, rgba(255, 213, 79, 0.5));
+  border-color: var(--bp-amber-border, rgba(240, 150, 90, 0.5));
   background: var(--bp-surface-ctrl, rgba(255, 255, 255, 0.08));
 }
 
@@ -1049,6 +1055,7 @@ p {
   cursor: default;
   gap: 0.5rem;
   width: 100%;
+  box-sizing: border-box;
 
   &:hover {
     // No interactive highlight — it's a form container, not a button.
@@ -1071,7 +1078,7 @@ p {
   width: 100%;
   box-sizing: border-box;
   padding: 6px 9px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: rgba(255, 255, 255, 0.06);
   color: var(--bp-text, #eee);
@@ -1080,7 +1087,7 @@ p {
 
   &:focus {
     outline: none;
-    border-color: var(--bp-amber-border, rgba(255, 213, 79, 0.5));
+    border-color: var(--bp-amber-border, rgba(240, 150, 90, 0.5));
   }
 
   &.is-invalid {
@@ -1097,17 +1104,17 @@ p {
   align-self: flex-end;
   margin-top: 0.15rem;
   padding: 6px 14px;
-  border-radius: 8px;
-  border: 1px solid var(--bp-amber-border, rgba(255, 213, 79, 0.5));
-  background: var(--bp-amber, rgba(255, 213, 79, 0.16));
-  color: var(--bp-text, #eee);
+  border-radius: 100px;
+  border: 1px solid rgba(255, 200, 170, 0.2);
+  background: linear-gradient(100deg, var(--bp-oxblood) 0%, #8c2a20 100%);
+  color: var(--bp-mist);
   font: inherit;
   font-size: 0.88rem;
   cursor: pointer;
   transition: background 160ms ease, border-color 160ms ease, opacity 160ms ease;
 
   &:hover:not(:disabled) {
-    background: var(--bp-amber, rgba(255, 213, 79, 0.28));
+    filter: brightness(1.15);
   }
 
   &:disabled {
@@ -1123,7 +1130,7 @@ p {
   transform: translateY(-50%);
   width: 64px;
   padding: 5px 8px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: rgba(255, 255, 255, 0.06);
   color: var(--bp-text, #eee);
@@ -1139,7 +1146,7 @@ p {
   }
 
   &:focus {
-    border-color: var(--bp-amber, #ffd54f);
+    border-color: var(--bp-amber, #f0a36b);
   }
 }
 
@@ -1216,13 +1223,13 @@ p {
 
 .command-item-row {
   position: relative;
-  border-radius: 10px;
+  border-radius: 14px;
 
   &::after {
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 10px;
+    border-radius: 14px;
     background: linear-gradient(
       to left,
       rgba(200, 50, 40, calc(var(--hover-x, 0) * var(--hover-x, 0) * 0.55)) 0%,
@@ -1245,7 +1252,7 @@ p {
   border: none;
   background: transparent;
   cursor: pointer;
-  border-radius: 0 10px 10px 0;
+  border-radius: 0 14px 14px 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1277,7 +1284,7 @@ p {
 .command-item {
   width: 100%;
   padding: 0.75rem 1rem;
-  border-radius: 10px;
+  border-radius: 14px;
   background: transparent;
   border: none;
   color: #fff;
@@ -1352,7 +1359,7 @@ p {
 .command-textarea {
   background: rgba(255, 255, 255, 0.04);
   border: none;
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 0.75rem;
   color: #fff;
   resize: none;
@@ -1379,7 +1386,7 @@ p {
 .primary {
   flex: 1;
   height: 2.6rem;
-  border-radius: 10px;
+  border-radius: 100px;
   border: none;
   background: #fff;
   color: #000;
@@ -1389,7 +1396,7 @@ p {
 .secondary {
   flex: 1;
   height: 2.6rem;
-  border-radius: 10px;
+  border-radius: 100px;
   background: transparent;
   border: 1px solid rgba(255, 255, 255, 0.25);
   color: #fff;
@@ -1409,9 +1416,9 @@ p {
 }
 
 .delete-modal {
-  background: linear-gradient(180deg, rgba(28, 28, 30, 0.98) 0%, rgba(18, 18, 20, 0.98) 100%);
+  background: var(--bp-surface-hi);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  border-radius: 14px;
+  border-radius: 20px;
   padding: 2rem;
   width: 380px;
   box-shadow: 0 24px 60px rgba(0, 0, 0, 0.6);
@@ -1423,8 +1430,9 @@ p {
 .delete-modal-title {
   margin: 0;
   font-size: 1.1rem;
-  font-weight: 600;
-  color: #fff;
+  font-family: inherit;
+  font-weight: 500;
+  color: var(--bp-mist);
 }
 
 .delete-modal-hint {
@@ -1468,14 +1476,14 @@ p {
   letter-spacing: 0.02em;
   background: rgba(255, 255, 255, 0.05);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 7px;
+  border-radius: 10px;
   color: transparent;
   caret-color: rgba(255, 255, 255, 0.8);
   outline: none;
   transition: border-color 150ms ease;
 
   &:focus {
-    border-color: rgba(255, 213, 79, 0.45);
+    border-color: rgba(240, 150, 90, 0.45);
   }
 }
 
@@ -1488,7 +1496,7 @@ p {
 
 .delete-modal-confirm {
   padding: 0.45rem 1.1rem;
-  border-radius: 7px;
+  border-radius: 100px;
   border: none;
   background: rgba(200, 50, 40, 0.85);
   color: #fff;
@@ -1509,7 +1517,7 @@ p {
 
 .delete-modal-cancel {
   padding: 0.45rem 1.1rem;
-  border-radius: 7px;
+  border-radius: 100px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: transparent;
   color: rgba(255, 255, 255, 0.7);
@@ -1534,7 +1542,7 @@ p {
 
 ::ng-deep .ai-bar-btn {
   padding: 4px 12px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.15);
   background: transparent;
   color: rgba(255, 255, 255, 0.8);
@@ -1555,12 +1563,12 @@ p {
   }
 
   &--primary {
-    background: rgba(255, 213, 79, 0.12);
+    background: rgba(240, 150, 90, 0.12);
     border-color: var(--bp-amber);
     color: var(--bp-amber);
 
     &:hover:not(:disabled) {
-      background: rgba(255, 213, 79, 0.22);
+      background: rgba(240, 150, 90, 0.22);
     }
   }
 }
@@ -1613,8 +1621,8 @@ p {
   max-height: min(78vh, 720px);
   background: linear-gradient(
     180deg,
-    rgba(30, 30, 34, 0.97),
-    rgba(20, 20, 24, 0.97)
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.03)
   );
   backdrop-filter: blur(18px);
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -1639,7 +1647,7 @@ p {
 }
 
 .quiz-card-icon {
-  color: var(--bp-amber, #ffd54f);
+  color: var(--bp-amber, #f0a36b);
   width: 18px;
   height: 18px;
   flex-shrink: 0;
@@ -1664,7 +1672,7 @@ p {
 .quiz-card-close {
   width: 28px;
   height: 28px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: none;
   background: transparent;
   color: rgba(255, 255, 255, 0.7);
@@ -1694,7 +1702,7 @@ p {
 
 .quiz-progress-fill {
   height: 100%;
-  background: var(--bp-amber, #ffd54f);
+  background: var(--bp-amber, #f0a36b);
   transition: width 200ms ease;
 }
 
@@ -1736,7 +1744,7 @@ p {
   width: 100%;
   text-align: left;
   padding: 13px 15px;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
   color: rgba(255, 255, 255, 0.9);
@@ -1756,7 +1764,7 @@ p {
   }
 
   &.selected {
-    background: rgba(255, 213, 79, 0.16);
+    background: rgba(240, 150, 90, 0.16);
     border-color: var(--bp-amber);
     color: #fff;
 
@@ -1775,7 +1783,7 @@ p {
   width: 24px;
   height: 24px;
   flex-shrink: 0;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(255, 255, 255, 0.05);
   font-size: 0.8rem;
@@ -1796,9 +1804,9 @@ p {
   font-size: 0.86em;
   padding: 1px 6px;
   border-radius: 5px;
-  background: rgba(255, 213, 79, 0.12);
+  background: rgba(240, 150, 90, 0.12);
   border: 1px solid rgba(255, 255, 255, 0.1);
-  color: var(--bp-amber, #ffd54f);
+  color: var(--bp-amber, #f0a36b);
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -1819,7 +1827,7 @@ p {
   right: 6px;
   z-index: 1;
   padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.18);
   background: rgba(0, 0, 0, 0.55);
   color: rgba(255, 255, 255, 0.85);
@@ -1842,7 +1850,7 @@ p {
 ::ng-deep .ai-code {
   margin: 10px 0;
   padding: 12px 14px;
-  border-radius: 10px;
+  border-radius: 14px;
   background: rgba(0, 0, 0, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.1);
   overflow-x: auto;
@@ -1927,7 +1935,7 @@ p {
 
 .quiz-btn {
   padding: 8px 16px;
-  border-radius: 9px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
   color: #fff;
@@ -1946,14 +1954,14 @@ p {
   }
 
   &--primary {
-    border-color: var(--bp-amber, #ffd54f);
-    background: var(--bp-amber, #ffd54f);
+    border-color: var(--bp-amber, #f0a36b);
+    background: var(--bp-amber, #f0a36b);
     color: #1a1a1a;
     font-weight: 700;
 
     &:hover:not(:disabled) {
       filter: brightness(1.08);
-      background: var(--bp-amber, #ffd54f);
+      background: var(--bp-amber, #f0a36b);
     }
   }
 }
@@ -2044,7 +2052,7 @@ p {
 .quiz-result {
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-left-width: 3px;
-  border-radius: 8px;
+  border-radius: 12px;
   padding: 10px 12px;
   background: rgba(255, 255, 255, 0.03);
 
@@ -2177,7 +2185,7 @@ p {
 
 .quiz-opt-expl {
   padding: 6px 8px;
-  border-radius: 8px;
+  border-radius: 12px;
   border-left: 3px solid rgba(255, 255, 255, 0.15);
   background: rgba(255, 255, 255, 0.04);
 
@@ -2217,7 +2225,7 @@ p {
   text-transform: uppercase;
   letter-spacing: 0.04em;
   padding: 1px 6px;
-  border-radius: 6px;
+  border-radius: 8px;
   white-space: nowrap;
 
   // Green = part of the answer key. Independent of what the user picked.
@@ -2243,7 +2251,7 @@ p {
   align-self: flex-start;
   margin-top: 6px;
   padding: 4px 10px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.85);
@@ -2264,7 +2272,7 @@ p {
   align-items: center;
   gap: 6px;
   padding: 5px 10px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
   color: rgba(255, 255, 255, 0.9);
@@ -2300,7 +2308,7 @@ p {
   gap: 6px;
   padding: 3px 10px 3px 6px;
   border-radius: 20px;
-  background: rgba(20, 20, 20, 0.9);
+  background: var(--bp-surface-hi);
   border: 1px solid rgba(255, 255, 255, 0.12);
   font-size: 0.72rem;
   color: rgba(255, 255, 255, 0.8);
@@ -2347,10 +2355,10 @@ p {
   top: 24px;
   right: 0;
   z-index: 11;
-  background: rgba(20, 20, 20, 0.95);
+  background: var(--bp-surface-hi);
   backdrop-filter: blur(16px);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 10px;
+  border-radius: 14px;
   padding: 12px;
   max-width: 320px;
   max-height: 300px;
@@ -2375,7 +2383,7 @@ p {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 0.7rem;
   font-weight: 700;
   color: #fff;
@@ -2417,9 +2425,9 @@ p {
   gap: 0.4rem;
   padding: 0.6rem 0.9rem;
   border-radius: 999px;
-  border: 1px solid var(--bp-amber-border, rgba(255, 213, 79, 0.5));
-  background: var(--bp-surface-hi, rgba(28, 28, 32, 0.96));
-  color: var(--bp-amber, #ffd54f);
+  border: 1px solid rgba(255, 200, 170, 0.2);
+  background: linear-gradient(100deg, var(--bp-oxblood) 0%, #8c2a20 100%);
+  color: var(--bp-mist);
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
@@ -2439,7 +2447,8 @@ p {
   display: flex;
   flex-direction: column;
   border-left: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
-  background: var(--bp-surface-hi, rgba(20, 20, 24, 0.98));
+  // Solid instead of blurred: the board keeps panning behind this panel.
+  background: rgb(18, 13, 14);
   color: var(--bp-text, #eee);
   box-shadow: -12px 0 40px rgba(0, 0, 0, 0.45);
 }
@@ -2452,7 +2461,7 @@ p {
   border-bottom: 1px solid var(--bp-border, rgba(255, 255, 255, 0.12));
 }
 
-.ai-chat-header-icon { color: var(--bp-amber, #ffd54f); }
+.ai-chat-header-icon { color: var(--bp-amber, #f0a36b); }
 
 // ── Tabs ───────────────────────────────────────────────────────────────────
 
@@ -2480,8 +2489,8 @@ p {
   }
 
   &.on {
-    color: var(--bp-amber, #ffd54f);
-    border-bottom-color: var(--bp-amber, #ffd54f);
+    color: var(--bp-amber, #f0a36b);
+    border-bottom-color: var(--bp-amber, #f0a36b);
   }
 }
 
@@ -2507,10 +2516,10 @@ p {
   justify-content: center;
   gap: 7px;
   padding: 9px 12px;
-  border-radius: 9px;
-  border: 1px solid var(--bp-amber-border, rgba(255, 213, 79, 0.5));
-  background: rgba(255, 213, 79, 0.12);
-  color: var(--bp-amber, #ffd54f);
+  border-radius: 12px;
+  border: 1px solid var(--bp-amber-border, rgba(240, 150, 90, 0.5));
+  background: rgba(240, 150, 90, 0.12);
+  color: var(--bp-amber, #f0a36b);
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
@@ -2518,7 +2527,7 @@ p {
 
   app-svg-icon { width: 15px; height: 15px; }
 
-  &:hover { background: rgba(255, 213, 79, 0.2); }
+  &:hover { background: rgba(240, 150, 90, 0.2); }
 }
 
 .ai-chat-empty--list {
@@ -2530,7 +2539,7 @@ p {
   align-items: center;
   gap: 8px;
   padding: 9px 10px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   cursor: pointer;
@@ -2574,7 +2583,7 @@ p {
   width: 24px;
   height: 24px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--bp-text-muted);
   cursor: pointer;
@@ -2652,7 +2661,7 @@ p {
   align-items: center;
   gap: 5px;
   padding: 6px 12px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.05);
   color: var(--bp-text, #eee);
@@ -2677,9 +2686,9 @@ p {
   }
 
   &--primary:not(:disabled) {
-    border-color: var(--bp-amber, #ffd54f);
-    color: var(--bp-amber, #ffd54f);
-    background: rgba(255, 213, 79, 0.12);
+    border-color: var(--bp-amber, #f0a36b);
+    color: var(--bp-amber, #f0a36b);
+    background: rgba(240, 150, 90, 0.12);
   }
 }
 
@@ -2698,7 +2707,7 @@ p {
   flex-direction: column;
   gap: 4px;
   padding: 8px;
-  border-radius: 8px;
+  border-radius: 12px;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid rgba(255, 255, 255, 0.08);
 }
@@ -2725,7 +2734,7 @@ p {
   width: 100%;
   text-align: left;
   padding: 8px 10px;
-  border-radius: 7px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.04);
   color: var(--bp-text, #eee);
@@ -2784,7 +2793,7 @@ p {
   gap: 10px;
   margin-top: 2px;
   padding: 9px 11px;
-  border-radius: 9px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   background: rgba(255, 255, 255, 0.03);
   color: var(--bp-text, #eee);
@@ -2806,8 +2815,8 @@ p {
 
   // Active (checked) card gets a subtle amber wash.
   &:has(input:checked) {
-    border-color: rgba(255, 213, 79, 0.45);
-    background: rgba(255, 213, 79, 0.07);
+    border-color: rgba(240, 150, 90, 0.45);
+    background: rgba(240, 150, 90, 0.07);
   }
 }
 
@@ -2837,8 +2846,8 @@ p {
 }
 
 input:checked + .ai-toggle-box {
-  background: var(--bp-amber, #ffd54f);
-  border-color: var(--bp-amber, #ffd54f);
+  background: var(--bp-amber, #f0a36b);
+  border-color: var(--bp-amber, #f0a36b);
 
   &::after {
     transform: rotate(45deg) scale(1);
@@ -2846,7 +2855,7 @@ input:checked + .ai-toggle-box {
 }
 
 input:focus-visible + .ai-toggle-box {
-  box-shadow: 0 0 0 3px rgba(255, 213, 79, 0.35);
+  box-shadow: 0 0 0 3px rgba(240, 150, 90, 0.35);
 }
 
 .ai-toggle-text {
@@ -2903,7 +2912,7 @@ input:focus-visible + .ai-toggle-box {
 
 .ai-tool-chip {
   padding: 4px 10px;
-  border-radius: 7px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.04);
   color: var(--bp-text, #eee);
@@ -2916,9 +2925,9 @@ input:focus-visible + .ai-toggle-box {
   }
 
   &.on {
-    border-color: var(--bp-amber, #ffd54f);
-    color: var(--bp-amber, #ffd54f);
-    background: rgba(255, 213, 79, 0.12);
+    border-color: var(--bp-amber, #f0a36b);
+    color: var(--bp-amber, #f0a36b);
+    background: rgba(240, 150, 90, 0.12);
   }
 }
 
@@ -2926,7 +2935,7 @@ input:focus-visible + .ai-toggle-box {
   width: 100%;
   resize: vertical;
   padding: 8px 10px;
-  border-radius: 8px;
+  border-radius: 12px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.04);
   color: var(--bp-text, #eee);
@@ -2936,7 +2945,7 @@ input:focus-visible + .ai-toggle-box {
 
   &:focus {
     outline: none;
-    border-color: var(--bp-amber, #ffd54f);
+    border-color: var(--bp-amber, #f0a36b);
   }
 }
 
@@ -2990,14 +2999,14 @@ input:focus-visible + .ai-toggle-box {
 .ai-chat-bubble {
   max-width: 85%;
   padding: 0.55rem 0.75rem;
-  border-radius: 12px;
+  border-radius: 16px;
   font-size: 0.9rem;
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
 
   .is-user & {
-    background: var(--bp-amber, #ffd54f);
+    background: var(--bp-amber, #f0a36b);
     color: #1c1c20;
   }
   .is-assistant & {
@@ -3019,7 +3028,7 @@ input:focus-visible + .ai-toggle-box {
 
 .ai-msg-copy {
   padding: 1px 8px;
-  border-radius: 6px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
   color: var(--bp-text-muted);
@@ -3043,7 +3052,7 @@ input:focus-visible + .ai-toggle-box {
 
 .ai-action {
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.14));
-  border-radius: 10px;
+  border-radius: 14px;
   background: var(--bp-surface-ctrl, rgba(255, 255, 255, 0.04));
   padding: 0.55rem 0.65rem;
 
@@ -3063,7 +3072,7 @@ input:focus-visible + .ai-toggle-box {
 .ai-action-label {
   font-size: 0.82rem;
   font-weight: 600;
-  color: var(--bp-amber, #ffd54f);
+  color: var(--bp-amber, #f0a36b);
 }
 
 .ai-action-status {
@@ -3097,7 +3106,7 @@ input:focus-visible + .ai-toggle-box {
 .ai-action-reject,
 .ai-action-revert,
 .ai-apply-all {
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 0.8rem;
   padding: 0.3rem 0.7rem;
   cursor: pointer;
@@ -3108,8 +3117,8 @@ input:focus-visible + .ai-toggle-box {
 }
 
 .ai-action-apply {
-  border-color: var(--bp-amber-border, rgba(255, 213, 79, 0.5));
-  background: var(--bp-amber, #ffd54f);
+  border-color: var(--bp-amber-border, rgba(240, 150, 90, 0.5));
+  background: var(--bp-amber, #f0a36b);
   color: #1c1c20;
   font-weight: 600;
 }
@@ -3118,8 +3127,8 @@ input:focus-visible + .ai-toggle-box {
 
 .ai-apply-all {
   align-self: flex-start;
-  border-color: var(--bp-amber-border, rgba(255, 213, 79, 0.5));
-  color: var(--bp-amber, #ffd54f);
+  border-color: var(--bp-amber-border, rgba(240, 150, 90, 0.5));
+  color: var(--bp-amber, #f0a36b);
 }
 
 .ai-chat-thinking {
@@ -3133,7 +3142,7 @@ input:focus-visible + .ai-toggle-box {
 
 .ai-stop-btn {
   padding: 3px 10px;
-  border-radius: 7px;
+  border-radius: 10px;
   border: 1px solid rgba(255, 120, 120, 0.45);
   background: rgba(255, 90, 90, 0.12);
   color: #ff8a8a;
@@ -3168,12 +3177,12 @@ input:focus-visible + .ai-toggle-box {
   text-overflow: ellipsis;
   white-space: nowrap;
 
-  app-svg-icon { width: 10px; height: 10px; flex-shrink: 0; color: var(--bp-amber, #ffd54f); }
+  app-svg-icon { width: 10px; height: 10px; flex-shrink: 0; color: var(--bp-amber, #f0a36b); }
 
   &--text {
-    color: var(--bp-amber, #ffd54f);
-    background: rgba(255, 213, 79, 0.1);
-    border-color: rgba(255, 213, 79, 0.35);
+    color: var(--bp-amber, #f0a36b);
+    background: rgba(240, 150, 90, 0.1);
+    border-color: rgba(240, 150, 90, 0.35);
   }
 
   &--note {
@@ -3221,9 +3230,9 @@ input:focus-visible + .ai-toggle-box {
   gap: 4px;
   max-width: 220px;
   padding-right: 0.2rem;
-  border-color: rgba(255, 213, 79, 0.4);
-  background: rgba(255, 213, 79, 0.1);
-  color: var(--bp-amber, #ffd54f);
+  border-color: rgba(240, 150, 90, 0.4);
+  background: rgba(240, 150, 90, 0.1);
+  color: var(--bp-amber, #f0a36b);
 }
 
 .ai-chat-chip-quote {
@@ -3263,7 +3272,7 @@ input:focus-visible + .ai-toggle-box {
   resize: none;
   min-height: 40px;
   max-height: 120px;
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.15));
   background: var(--bp-surface-ctrl, rgba(255, 255, 255, 0.05));
   color: var(--bp-text, #eee);
@@ -3283,7 +3292,7 @@ input:focus-visible + .ai-toggle-box {
 
   &:focus {
     outline: none;
-    border-color: var(--bp-amber, #ffd54f);
+    border-color: var(--bp-amber, #f0a36b);
   }
 
   &:disabled {
@@ -3293,9 +3302,9 @@ input:focus-visible + .ai-toggle-box {
 }
 
 .ai-chat-send {
-  border-radius: 10px;
-  border: 1px solid var(--bp-amber-border, rgba(255, 213, 79, 0.5));
-  background: var(--bp-amber, #ffd54f);
+  border-radius: 14px;
+  border: 1px solid var(--bp-amber-border, rgba(240, 150, 90, 0.5));
+  background: var(--bp-amber, #f0a36b);
   color: #1c1c20;
   font-weight: 600;
   padding: 0 0.9rem;
@@ -3316,7 +3325,7 @@ input:focus-visible + .ai-toggle-box {
   z-index: 5;
 
   &:hover {
-    background: var(--bp-amber, #ffd54f);
+    background: var(--bp-amber, #f0a36b);
     opacity: 0.5;
   }
 }
@@ -3330,7 +3339,7 @@ input:focus-visible + .ai-toggle-box {
   width: 26px;
   height: 26px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   background: transparent;
   color: var(--bp-text-muted);
   font-size: 1rem;
@@ -3355,7 +3364,7 @@ input:focus-visible + .ai-toggle-box {
   flex-direction: column;
   overflow: hidden;
   border: 1px solid var(--bp-border, rgba(255, 255, 255, 0.18));
-  border-radius: 12px;
+  border-radius: 16px;
   background: var(--bp-surface-hi, rgba(20, 20, 24, 0.99));
   color: var(--bp-text, #eee);
   box-shadow: 0 16px 50px rgba(0, 0, 0, 0.55);
@@ -3391,7 +3400,7 @@ input:focus-visible + .ai-toggle-box {
     }
     &::-webkit-scrollbar-thumb {
       background: rgba(255, 255, 255, 0.18);
-      border-radius: 6px;
+      border-radius: 8px;
       // Inset the thumb so it looks like a slim pill, not edge-to-edge.
       border: 2px solid transparent;
       background-clip: padding-box;
@@ -3422,3 +3431,22 @@ input:focus-visible + .ai-toggle-box {
 .qz-rs-nw { top: -4px; left: -4px; width: 14px; height: 14px; cursor: nwse-resize; }
 .qz-rs-se { bottom: -4px; right: -4px; width: 14px; height: 14px; cursor: nwse-resize; }
 .qz-rs-sw { bottom: -4px; left: -4px; width: 14px; height: 14px; cursor: nesw-resize; }
+
+// ── Glass panels ───────────────────────────────────────────────────────────
+
+.search-window,
+.options-popup,
+.quiz-popup {
+  @include glass.panel;
+}
+
+.delete-modal,
+.restore-modal,
+.sync-panel,
+.link-pick-bar {
+  @include glass.panel(18px);
+}
+
+::ng-deep .global-search-results {
+  @include glass.panel(14px);
+}

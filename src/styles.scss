@@ -119,6 +119,12 @@ a {
     );
 }
 
+// Form controls ignore the page font by default. :where keeps this weaker than
+// any class, so the monospace inputs on the board stay monospace.
+:where(#background) :is(button, input, textarea, select) {
+  font-family: inherit;
+}
+
 .glass-button {
   border: 1px solid rgba(white, 0.1);
   background-color: rgba(255, 255, 255, 0.1);
@@ -217,7 +223,7 @@ a {
   box-shadow: none !important;
   border: none !important;
   color: #fff !important;
-  padding-left: 8px !important;
+  padding-left: 14px !important;
   padding-right: 8px !important;
 }
 

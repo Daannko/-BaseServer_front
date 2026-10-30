@@ -9,9 +9,9 @@
   font-size: 11px;
   line-height: 1.4;
   color: #e6edf3;
-  background: rgba(13, 17, 23, 0.82);
+  background: var(--bp-surface-hi);
   border: 1px solid rgba(255, 255, 255, 0.12);
-  border-radius: 8px;
+  border-radius: 12px;
   backdrop-filter: blur(4px);
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
   user-select: none;

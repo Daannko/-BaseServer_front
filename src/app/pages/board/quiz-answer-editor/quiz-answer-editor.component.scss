@@ -4,7 +4,7 @@
 
 .quiz-answer-host {
   // Matches the old plain-textarea look so the panel layout is unchanged.
-  border-radius: 10px;
+  border-radius: 14px;
   border: 1px solid rgba(255, 255, 255, 0.12);
   background: rgba(255, 255, 255, 0.05);
   transition: border-color 100ms ease, background 100ms ease;
@@ -40,16 +40,16 @@
     font-size: 0.86em;
     padding: 1px 6px;
     border-radius: 5px;
-    background: rgba(255, 213, 79, 0.12);
+    background: rgba(240, 150, 90, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--bp-amber, #ffd54f);
+    color: var(--bp-amber, #f0a36b);
   }
 
   // Fenced code block: ```…``` (token colors come from the global .hljs rules)
   pre {
     margin: 8px 0;
     padding: 12px 14px;
-    border-radius: 10px;
+    border-radius: 14px;
     background: rgba(0, 0, 0, 0.4);
     border: 1px solid rgba(255, 255, 255, 0.1);
     overflow-x: auto;

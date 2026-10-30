@@ -221,10 +221,10 @@ export class BoardMainService {
       viewport.style.transform = `scale(${this.zoom}) translate(${-this.cameraX}px, ${-this.cameraY}px)`;
     }
 
-    // Infinite grid: lines are CSS gradients (see board.component.scss). The
+    // Infinite grid: dots are CSS gradients (see board.component.scss). The
     // cell size scales with zoom; an adaptive factor keeps the on-screen cell
     // in a sane range so the grid never turns to noise when zoomed far out/in.
-    // Major lines sit every 5 fine cells. Background moves in screen px, so the
+    // Major dots sit every 5 fine cells. Background moves in screen px, so the
     // camera offset is multiplied by zoom (same as the viewport transform).
     const BASE = 50; // world px per fine cell at zoom 1
     let cell = BASE * this.zoom;
@@ -236,8 +236,7 @@ export class BoardMainService {
     if (this.debug.freezeGridOnPan && this.isDragging) return;
     const px = -this.cameraX * this.zoom;
     const py = -this.cameraY * this.zoom;
-    board.style.backgroundSize =
-      `${cell}px ${cell}px, ${cell}px ${cell}px, ${major}px ${major}px, ${major}px ${major}px`;
+    board.style.backgroundSize = `${cell}px ${cell}px, ${major}px ${major}px`;
     board.style.backgroundPosition = `${px}px ${py}px`;
   }
 

@@ -57,9 +57,12 @@
   box-sizing: border-box;
   height: 100%;
   width: 100%;
-  border-radius: calc(var(--tile-w) * 0.02);
-  border: var(--note-border-width, 1px) solid var(--note-border-color, transparent);
-  background: transparent;
+  border-radius: clamp(10px, calc(var(--tile-w) * 0.03), 28px);
+  border: var(--note-border-width, 1px) solid var(--note-border-color, rgba(255, 255, 255, 0.09));
+  // Flat fill and a hard-edged highlight only. No blur: a board can hold
+  // hundreds of these and they all repaint while panning.
+  background: rgba(255, 255, 255, 0.045);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.07);
   cursor: grab;
   // clip (not hidden): clips identically but is NOT a scroll container, so
   // focusing the editor can't scroll it and shift the board.
@@ -69,12 +72,12 @@
     box-shadow 120ms ease-out;
 
   &:hover {
-    border-color: var(--note-border-color, rgba(255, 255, 255, 0.12));
+    border-color: var(--note-border-color, rgba(255, 255, 255, 0.2));
   }
 
   &.is-focused {
-    border-color: var(--note-border-color, rgba(255, 255, 255, 0.65));
-    box-shadow: 0 0 0 3px var(--note-border-glow, rgba(255, 255, 255, 0.15));
+    border-color: var(--note-border-color, var(--bp-amber-border));
+    box-shadow: 0 0 0 3px var(--note-border-glow, var(--bp-amber-dim));
     cursor: default;
   }
 
@@ -85,15 +88,18 @@
     // Scale with note size so the outline stays visible on big notes
     // (a fixed 2px disappears when the note is large / zoomed out).
     border-width: max(2px, calc(var(--tile-min, 200px) * 0.005));
-    border-color: rgba(255, 255, 255, 0.45);
+    border-color: rgba(255, 255, 255, 0.2);
+    background: transparent;
+    box-shadow: none;
 
     &:hover {
-      border-color: rgba(255, 255, 255, 0.6);
+      border-color: rgba(255, 255, 255, 0.35);
     }
 
     &.is-focused {
       border-style: solid;
-      border-color: rgba(255, 255, 255, 0.7);
+      border-color: var(--bp-amber-border);
+      box-shadow: 0 0 0 3px var(--bp-amber-dim);
     }
   }
 }
@@ -125,7 +131,7 @@
 
 
 ::ng-deep .pm-persistent-selection {
-  background: rgba(180, 213, 255, 0.65);
+  background: rgba(240, 150, 90, 0.35);
 }
 
 ::ng-deep .note-option-input {
@@ -147,7 +153,7 @@
 
   &:focus {
     border-color: var(--bp-amber-border);
-    background: rgba(255, 213, 79, 0.06);
+    background: rgba(240, 150, 90, 0.06);
   }
 }
 
@@ -165,7 +171,7 @@
   cursor: pointer;
 
   &:hover {
-    color: var(--bp-amber, #ffd54f);
+    color: var(--bp-amber, #f0a36b);
   }
 }
 
@@ -176,7 +182,7 @@
   overflow: clip;
   height: 100%;
   box-sizing: border-box;
-  padding: 6px 6px 0 0;
+  padding: 12px 10px 0 14px;
   white-space: pre-wrap;
   word-break: break-word;
   font-size: var(--note-font-size, 25px);
@@ -193,9 +199,9 @@
   overflow: clip;
   height: 100%;
   box-sizing: border-box;
-  padding-right: 6px;
+  padding-right: 10px;
   cursor: text;
-  padding-top: 6px;
+  padding-top: 12px;
   line-height: 1;
 
   // Lists: nudge in from the left so the marker (•, 1.) isn't clipped against
@@ -229,6 +235,15 @@
   .tiptap,
   .ProseMirror {
     font-size: var(--note-font-size, 25px);
+    line-height: 1.2;
+
+    // Beats the global grey h1/h3 rule in styles.scss and Material's Roboto.
+    h1, h2, h3, h4, h5, h6 {
+      color: var(--bp-mist);
+      font-family: inherit;
+      font-weight: 500;
+      letter-spacing: -0.015em;
+    }
   }
 
   :global(.ProseMirror),
@@ -242,7 +257,7 @@
 
   :global(.tiptap) {
     outline: none;
-    color: rgba(255, 255, 255, 0.86);
+    color: var(--bp-text);
     line-height: 1.35;
 
     span[style*="font-size"] {
@@ -279,17 +294,17 @@
     background-color: rgba(0, 0, 0, 0.3);
     color: var(--bp-amber);
     padding: 2px 6px;
-    border-radius: 4px;
-    font-family: "Courier New", monospace;
+    border-radius: 6px;
+    font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
     // Inherit the surrounding run's size — the fontSize textStyle mark now
     // survives the code mark, so 1em matches the text it was typed in.
     font-size: 1em;
   }
 
   pre {
-    background-color: rgba(0, 0, 0, 0.4);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
+    background-color: rgba(5, 2, 3, 0.45);
+    border: 1px solid var(--bp-border);
+    border-radius: 12px;
     padding: 12px;
     overflow-x: auto;
     margin: 8px 0;
@@ -302,7 +317,7 @@
       color: #e6ebf0;
       padding: 0;
       border-radius: 0;
-      font-family: "Courier New", monospace;
+      font-family: ui-monospace, 'Cascadia Code', Consolas, monospace;
       // Match the size set on the <pre> (its fontSize attr = the size active
       // when the block was made), so code text keeps the user's font size.
       font-size: 1em;
@@ -314,15 +329,15 @@
   table {
     border-collapse: collapse;
     margin: 12px 0;
-    background-color: rgba(0, 0, 0, 0.2);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background-color: rgba(5, 2, 3, 0.25);
+    border: 1px solid var(--bp-border);
     border-radius: 4px;
     overflow: hidden;
     width: auto;
   }
 
   th, td {
-    border: 1px solid rgba(255, 255, 255, 0.15);
+    border: 1px solid var(--bp-border);
     padding: 10px 12px;
     text-align: left;
     color: rgba(255, 255, 255, 0.9);
@@ -344,9 +359,9 @@
   }
 
   th {
-    background-color: rgba(255, 213, 79, 0.15);
-    color: var(--bp-amber);
-    font-weight: 600;
+    background-color: rgba(255, 255, 255, 0.06);
+    color: var(--bp-mist);
+    font-weight: 500;
   }
 
   td:hover { background-color: rgba(255, 255, 255, 0.05); }
@@ -366,10 +381,10 @@
   margin-top: 1rem;
   width: fit-content;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 12px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 0.95rem;
-  background: rgb(30, 30, 30);
+  background: var(--bp-surface-hi);
   border: 1px solid rgba(255, 255, 255, 0.12);
   transition:
     transform 200ms ease-out,
@@ -384,7 +399,7 @@
     border: none;
     background: transparent;
     color: #e6ebf0;
-    border-radius: 6px;
+    border-radius: 8px;
     cursor: pointer;
     font-size: 0.75rem;
     font-weight: 600;
