@@ -11,6 +11,7 @@ import { AuthService } from '../../service/auth.service';
 import { Router, RouterModule } from '@angular/router';
 import { SnackBarService } from '../../service/snackbar.service';
 import { NgIf } from '@angular/common'; // Updated import path
+import { environment } from '../../../environments/environment';
 
 @Component({
   selector: 'app-auth',
@@ -29,6 +30,7 @@ export class AuthComponent {
   registrationForm!: FormGroup;
   leavingLogin: boolean = false;
   leavingRegistration: boolean = false;
+  signUpEnabled: boolean = environment.signUpEnabled;
   private ANIM_MS = 200;
 
   constructor(

@@ -23,7 +23,7 @@
             Sign In
           </button>
   
-          <div class="auth-info-container">
+          <div *ngIf="signUpEnabled" class="auth-info-container">
             <span class="auth-info" (click)="changeAuthForm()">
               Don't have an account? <span class="auth-link">Sign up</span>
             </span>

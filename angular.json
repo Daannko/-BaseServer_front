@@ -57,6 +57,17 @@
               "extractLicenses": false,
               "sourceMap": true
 
+            },
+            "lan": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true,
+              "fileReplacements": [
+                {
+                  "replace": "src/environments/environment.ts",
+                  "with": "src/environments/environment.lan.ts"
+                }
+              ]
             }
           },
           "defaultConfiguration": "production"
@@ -69,6 +80,12 @@
             },
             "development": {
               "buildTarget": "BaseServer-app:build:development"
+            },
+            "lan": {
+              "buildTarget": "BaseServer-app:build:lan",
+              "host": "0.0.0.0",
+              "port": 49191,
+              "proxyConfig": "proxy.lan.json"
             }
           },
           "defaultConfiguration": "development"
