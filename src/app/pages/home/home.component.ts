@@ -57,10 +57,10 @@ export class HomeComponent implements AfterViewInit, OnInit, OnDestroy {
     art: string;
     url: string;
   }[] = [
-    { name: 'Home Assistant', description: 'Home and farm sensors', icon: 'general/service-home', art: 'home', url: '' },
-    { name: 'Vaultwarden', description: 'Passwords', icon: 'general/service-vault', art: 'vault', url: '' },
-    { name: 'Cameras', description: 'Live streams', icon: 'general/service-camera', art: 'camera', url: '' },
-    { name: 'RacketWatch', description: 'OLX listings', icon: 'general/service-racket', art: 'racket', url: '' },
+    { name: 'Home Assistant', description: 'Home and farm sensors', icon: 'general/service-home', art: 'home', url: 'https://home.dannko.com' },
+    { name: 'Vaultwarden', description: 'Passwords', icon: 'general/service-vault', art: 'vault', url: 'https://vault.dannko.com' },
+    { name: 'Cameras', description: 'Live streams', icon: 'general/service-camera', art: 'camera', url: 'https://home.dannko.com/lovelace/default_view' },
+    { name: 'RacketWatch', description: 'OLX listings', icon: 'general/service-racket', art: 'racket', url: 'https://racketwatch.dannko.com' },
     { name: 'Free slot', description: 'Room for one more', icon: 'general/service-plus', art: 'slot', url: '' },
   ];
 
