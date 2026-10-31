@@ -25,20 +25,21 @@ app-navbar {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  justify-content: flex-end;
+  justify-content: center;
   min-height: 100%;
-  max-width: 96rem;
+  max-width: clamp(96rem, 80vw, 140rem);
   margin: 0 auto;
   padding: 2rem clamp(1.25rem, 3.5vw, 3rem);
+  // Read by the tiles too, so the whole block grows with the screen.
+  --tile-min: clamp(10.5rem, 18dvh, 19rem);
 }
 
 .hero {
-  flex: 1;
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
   gap: 2rem;
-  padding-bottom: 2rem;
+  padding-bottom: clamp(2rem, 5dvh, 4rem);
 }
 
 .dateInfo {
@@ -47,7 +48,7 @@ app-navbar {
 
 .clock {
   color: var(--bp-mist);
-  font-size: clamp(5.5rem, 17vw, 13.5rem);
+  font-size: clamp(5.5rem, min(17vw, 26dvh), 24rem);
   font-weight: 300;
   line-height: 0.9;
   letter-spacing: -0.05em;
@@ -58,14 +59,14 @@ app-navbar {
 .date {
   margin-top: 1rem;
   color: rgba(255, 255, 255, 0.72);
-  font-size: 1.25rem;
+  font-size: clamp(1.25rem, 2.4dvh, 2rem);
 }
 
 .weather-card {
   @include glass.ember-glass;
   box-sizing: border-box;
   flex: 0 0 auto;
-  width: 19rem;
+  width: clamp(19rem, 32dvh, 28rem);
   padding: 1.25rem 1.5rem;
   border-radius: 28px;
   color: white;
@@ -79,7 +80,7 @@ app-navbar {
 
 .weather-temp {
   margin: 0.5rem 0 1rem;
-  font-size: 5.5rem;
+  font-size: clamp(5.5rem, 13dvh, 9rem);
   font-weight: 300;
   line-height: 1;
   letter-spacing: -0.04em;
