@@ -150,6 +150,7 @@
         class="content-editor content-static"
         [class.is-static]="debug.disableEditor"
         (click)="onStaticClick($event)"
+        (mousedown)="onStaticMouseDown($event)"
       >
         <ng-container *ngIf="debug.disableEditor; else richStatic">{{ plainText }}</ng-container>
         <ng-template #richStatic>
@@ -279,6 +280,13 @@
           title="Code block"
         >
           <app-svg-icon icon="editor-code-duplicate"></app-svg-icon>
+        </button>
+        <button
+          (click)="tiptap.toggleDetails(contentEditor)"
+          [class.active]="tiptap.isToggleActive"
+          title="Click-to-show text: this line shows or hides the text under it"
+        >
+          <app-svg-icon icon="editor-toggle"></app-svg-icon>
         </button>
         <app-query-select
           *ngIf="tiptap.isCodeBlockActive"

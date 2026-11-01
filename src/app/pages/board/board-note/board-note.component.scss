@@ -121,6 +121,21 @@
   content-visibility: auto;
 }
 
+// An open toggle may need more room than the note's saved size. The box grows
+// over whatever is below it and goes back when closed, so hiding text never
+// resizes the note. Global because the toggle sits in [innerHTML] content.
+::ng-deep .note-surface:has(.note-toggle[open], .note-toggle.is-open) {
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 100%;
+
+  .note-body {
+    flex: 1;
+    height: auto;
+  }
+}
+
 ::ng-deep .content-editor .ProseMirror p.is-editor-empty:first-child::before {
   content: 'Start writing...';
   float: left;
@@ -227,6 +242,67 @@
     white-space: pre-wrap;
     tab-size: 4;
     -moz-tab-size: 4;
+  }
+
+  // Click-to-show text. Static notes render a native <details>, the editor its
+  // node view (button + content div), so both are laid out from the same box.
+  .note-toggle {
+    position: relative;
+    margin: 0 0 4px;
+    padding-left: 1.2em;
+
+    > button {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 1.2em;
+      height: 1.2em;
+      padding: 0;
+      border: 0;
+      background: none;
+      font-size: inherit;
+      cursor: pointer;
+    }
+
+    > summary::before,
+    > button::before {
+      content: '';
+      position: absolute;
+      left: 0.35em;
+      top: 0.34em;
+      border-left: 0.42em solid var(--bp-amber);
+      border-block: 0.28em solid transparent;
+    }
+
+    &[open] > summary::before,
+    &.is-open > button::before {
+      transform: rotate(90deg);
+    }
+  }
+
+  .note-toggle summary {
+    display: block;
+    list-style: none;
+    color: var(--bp-mist);
+    font-weight: 500;
+
+    &::-webkit-details-marker {
+      display: none;
+    }
+  }
+
+  &.content-static .note-toggle summary {
+    cursor: pointer;
+
+    &:hover {
+      color: var(--bp-amber);
+    }
+  }
+
+  .note-toggle [data-type='detailsContent'] {
+    margin-top: 0.2em;
+    padding-left: 0.6em;
+    border-left: 1px solid var(--bp-border);
   }
 
   // Base font-size for text that carries no explicit fontSize mark. A plain

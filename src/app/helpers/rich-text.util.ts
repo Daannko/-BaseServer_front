@@ -69,6 +69,22 @@ export function extractPlainText(doc: JSONContent | undefined): string {
   return '';
 }
 
+/** Copy of `doc` with the open state of its nth details node flipped, counting
+ *  in document order (the order querySelectorAll gives on the rendered HTML). */
+export function toggleDetailsAt(doc: JSONContent, index: number): JSONContent {
+  const next = structuredClone(doc);
+  let seen = 0;
+  const visit = (node: JSONContent): boolean => {
+    if (node.type === 'details' && seen++ === index) {
+      node.attrs = { ...node.attrs, open: !node.attrs?.['open'] };
+      return true;
+    }
+    return (node.content ?? []).some(visit);
+  };
+  visit(next);
+  return next;
+}
+
 export function getDoc(value?: unknown): JSONContent {
   if (!value) return emptyDoc();
 

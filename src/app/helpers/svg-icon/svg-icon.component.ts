@@ -21,6 +21,7 @@ export class SvgIconComponent {
       'editor-code': 'board_icons/editor-code.svg',
       'editor-code-duplicate': 'board_icons/editor-code-duplicate.svg',
       'editor-quote': 'board_icons/editor-quote.svg',
+      'editor-toggle': 'board_icons/editor-toggle.svg',
       'editor-ul': 'board_icons/editor-ul.svg',
       'editor-ol': 'board_icons/editor-ol.svg',
       'editor-table': 'board_icons/editor-table.svg',

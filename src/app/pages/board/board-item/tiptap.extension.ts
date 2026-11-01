@@ -1,5 +1,6 @@
 import { Mark as TiptapMark, mergeAttributes } from '@tiptap/core';
 import { Extension } from '@tiptap/core';
+import { Details, DetailsContent, DetailsSummary } from '@tiptap/extension-details';
 import { Plugin, PluginKey } from 'prosemirror-state';
 import { Decoration, DecorationSet } from 'prosemirror-view';
 
@@ -60,6 +61,15 @@ export const BoardLink = TiptapMark.create({
     };
   },
 });
+
+/** Click-to-show text: a summary line that shows or hides the blocks under it.
+ *  `persist` keeps the open state in the document, so a note reopens as it was
+ *  left. Shared by the live editor and the static note renderer. */
+export const NoteToggle = [
+  Details.configure({ persist: true, HTMLAttributes: { class: 'note-toggle' } }),
+  DetailsSummary,
+  DetailsContent,
+];
 
 const emptyLineSizeKey = new PluginKey('emptyLineFontSize');
 

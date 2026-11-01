@@ -31,7 +31,7 @@ import { BoardHistoryService } from '../board-history.service';
 import { BoardSelectionService } from '../board-selection.service';
 import { EditorPrefsService } from '../board-editor-prefs.service';
 import { BoardDebugService } from '../board-debug.service';
-import { extractPlainText } from '../../../helpers/rich-text.util';
+import { extractPlainText, toggleDetailsAt } from '../../../helpers/rich-text.util';
 import { NoteRenderService } from './note-render.service';
 import type { SafeHtml } from '@angular/platform-browser';
 
@@ -386,7 +386,8 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
     // instead of one per note.
   }
 
-  /** Click on the static note body: follow a board-link, else enter edit mode. */
+  /** Click on the static note body: follow a board-link, show or hide a toggle,
+   *  else enter edit mode. */
   onStaticClick(e: MouseEvent): void {
     const path = (e.composedPath?.() ?? []) as EventTarget[];
     const linkEl = path.find(
@@ -399,7 +400,29 @@ export class BoardNoteComponent implements OnDestroy, AfterViewInit {
       this.main.navigateToLink(targetId);
       return;
     }
+    const summary = path.find(
+      (p): p is HTMLElement => p instanceof HTMLElement && p.tagName === 'SUMMARY',
+    );
+    if (summary) {
+      // The doc holds the open state, so the static render and the editor agree.
+      e.preventDefault();
+      const root = summary.closest('.ProseMirror');
+      const index = Array.from(root?.querySelectorAll('details') ?? []).indexOf(
+        summary.parentElement as HTMLDetailsElement,
+      );
+      this.tile.content = toggleDetailsAt(this.tile.content, index);
+      return;
+    }
     this.enterEditMode(e);
+  }
+
+  /** Double click on a toggle line edits it. The first click re-renders the note
+   *  and replaces the line, so the browser sends no dblclick: use the second press. */
+  onStaticMouseDown(e: MouseEvent): void {
+    if (e.detail === 2 && (e.target as HTMLElement).closest('summary')) {
+      e.preventDefault();
+      this.enterEditMode(e);
+    }
   }
 
   /** Mount a live tiptap editor on this note and focus it. No-op if already

@@ -41,10 +41,13 @@ import {
   PersistentSelectionKey,
 } from '../../../helpers/tiptap/PersistentSelector';
 import type { BoardItem } from './board-item.data';
-import { BoardLink, EmptyLineFontSize, TabIndent } from './tiptap.extension';
+import { BoardLink, EmptyLineFontSize, NoteToggle, TabIndent } from './tiptap.extension';
 import { BoardLinkService } from '../board-link.service';
 
 type SelectionRange = { from: number; to: number };
+
+/** Summary text for a toggle made from an empty line. */
+const DEFAULT_TOGGLE_SUMMARY = 'Click to show more';
 
 /** Shared lowlight registry for code-block syntax highlighting. Only the
  *  languages offered in the picker are registered (keeps the bundle small vs
@@ -176,6 +179,7 @@ export class TiptapService {
   disableTextDrag = true;
   isTableActive = false;
   isCodeBlockActive = false;
+  isToggleActive = false;
   currentCodeLanguage = 'plaintext';
   currentFont = '';
   currentSize = '';
@@ -284,6 +288,7 @@ export class TiptapService {
         TextAlign.configure({ types: ['heading', 'paragraph'] }),
 
         BoardLink,
+        ...NoteToggle,
         TabIndent,
         EmptyLineFontSize,
         PersistentSelection,
@@ -411,6 +416,7 @@ export class TiptapService {
       editor.isActive('tableCell') || editor.isActive('tableHeader');
 
     this.isCodeBlockActive = editor.isActive('codeBlock');
+    this.isToggleActive = editor.isActive('details');
     this.currentCodeLanguage = this.isCodeBlockActive
       ? editor.getAttributes('codeBlock')?.['language'] || 'plaintext'
       : 'plaintext';
@@ -481,6 +487,65 @@ export class TiptapService {
     // Start the block at the size of the surrounding text.
     const fontSize = currentFontSize(editor.state);
     editor.chain().focus().toggleCodeBlock({ fontSize } as any).run();
+  }
+
+  /** Turn the current line into a click-to-show toggle with the rest of the
+   *  selection hidden under it, or back into plain text when already in one.
+   *  An empty line gets placeholder summary text, selected to type over. */
+  toggleDetails(editor: Editor) {
+    if (editor.isActive('details')) {
+      editor.chain().focus().unsetDetails().run();
+      return;
+    }
+
+    const { doc, schema, selection } = editor.state;
+    const range = selection.$from.blockRange(selection.$to);
+    if (!range) return;
+
+    const slice = doc.slice(range.start, range.end).content;
+    const blocks: any[] = slice.toJSON() ?? [];
+    if (!schema.nodes['detailsContent'].contentMatch.matchFragment(slice)) return;
+
+    const first = slice.firstChild;
+    const titled =
+      !!first?.textContent.trim() &&
+      (first.type.name === 'paragraph' || first.type.name === 'heading');
+    // A summary holds text only, so hard breaks in the line are dropped.
+    const summary = titled
+      ? blocks[0].content.filter((n: any) => n.type === 'text')
+      : [{ type: 'text', text: DEFAULT_TOGGLE_SUMMARY }];
+    const body = titled ? blocks.slice(1) : blocks;
+    const summaryEnd =
+      range.start + 2 + summary.reduce((n: number, s: any) => n + s.text.length, 0);
+
+    editor
+      .chain()
+      .focus()
+      .insertContentAt(
+        { from: range.start, to: range.end },
+        {
+          type: 'details',
+          attrs: { open: true },
+          content: [
+            { type: 'detailsSummary', content: summary },
+            { type: 'detailsContent', content: body.length ? body : [{ type: 'paragraph' }] },
+          ],
+        },
+      )
+      .run();
+
+    // The node view reveals its body on a timeout, and the Details plugin pushes
+    // a caret out of hidden content, so the caret has to land after that.
+    setTimeout(() => {
+      if (editor.isDestroyed) return;
+      editor
+        .chain()
+        .focus()
+        .setTextSelection(
+          titled ? summaryEnd + 3 : { from: range.start + 2, to: summaryEnd },
+        )
+        .run();
+    });
   }
 
   insertTable(editor: Editor) {

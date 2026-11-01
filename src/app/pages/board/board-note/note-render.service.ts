@@ -14,7 +14,7 @@ import { FontFamily } from '@tiptap/extension-font-family';
 import Color from '@tiptap/extension-color';
 import DOMPurify from 'dompurify';
 import { getDoc } from '../../../helpers/rich-text.util';
-import { BoardLink } from '../board-item/tiptap.extension';
+import { BoardLink, NoteToggle } from '../board-item/tiptap.extension';
 import { HighlightedCodeBlock, lowlight } from '../board-item/tiptap.service';
 
 /**
@@ -48,6 +48,7 @@ export class NoteRenderService {
     TableCell,
     TextAlign.configure({ types: ['heading', 'paragraph'] }),
     BoardLink,
+    ...NoteToggle,
   ];
 
   // Schema + serializer are built ONCE. generateHTML() would rebuild the whole
@@ -193,8 +194,9 @@ export class NoteRenderService {
         'code', 'pre', 'blockquote', 'ul', 'ol', 'li',
         'table', 'thead', 'tbody', 'tr', 'th', 'td',
         'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'a',
+        'details', 'summary', 'div',
       ],
-      ALLOWED_ATTR: ['style', 'href', 'class', 'data-board-link', 'data-font-size', 'colspan', 'rowspan'],
+      ALLOWED_ATTR: ['style', 'href', 'class', 'data-board-link', 'data-font-size', 'data-type', 'colspan', 'rowspan', 'open'],
       ALLOWED_URI_REGEXP: /^https?:\/\//i,
     });
   }
