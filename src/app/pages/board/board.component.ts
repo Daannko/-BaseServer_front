@@ -36,7 +36,8 @@ import { BoardSectionComponent } from './board-section/board-section.component';
 import { BoardSection } from './board-section/board-section.data';
 import { BoardImageComponent } from './board-image/board-image.component';
 import { BoardImage } from './board-image/board-image.data';
-import { extractPlainText } from '../../helpers/rich-text.util';
+import { docToPlainText, extractPlainText } from '../../helpers/rich-text.util';
+import { readBoardItems, readingOrder, writeBoardItems } from './board-clipboard';
 import {
   BoardDrawing,
   DrawPoint,
@@ -461,25 +462,49 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   // ── Copy / paste of board elements ─────────────────────────────────────────
+  // Through the system clipboard: board data for pasting onto any board (other
+  // tab, after a reload), plus plain and formatted text for other apps.
 
-  /** Buffer of elements captured on Ctrl+C. Cloned (not referenced) on paste. */
-  private clipboard: BoardItem[] = [];
-
-  /** Ctrl+C — snapshot the current selection into the clipboard. */
-  copySelection(): void {
-    const items = this.selection.items;
+  /** Ctrl+C with elements selected and no highlighted text. */
+  @HostListener('window:copy', ['$event'])
+  onCopy(event: ClipboardEvent): void {
+    const data = event.clipboardData;
+    if (event.defaultPrevented || !data) return;
+    // Highlighted text (in a note, a field, the page) copies as text.
+    if (isFormFieldFocused() || hasActiveTextSelection()) return;
+    const items = readingOrder(this.selection.items);
     if (!items.length) return;
-    this.clipboard = items.slice();
+    event.preventDefault();
+
+    writeBoardItems(data, items.map((i) => i.toSnapshot()));
+    const text: string[] = [];
+    const html: string[] = [];
+    for (const item of items) {
+      if (item instanceof BoardNote) {
+        text.push(docToPlainText(item.content));
+        html.push(`<div>${this.noteRender.clipboardHtml(item.content)}</div>`);
+      } else if (item instanceof BoardSection) {
+        const title = extractPlainText(item.name);
+        text.push(title);
+        html.push(`<h3>${escapeHtml(title)}</h3>`);
+      }
+      // Images and drawings have no text; they paste back onto boards only.
+    }
+    const plain = text.filter((t) => t.trim()).join('\n\n');
+    if (plain) {
+      data.setData('text/plain', plain);
+      data.setData('text/html', html.join('<br>'));
+    }
   }
 
-  /** Ctrl+V — clone the buffered elements onto the board centered on the mouse
-   *  (relative layout preserved), and select the freshly pasted copies. */
-  pasteClipboard(): void {
-    if (!this.selectedBoard || !this.clipboard.length) return;
+  /** Clone pasted elements onto the board centered on the mouse (relative
+   *  layout preserved), and select the freshly pasted copies. */
+  private pasteItems(snaps: BoardItemSnapshot[]): void {
+    if (!this.selectedBoard) return;
 
-    // Bounding-box center of the buffered group, in world units.
+    // Bounding-box center of the pasted group, in world units.
     let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-    for (const s of this.clipboard) {
+    for (const s of snaps) {
       minX = Math.min(minX, s.x);
       minY = Math.min(minY, s.y);
       maxX = Math.max(maxX, s.x + s.width);
@@ -505,28 +530,22 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     const dy = target.y - groupCy;
 
     const pasted: BoardItem[] = [];
-    for (const src of this.clipboard) {
-      let copy: BoardItem | null = null;
-      if (src instanceof BoardNote) {
-        copy = src.clone(dx, dy);
-        this.notes.push(copy as BoardNote);
-        this.notesMap.set(copy.id, copy);
-        this.bringToFront(copy);
-      } else if (src instanceof BoardSection) {
-        copy = src.clone(dx, dy);
-        this.sections.push(copy as BoardSection);
-        this.restackSections();
-      } else if (src instanceof BoardImage) {
-        copy = src.clone(dx, dy);
-        this.images.push(copy as BoardImage);
-        this.bringToFront(copy);
-      } else if (src instanceof BoardDrawing) {
-        copy = src.clone(dx, dy);
-        this.drawings.push(copy as BoardDrawing);
-        this.bringToFront(copy);
-      }
-      if (copy) pasted.push(copy);
+    for (const s of snaps) {
+      // A new element: fresh id, no server copy yet, so the next save creates it.
+      const copy = this.itemFromSnapshot({
+        ...structuredClone(s),
+        id: globalThis.crypto.randomUUID(),
+        serverId: undefined,
+        x: s.x + dx,
+        y: s.y + dy,
+        syncState: 'local',
+      });
+      if (!copy) continue;
+      this.addRecreated(copy);
+      if (!(copy instanceof BoardSection)) this.bringToFront(copy);
+      pasted.push(copy);
     }
+    if (pasted.some((i) => i instanceof BoardSection)) this.restackSections();
 
     if (!pasted.length) return;
     // One history entry for the whole paste, so a single Ctrl+Z removes them all.
@@ -1031,27 +1050,7 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
       event.preventDefault();
       this.history.redo();
     }
-    // Copy / paste selected elements. While a text editor is focused, let the
-    // browser handle Ctrl+C/V for the text itself.
-    if (mod && (event.key === 'c' || event.key === 'C')) {
-      // Only defer to the browser when there's actual highlighted text to copy.
-      // A selected note keeps a *collapsed* caret in its contentEditable body,
-      // which made isTextEditingActive() true and silently swallowed Ctrl+C —
-      // so the element never reached the clipboard until you blurred the editor.
-      if (isTextEditingActive() && hasActiveTextSelection()) return;
-      this.copySelection();
-      return;
-    }
-    if (mod && (event.key === 'v' || event.key === 'V')) {
-      if (isTextEditingActive()) return;
-      // Only intercept when we have board elements buffered; otherwise fall
-      // through so the window:paste handler can still paste images.
-      if (this.clipboard.length) {
-        event.preventDefault();
-        this.pasteClipboard();
-      }
-      return;
-    }
+    // Ctrl+C / Ctrl+V go to the window copy / paste handlers (onCopy, onPaste).
     // Delete key — delete selected elements
     if (event.key === 'Delete' || event.key === 'Del') {
       if (isTextEditingActive()) return;
@@ -1439,11 +1438,19 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.history.pushDelete([item.id]);
   }
 
-  // ── Paste image (Ctrl+V) ──────────────────────────────────────────────────
+  // ── Paste elements or an image (Ctrl+V) ──────────────────────────────────────────────────
 
   @HostListener('window:paste', ['$event'])
   onPaste(event: ClipboardEvent): void {
     if (!this.selectedBoard) return;
+    // Copied board elements. In a text field or note editor the formatted text
+    // copy is pasted there instead.
+    const snaps = readBoardItems(event.clipboardData);
+    if (snaps && !isTextEditingActive()) {
+      event.preventDefault();
+      this.pasteItems(snaps);
+      return;
+    }
     const items = event.clipboardData?.items;
     if (!items) return;
 
@@ -4007,6 +4014,15 @@ function isTextEditingActive(): boolean {
  *  user has actually highlighted text (so Ctrl+C should copy that text, not the
  *  selected board element). A bare caret in a note's editor is collapsed and
  *  returns false. */
+function isFormFieldFocused(): boolean {
+  const tag = document.activeElement?.tagName;
+  return tag === 'INPUT' || tag === 'TEXTAREA';
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
 function hasActiveTextSelection(): boolean {
   const sel = window.getSelection();
   return !!sel && !sel.isCollapsed && sel.toString().length > 0;

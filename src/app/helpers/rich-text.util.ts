@@ -99,3 +99,50 @@ export function getDoc(value?: unknown): JSONContent {
 
   return emptyDoc();
 }
+
+/** Readable plain text of a note, for pasting into other apps: one line per
+ *  paragraph, "- " / "1. " list items, tab-separated table cells. */
+export function docToPlainText(doc: JSONContent | undefined): string {
+  return blockLines(doc ?? {}, '').join('\n').trimEnd();
+}
+
+function inlineText(node: JSONContent): string {
+  if (node.type === 'text') return node.text ?? '';
+  if (node.type === 'hardBreak') return '\n';
+  return (node.content ?? []).map(inlineText).join('');
+}
+
+function blockLines(node: JSONContent, indent: string): string[] {
+  const kids = node.content ?? [];
+  switch (node.type) {
+    case 'paragraph':
+    case 'heading':
+    case 'detailsSummary':
+    case 'codeBlock':
+      return inlineText(node).split('\n').map((line) => indent + line);
+    case 'bulletList':
+    case 'orderedList':
+      return kids.flatMap((item, i) => {
+        const mark =
+          node.type === 'orderedList' ? `${(node.attrs?.['start'] ?? 1) + i}. ` : '- ';
+        const lines = (item.content ?? []).flatMap((c) => blockLines(c, indent + '  '));
+        if (lines.length) lines[0] = indent + mark + lines[0].slice(indent.length + 2);
+        return lines;
+      });
+    case 'table':
+      return kids.map(
+        (row) =>
+          indent +
+          (row.content ?? [])
+            .map((cell) => (cell.content ?? []).flatMap((c) => blockLines(c, '')).join(' '))
+            .join('\t'),
+      );
+    case 'blockquote':
+      return kids.flatMap((c) => blockLines(c, indent + '> '));
+    case 'horizontalRule':
+      return [indent + '---'];
+    default:
+      // doc, details, detailsContent: hidden text is copied as shown open.
+      return kids.flatMap((c) => blockLines(c, indent));
+  }
+}

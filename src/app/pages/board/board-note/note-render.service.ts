@@ -87,6 +87,27 @@ export class NoteRenderService {
     return safe;
   }
 
+  /** HTML of a note for pasting into other apps (Word, mail). Most of them
+   *  don't show <details>, so toggles become plain blocks, shown open. */
+  clipboardHtml(content: unknown): string {
+    let html = '';
+    try {
+      html = this.toHtml(getDoc(content));
+    } catch {
+      return '';
+    }
+    const doc = new DOMParser().parseFromString(`<body>${this.sanitize(html)}</body>`, 'text/html');
+    doc.querySelectorAll('summary').forEach((el) => {
+      const p = doc.createElement('p');
+      p.innerHTML = el.innerHTML;
+      el.replaceWith(p);
+    });
+    doc
+      .querySelectorAll('details, [data-type="detailsContent"]')
+      .forEach((el) => el.replaceWith(...Array.from(el.childNodes)));
+    return doc.body.innerHTML;
+  }
+
   /** JSON doc → HTML string via the cached schema/serializer (what
    *  generateHTML() does internally, minus the per-call schema build). */
   private toHtml(doc: JSONContent): string {
