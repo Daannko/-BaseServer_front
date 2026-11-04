@@ -1644,8 +1644,8 @@ export class BoardComponent implements OnInit, AfterViewInit, OnDestroy {
         this.saveDots = (this.saveDots % 3) + 1;
         this.cdr.detectChanges();
       }, 400);
-    } else {
-      // Auto-hide success/failure after 2.5 s
+    } else if (s === 'saved') {
+      // Auto-hide success after 2.5 s; a failure stays until the next save.
       setTimeout(() => {
         if (this.saveStatus === s) this.saveStatus = 'idle';
         this.cdr.detectChanges();

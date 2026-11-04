@@ -43,6 +43,9 @@ export class HttpRequestInterceptor implements HttpInterceptor {
         if (
           error instanceof HttpErrorResponse &&
           !req.url.includes('auth/signin') &&
+          // A failed refresh must reach handle401Error's catchError. Queuing it
+          // behind itself (isRefreshing is set) would hang every request.
+          !req.url.includes('auth/refresh') &&
           (error.status === 401 || error.status === 462)
         ) {
           return this.handle401Error(req, next);
@@ -87,7 +90,7 @@ export class HttpRequestInterceptor implements HttpInterceptor {
         this.refreshDone$.next();
 
         if (error.status == '462' || error.status === 462) {
-          this.eventService.emit(new EventData('logout', null));
+          this.eventService.emit(new EventData('logout', { expired: true }));
         }
 
         return throwError(() => error);

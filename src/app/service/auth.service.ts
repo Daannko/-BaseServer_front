@@ -22,6 +22,7 @@ import { Router } from '@angular/router';
 import { SnackBarService } from './snackbar.service';
 import { response } from 'express';
 import { environment } from '../../environments/environment';
+import { BOARD_BACKUP_PREFIX } from '../pages/board/board-persistence.service';
 
 @Injectable({
   providedIn: 'root',
@@ -79,13 +80,26 @@ export class AuthService {
     });
   }
 
-  logout() {
+  /** `expired`: the session ran out rather than the user logging out. */
+  logout(expired = false) {
     window.sessionStorage.clear();
-    localStorage.clear();
+    // Keep board backups: they hold changes that never reached the server.
+    for (const key of Object.keys(localStorage)) {
+      if (!key.startsWith(BOARD_BACKUP_PREFIX)) localStorage.removeItem(key);
+    }
     this.firstLogin = false;
-    this.http.get<any>(this.apiUrl + 'logout').subscribe({
-      complete: () => this.router.navigate(['/auth']),
-    });
-    this.snackBar.success('Successfuly loged out');
+    // An expired session makes this call fail too: go to login either way.
+    this.http
+      .get<any>(this.apiUrl + 'logout')
+      .pipe(finalize(() => this.router.navigate(['/auth'])))
+      .subscribe({ error: () => {} });
+    if (expired) {
+      this.snackBar.error(
+        'Session expired. Log in again: unsaved board changes are kept in this browser.',
+        10000,
+      );
+    } else {
+      this.snackBar.success('Successfuly loged out');
+    }
   }
 }

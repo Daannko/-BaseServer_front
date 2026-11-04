@@ -33,8 +33,8 @@ export class AppComponent {
   eventSub?: Subscription;
 
   ngOnInit(): void {
-  this.eventSub = this.eventService.on('logout', () => {
-    this.logout();
+  this.eventSub = this.eventService.on('logout', (value: { expired?: boolean } | null) => {
+    this.authService.logout(!!value?.expired);
   });
 
   }

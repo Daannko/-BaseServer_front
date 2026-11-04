@@ -1124,8 +1124,8 @@
   >
     <span *ngIf="saveStatus === 'saving'">Saving{{ saveDotsText }}</span>
     <span *ngIf="saveStatus === 'saved'">Saved!</span>
-    <span *ngIf="saveStatus === 'partial'">Some items failed to save</span>
-    <span *ngIf="saveStatus === 'failed'">Failed to save</span>
+    <span *ngIf="saveStatus === 'partial'">Some items not saved, kept in this browser</span>
+    <span *ngIf="saveStatus === 'failed'">Not saved, kept in this browser</span>
   </div>
 
   <!-- Sync-status button + panel: what is in the DB vs. only local -->

@@ -2,6 +2,10 @@ import { Injectable } from '@angular/core';
 import type { BoardItemSnapshot } from './board-item/board-item.data';
 import { SecureStorageService } from '../../service/secure-storage.service';
 
+/** localStorage key prefix of the board backups. Logout keeps these keys, so
+ *  changes that failed to save are still offered after the next login. */
+export const BOARD_BACKUP_PREFIX = 'board_local_';
+
 /** What gets persisted locally for one board. */
 export interface PersistedBoard {
   savedAt: number;
@@ -27,7 +31,7 @@ export interface PersistedBoard {
  */
 @Injectable({ providedIn: 'root' })
 export class BoardPersistenceService {
-  private readonly PREFIX = 'board_local_';
+  private readonly PREFIX = BOARD_BACKUP_PREFIX;
   private pending: { boardId: string; items: BoardItemSnapshot[] } | null = null;
   private writing = false;
 
