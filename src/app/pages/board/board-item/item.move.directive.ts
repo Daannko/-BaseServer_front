@@ -69,6 +69,7 @@ export class ItemMoveDirective implements OnInit, OnDestroy {
 
         let dragging = false;
         this.didDrag = false;
+        let restoreSelect: (() => void) | null = null;
 
         // Keep receiving pointer events even if leaving the element.
         try {
@@ -89,6 +90,7 @@ export class ItemMoveDirective implements OnInit, OnDestroy {
             }
             dragging = true;
             this.didDrag = true;
+            restoreSelect = suppressTextSelection(host);
           }
 
           moveEv.preventDefault();
@@ -138,6 +140,7 @@ export class ItemMoveDirective implements OnInit, OnDestroy {
 
           window.removeEventListener('pointermove', onMove);
           window.removeEventListener('pointerup', onUp);
+          restoreSelect?.();
 
           this.zone.run(() => this.moveEnd.emit());
 
@@ -171,4 +174,21 @@ export class ItemMoveDirective implements OnInit, OnDestroy {
       );
     });
   }
+}
+
+/** The pointerdown is not cancelled (other notes need its mousedown), so the
+ *  browser starts a text selection and drags it across every note the pointer
+ *  passes. Drop it and block new ones for the rest of the drag. A selection
+ *  inside the moved item itself (an edited note) is left alone. */
+function suppressTextSelection(host: HTMLElement): () => void {
+  const sel = window.getSelection();
+  if (sel && sel.rangeCount && !host.contains(sel.anchorNode)) {
+    sel.removeAllRanges();
+  }
+  const body = document.body.style;
+  const prev = body.userSelect;
+  body.userSelect = 'none';
+  return () => {
+    body.userSelect = prev;
+  };
 }
